@@ -82,7 +82,7 @@ fun AttendancePieChart(
             val startRadius = radius - indicatorLength / 2
             val endRadius = radius + indicatorLength / 2
             
-            val radians = Math.toRadians(requiredAngle.toDouble())
+            val radians = requiredAngle * kotlin.math.PI / 180.0
             val startX = centerX + (startRadius * kotlin.math.cos(radians)).toFloat()
             val startY = centerY + (startRadius * kotlin.math.sin(radians)).toFloat()
             val endX = centerX + (endRadius * kotlin.math.cos(radians)).toFloat()
