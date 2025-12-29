@@ -85,7 +85,10 @@ fun CalendarView(
         // Calendar Grid
         val firstDayOfMonth = selectedMonth.atDay(1)
         val lastDayOfMonth = selectedMonth.atEndOfMonth()
-        val startOffset = (firstDayOfMonth.dayOfWeek.value % 7) // Sunday = 0
+        // DayOfWeek.value: Monday=1, Tuesday=2, ..., Sunday=7
+        // For Sunday-first calendar: Sunday=0, Monday=1, ..., Saturday=6
+        val startOffset = if (firstDayOfMonth.dayOfWeek == DayOfWeek.SUNDAY) 0 
+                          else firstDayOfMonth.dayOfWeek.value
         val daysInMonth = lastDayOfMonth.dayOfMonth
 
         val calendarDays = buildList {

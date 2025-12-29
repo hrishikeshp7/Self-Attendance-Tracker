@@ -8,6 +8,7 @@ import com.attendance.tracker.data.model.AttendanceStatus
 import com.attendance.tracker.data.model.ScheduleEntry
 import com.attendance.tracker.data.model.Subject
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import java.time.DayOfWeek
 import java.time.LocalDate
 
@@ -102,11 +103,7 @@ class AttendanceRepository(
         scheduleDao.deleteScheduleForSubject(subjectId)
 
     suspend fun toggleScheduleEntry(subjectId: Long, dayOfWeek: DayOfWeek) {
-        val existingEntries = mutableListOf<ScheduleEntry>()
-        scheduleDao.getScheduleForSubject(subjectId).collect { entries ->
-            existingEntries.clear()
-            existingEntries.addAll(entries)
-        }
+        val existingEntries = scheduleDao.getScheduleForSubject(subjectId).first()
         
         val existing = existingEntries.find { it.dayOfWeek == dayOfWeek }
         if (existing != null) {
