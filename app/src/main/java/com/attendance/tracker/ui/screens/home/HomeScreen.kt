@@ -13,6 +13,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.attendance.tracker.data.model.AttendanceStatus
 import com.attendance.tracker.data.model.Subject
+import com.attendance.tracker.ui.components.GitHubFooter
 import com.attendance.tracker.ui.components.SubjectCard
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -69,7 +70,9 @@ fun HomeScreen(
             if (subjects.isEmpty()) {
                 // Empty State
                 Box(
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth(),
                     contentAlignment = Alignment.Center
                 ) {
                     Column(
@@ -93,7 +96,9 @@ fun HomeScreen(
             } else {
                 // Subject List
                 LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth(),
                     contentPadding = PaddingValues(bottom = 88.dp)
                 ) {
                     items(subjects, key = { it.id }) { subject ->
@@ -108,6 +113,9 @@ fun HomeScreen(
                     }
                 }
             }
+            
+            // GitHub Footer
+            GitHubFooter()
         }
     }
 }

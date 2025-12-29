@@ -2,16 +2,24 @@
 
 An Android application for tracking and managing class attendance. Built with Kotlin, Jetpack Compose, and Room Database.
 
+[![Build and Release APK](https://github.com/hrishikeshp7/web-sf-hf/actions/workflows/build-release.yml/badge.svg)](https://github.com/hrishikeshp7/web-sf-hf/actions/workflows/build-release.yml)
+
 ## Features
 
 ### 📱 Home Screen
 - View all subjects with their attendance statistics
+- **Visual pie chart** showing attendance percentage at a glance
 - Mark attendance for each subject with three options:
   - **Present** - Mark as attended
   - **Absent** - Mark as missed
   - **No Class** - Mark as no class scheduled
 - Real-time attendance percentage calculation
 - Visual indicators for attendance status (green for above required, red for below)
+
+### 🌙 Dark Mode Support
+- Automatic dark mode based on system settings
+- Beautiful Material 3 theming in both light and dark modes
+- Dynamic colors on Android 12+ devices
 
 ### 📅 Calendar View
 - Monthly calendar with attendance history
@@ -46,7 +54,7 @@ An Android application for tracking and managing class attendance. Built with Ko
 - **Architecture**: MVVM (Model-View-ViewModel)
 - **Navigation**: Jetpack Navigation Compose
 - **Minimum SDK**: 26 (Android 8.0)
-- **Target SDK**: 34 (Android 14)
+- **Target SDK**: 36 (Android 16)
 
 ## Project Structure
 
@@ -88,9 +96,9 @@ app/src/main/java/com/attendance/tracker/
 ## Building the Project
 
 ### Prerequisites
-- Android Studio Arctic Fox or newer
+- Android Studio Hedgehog or newer
 - JDK 17
-- Android SDK 34
+- Android SDK 36
 
 ### Build Steps
 
@@ -141,6 +149,19 @@ Or use Android Studio's Run button.
 ### Editing Subject Settings
 1. Navigate to the "Subjects" tab to edit subject details
 2. Or use the "Settings" tab to adjust only the required attendance percentage
+
+## Download
+
+You can download the latest APK from the [Releases page](https://github.com/hrishikeshp7/web-sf-hf/releases).
+
+### Automated Releases
+APK releases are automatically created:
+- When a pull request is merged to main
+- Via manual workflow dispatch from the Actions tab
+
+## Author
+
+Made with ❤️ by [hrishikeshp7](https://github.com/hrishikeshp7)
 
 ## License
 

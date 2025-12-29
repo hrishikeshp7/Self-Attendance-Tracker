@@ -34,22 +34,35 @@ fun SubjectCard(
                 .fillMaxWidth()
                 .padding(16.dp)
         ) {
-            // Subject Name and Edit Button Row
+            // Subject Name, Edit Button, and Pie Chart Row
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = subject.name,
-                    style = MaterialTheme.typography.titleLarge
-                )
-                TextButton(onClick = onEditClick) {
-                    Text("Edit")
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = subject.name,
+                        style = MaterialTheme.typography.titleLarge
+                    )
+                    TextButton(
+                        onClick = onEditClick,
+                        contentPadding = PaddingValues(0.dp)
+                    ) {
+                        Text("Edit")
+                    }
                 }
+                
+                // Pie Chart for attendance visualization
+                AttendancePieChart(
+                    percentage = subject.currentAttendancePercentage,
+                    requiredPercentage = subject.requiredAttendance,
+                    size = 70.dp,
+                    strokeWidth = 8.dp
+                )
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
             // Attendance Statistics
             Row(
@@ -75,12 +88,12 @@ fun SubjectCard(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Attendance Percentage
+            // Attendance Percentage Text
             val attendanceColor = if (subject.isAboveRequired) PresentGreen else AbsentRed
             Text(
-                text = "Attendance: ${"%.1f".format(subject.currentAttendancePercentage)}% (Required: ${subject.requiredAttendance}%)",
-                style = MaterialTheme.typography.bodyMedium,
-                color = attendanceColor,
+                text = "Required: ${subject.requiredAttendance}%",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.fillMaxWidth(),
                 textAlign = TextAlign.Center
             )
