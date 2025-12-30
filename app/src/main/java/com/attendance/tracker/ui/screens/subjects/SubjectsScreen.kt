@@ -22,7 +22,7 @@ import com.attendance.tracker.ui.theme.PresentGreen
 @Composable
 fun SubjectsScreen(
     subjects: List<Subject>,
-    onAddSubject: (String, Int) -> Unit,
+    onAddSubject: (String, Int, Long?) -> Unit,
     onAddFolder: (String) -> Unit,
     onUpdateSubject: (Subject) -> Unit,
     onDeleteSubject: (Subject) -> Unit,
@@ -32,6 +32,14 @@ fun SubjectsScreen(
     var showAddDialog by remember { mutableStateOf(false) }
     var showEditDialog by remember { mutableStateOf(false) }
     var selectedSubject by remember { mutableStateOf<Subject?>(null) }
+    var selectedFolder by remember { mutableStateOf<Subject?>(null) }
+    
+    // Separate folders and non-folder top-level subjects
+    val folders = subjects.filter { it.isFolder && it.parentSubjectId == null }
+    val topLevelSubjects = subjects.filter { !it.isFolder && it.parentSubjectId == null }
+    
+    // Tab state
+    var selectedTabIndex by remember { mutableStateOf(0) }
 
     Scaffold(
         topBar = {
@@ -45,7 +53,14 @@ fun SubjectsScreen(
         },
         floatingActionButton = {
             FloatingActionButton(
-                onClick = { showAddDialog = true },
+                onClick = { 
+                    selectedFolder = if (selectedTabIndex > 0 && selectedTabIndex <= folders.size) {
+                        folders[selectedTabIndex - 1]
+                    } else {
+                        null
+                    }
+                    showAddDialog = true 
+                },
                 containerColor = MaterialTheme.colorScheme.primary
             ) {
                 Icon(Icons.Default.Add, contentDescription = "Add Subject")
@@ -53,42 +68,93 @@ fun SubjectsScreen(
         },
         modifier = modifier
     ) { paddingValues ->
-        if (subjects.isEmpty()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(paddingValues),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(
-                        text = "No subjects added yet",
-                        style = MaterialTheme.typography.titleLarge
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+        ) {
+            // Tabs for folders
+            if (folders.isNotEmpty()) {
+                ScrollableTabRow(
+                    selectedTabIndex = selectedTabIndex,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Tab(
+                        selected = selectedTabIndex == 0,
+                        onClick = { selectedTabIndex = 0 },
+                        text = { Text("All") }
                     )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = "Tap + to add a subject",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    folders.forEachIndexed { index, folder ->
+                        Tab(
+                            selected = selectedTabIndex == index + 1,
+                            onClick = { selectedTabIndex = index + 1 },
+                            text = { Text(folder.name) }
+                        )
+                    }
                 }
             }
-        } else {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(paddingValues),
-                contentPadding = PaddingValues(16.dp)
-            ) {
-                items(subjects, key = { it.id }) { subject ->
-                    SubjectListItem(
-                        subject = subject,
-                        onEditClick = {
-                            selectedSubject = subject
-                            showEditDialog = true
-                        },
-                        onDeleteClick = { onDeleteSubject(subject) }
-                    )
+            
+            // Content based on selected tab
+            val displaySubjects = when {
+                selectedTabIndex == 0 -> topLevelSubjects
+                selectedTabIndex <= folders.size -> {
+                    val folder = folders[selectedTabIndex - 1]
+                    subjects.filter { it.parentSubjectId == folder.id }
+                }
+                else -> topLevelSubjects
+            }
+            
+            if (displaySubjects.isEmpty() && subjects.isEmpty()) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            text = "No subjects added yet",
+                            style = MaterialTheme.typography.titleLarge
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "Tap + to add a subject",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            } else if (displaySubjects.isEmpty()) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            text = "No subjects in this folder",
+                            style = MaterialTheme.typography.titleLarge
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "Tap + to add a subject to this folder",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(16.dp)
+                ) {
+                    items(displaySubjects, key = { it.id }) { subject ->
+                        SubjectListItem(
+                            subject = subject,
+                            onEditClick = {
+                                selectedSubject = subject
+                                showEditDialog = true
+                            },
+                            onDeleteClick = { onDeleteSubject(subject) }
+                        )
+                    }
                 }
             }
         }
@@ -97,14 +163,21 @@ fun SubjectsScreen(
     // Add Subject Dialog
     if (showAddDialog) {
         AddSubjectDialog(
-            onDismiss = { showAddDialog = false },
-            onConfirm = { name, required ->
-                onAddSubject(name, required)
+            folders = folders,
+            selectedFolder = selectedFolder,
+            onDismiss = { 
                 showAddDialog = false
+                selectedFolder = null
+            },
+            onConfirm = { name, required, parentId ->
+                onAddSubject(name, required, parentId)
+                showAddDialog = false
+                selectedFolder = null
             },
             onConfirmFolder = { name ->
                 onAddFolder(name)
                 showAddDialog = false
+                selectedFolder = null
             }
         )
     }
@@ -211,8 +284,10 @@ private fun SubjectListItem(
 
 @Composable
 private fun AddSubjectDialog(
+    folders: List<Subject>,
+    selectedFolder: Subject?,
     onDismiss: () -> Unit,
-    onConfirm: (String, Int) -> Unit,
+    onConfirm: (String, Int, Long?) -> Unit,
     onConfirmFolder: (String) -> Unit
 ) {
     var name by remember { mutableStateOf("") }
@@ -221,21 +296,29 @@ private fun AddSubjectDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(if (isFolder) "Add Folder" else "Add Subject") },
+        title = { 
+            Text(
+                if (isFolder) "Add Folder" 
+                else if (selectedFolder != null) "Add Subject to ${selectedFolder.name}"
+                else "Add Subject"
+            ) 
+        },
         text = {
             Column {
-                // Folder/Subject toggle
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("Create as folder", modifier = Modifier.weight(1f))
-                    Switch(
-                        checked = isFolder,
-                        onCheckedChange = { isFolder = it }
-                    )
+                // Only show folder toggle if not adding to a folder
+                if (selectedFolder == null) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("Create as folder", modifier = Modifier.weight(1f))
+                        Switch(
+                            checked = isFolder,
+                            onCheckedChange = { isFolder = it }
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(16.dp))
                 }
-                Spacer(modifier = Modifier.height(16.dp))
                 
                 OutlinedTextField(
                     value = name,
@@ -266,7 +349,7 @@ private fun AddSubjectDialog(
                             onConfirmFolder(name.trim())
                         } else {
                             val required = requiredAttendance.toIntOrNull() ?: 75
-                            onConfirm(name.trim(), required.coerceIn(0, 100))
+                            onConfirm(name.trim(), required.coerceIn(0, 100), selectedFolder?.id)
                         }
                     }
                 },

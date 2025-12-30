@@ -148,8 +148,12 @@ fun AttendanceApp(
             composable(Screen.Subjects.route) {
                 SubjectsScreen(
                     subjects = allSubjectsIncludingFolders,
-                    onAddSubject = { name, required ->
-                        viewModel.addSubject(name, required)
+                    onAddSubject = { name, required, parentId ->
+                        if (parentId != null) {
+                            viewModel.addSubSubject(name, parentId, required)
+                        } else {
+                            viewModel.addSubject(name, required)
+                        }
                     },
                     onAddFolder = { name ->
                         viewModel.addSubjectFolder(name)
