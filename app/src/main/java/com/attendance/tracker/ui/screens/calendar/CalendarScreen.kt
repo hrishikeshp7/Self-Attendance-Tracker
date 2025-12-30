@@ -59,7 +59,7 @@ fun CalendarScreen(
                 onMonthChanged = onMonthChanged
             )
 
-            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+            Divider(modifier = Modifier.padding(vertical = 8.dp))
 
             // Selected Date Attendance Details
             Text(
