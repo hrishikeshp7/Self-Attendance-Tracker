@@ -27,7 +27,6 @@ fun CalendarScreen(
     selectedDate: LocalDate,
     attendanceRecords: List<AttendanceRecord>,
     subjects: List<Subject>,
-    todayAttendance: Map<Long, AttendanceStatus>,
     onDateSelected: (LocalDate) -> Unit,
     onMonthChanged: (YearMonth) -> Unit,
     onMarkAttendance: (Long, AttendanceStatus, LocalDate) -> Unit,

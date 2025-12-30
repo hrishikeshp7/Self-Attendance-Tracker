@@ -47,7 +47,6 @@ fun AttendanceApp(
     
     // Collect state from ViewModel
     val subjects by viewModel.subjects.collectAsState()
-    val topLevelSubjects by viewModel.topLevelSubjects.collectAsState()
     val scheduleEntries by viewModel.scheduleEntries.collectAsState()
     val selectedDate by viewModel.selectedDate.collectAsState()
     val selectedMonth by viewModel.selectedMonth.collectAsState()
@@ -133,7 +132,6 @@ fun AttendanceApp(
                     selectedDate = selectedDate,
                     attendanceRecords = attendanceRecords,
                     subjects = subjects,
-                    todayAttendance = todayAttendance,
                     onDateSelected = { date ->
                         viewModel.setSelectedDate(date)
                     },
@@ -154,9 +152,6 @@ fun AttendanceApp(
                     },
                     onAddFolder = { name ->
                         viewModel.addSubjectFolder(name)
-                    },
-                    onAddSubSubject = { name, parentId, required ->
-                        viewModel.addSubSubject(name, parentId, required)
                     },
                     onUpdateSubject = { subject ->
                         viewModel.updateSubject(subject)
