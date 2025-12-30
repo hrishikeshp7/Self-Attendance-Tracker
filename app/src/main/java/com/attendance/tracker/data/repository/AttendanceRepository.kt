@@ -81,6 +81,10 @@ class AttendanceRepository(
     fun getAttendanceInRange(startDate: LocalDate, endDate: LocalDate): Flow<List<AttendanceRecord>> =
         attendanceDao.getAttendanceInRange(startDate, endDate)
 
+    suspend fun deleteAttendanceRecord(subjectId: Long, date: LocalDate) {
+        attendanceDao.deleteAttendanceForSubjectOnDate(subjectId, date)
+    }
+
     // Schedule operations
     val allScheduleEntries: Flow<List<ScheduleEntry>> = scheduleDao.getAllScheduleEntries()
 

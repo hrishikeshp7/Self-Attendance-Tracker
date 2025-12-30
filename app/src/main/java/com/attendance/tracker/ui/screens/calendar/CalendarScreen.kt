@@ -15,6 +15,7 @@ import com.attendance.tracker.ui.components.CalendarView
 import com.attendance.tracker.ui.theme.AbsentRed
 import com.attendance.tracker.ui.theme.NoClassGray
 import com.attendance.tracker.ui.theme.PresentGreen
+import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
@@ -29,9 +30,27 @@ fun CalendarScreen(
     todayAttendance: Map<Long, AttendanceStatus>,
     onDateSelected: (LocalDate) -> Unit,
     onMonthChanged: (YearMonth) -> Unit,
+    onMarkAttendance: (Long, AttendanceStatus, LocalDate) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val dateFormatter = DateTimeFormatter.ofPattern("EEEE, MMMM d")
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+    
+    // Helper function to show snackbar with attendance status
+    val showAttendanceSnackbar: (String, AttendanceStatus) -> Unit = { subjectName, status ->
+        scope.launch {
+            val statusText = when (status) {
+                AttendanceStatus.PRESENT -> "Marked Present"
+                AttendanceStatus.ABSENT -> "Marked Absent"
+                AttendanceStatus.NO_CLASS -> "Marked No Class"
+            }
+            snackbarHostState.showSnackbar(
+                message = "$subjectName: $statusText",
+                duration = SnackbarDuration.Short
+            )
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -43,6 +62,7 @@ fun CalendarScreen(
                 )
             )
         },
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         modifier = modifier
     ) { paddingValues ->
         Column(
@@ -70,7 +90,7 @@ fun CalendarScreen(
 
             val selectedDateRecords = attendanceRecords.filter { it.date == selectedDate }
             
-            if (selectedDateRecords.isEmpty()) {
+            if (subjects.isEmpty()) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -78,7 +98,7 @@ fun CalendarScreen(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = "No attendance recorded for this day",
+                        text = "No subjects added yet",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -88,18 +108,103 @@ fun CalendarScreen(
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(16.dp)
                 ) {
-                    items(selectedDateRecords) { record ->
-                        val subject = subjects.find { it.id == record.subjectId }
-                        if (subject != null) {
-                            AttendanceRecordItem(
-                                subjectName = subject.name,
-                                status = record.status
-                            )
-                        }
+                    items(subjects, key = { it.id }) { subject ->
+                        val record = selectedDateRecords.find { it.subjectId == subject.id }
+                        CalendarAttendanceItem(
+                            subject = subject,
+                            currentStatus = record?.status,
+                            onMarkPresent = { 
+                                onMarkAttendance(subject.id, AttendanceStatus.PRESENT, selectedDate)
+                                showAttendanceSnackbar(subject.name, AttendanceStatus.PRESENT)
+                            },
+                            onMarkAbsent = { 
+                                onMarkAttendance(subject.id, AttendanceStatus.ABSENT, selectedDate)
+                                showAttendanceSnackbar(subject.name, AttendanceStatus.ABSENT)
+                            },
+                            onMarkNoClass = { 
+                                onMarkAttendance(subject.id, AttendanceStatus.NO_CLASS, selectedDate)
+                                showAttendanceSnackbar(subject.name, AttendanceStatus.NO_CLASS)
+                            }
+                        )
                     }
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun CalendarAttendanceItem(
+    subject: Subject,
+    currentStatus: AttendanceStatus?,
+    onMarkPresent: () -> Unit,
+    onMarkAbsent: () -> Unit,
+    onMarkNoClass: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+        ) {
+            Text(
+                text = subject.name,
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+            
+            // Attendance Action Buttons
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                CalendarAttendanceButton(
+                    text = "Present",
+                    isSelected = currentStatus == AttendanceStatus.PRESENT,
+                    color = PresentGreen,
+                    onClick = onMarkPresent
+                )
+                CalendarAttendanceButton(
+                    text = "Absent",
+                    isSelected = currentStatus == AttendanceStatus.ABSENT,
+                    color = AbsentRed,
+                    onClick = onMarkAbsent
+                )
+                CalendarAttendanceButton(
+                    text = "No Class",
+                    isSelected = currentStatus == AttendanceStatus.NO_CLASS,
+                    color = NoClassGray,
+                    onClick = onMarkNoClass
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun CalendarAttendanceButton(
+    text: String,
+    isSelected: Boolean,
+    color: androidx.compose.ui.graphics.Color,
+    onClick: () -> Unit
+) {
+    Button(
+        onClick = onClick,
+        colors = ButtonDefaults.buttonColors(
+            containerColor = if (isSelected) color else color.copy(alpha = 0.3f),
+            contentColor = if (isSelected) MaterialTheme.colorScheme.onPrimary else color
+        ),
+        modifier = Modifier.width(100.dp)
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelMedium
+        )
     }
 }
 
