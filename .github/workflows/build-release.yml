@@ -53,6 +53,9 @@ jobs:
             -keypass android \
             -dname "CN=AttendanceTracker, OU=Development, O=AttendanceTracker, L=Unknown, ST=Unknown, C=US"
 
+      - name: Build Debug APK
+        run: ./gradlew assembleDebug
+
       - name: Build Release APK
         env:
           KEYSTORE_FILE: release.keystore
@@ -60,9 +63,6 @@ jobs:
           KEY_ALIAS: release
           KEY_PASSWORD: android
         run: ./gradlew assembleRelease
-
-      - name: Build Debug APK
-        run: ./gradlew assembleDebug
 
       - name: Get version info
         id: version
@@ -91,7 +91,6 @@ jobs:
           path: app/build/outputs/apk/debug/*.apk
 
       - name: Create Release
-        if: github.event_name == 'workflow_dispatch'
         uses: softprops/action-gh-release@v1
         with:
           tag_name: v${{ steps.version.outputs.version_name }}-${{ steps.version.outputs.date }}
