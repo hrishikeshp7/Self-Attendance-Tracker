@@ -224,7 +224,7 @@ private fun AddSubjectDialog(
                     Text("Create as folder", modifier = Modifier.weight(1f))
                     Switch(
                         checked = isFolder,
-                        onCheckedChanged = { isFolder = it }
+                        onCheckedChange = { isFolder = it }
                     )
                 }
                 Spacer(modifier = Modifier.height(16.dp))
