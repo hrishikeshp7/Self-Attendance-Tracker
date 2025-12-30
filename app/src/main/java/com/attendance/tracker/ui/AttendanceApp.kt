@@ -47,6 +47,7 @@ fun AttendanceApp(
     
     // Collect state from ViewModel
     val subjects by viewModel.subjects.collectAsState()
+    val allSubjectsIncludingFolders by viewModel.allSubjectsIncludingFolders.collectAsState()
     val scheduleEntries by viewModel.scheduleEntries.collectAsState()
     val selectedDate by viewModel.selectedDate.collectAsState()
     val selectedMonth by viewModel.selectedMonth.collectAsState()
@@ -146,7 +147,7 @@ fun AttendanceApp(
 
             composable(Screen.Subjects.route) {
                 SubjectsScreen(
-                    subjects = subjects,
+                    subjects = allSubjectsIncludingFolders,
                     onAddSubject = { name, required ->
                         viewModel.addSubject(name, required)
                     },

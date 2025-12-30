@@ -36,8 +36,9 @@ class AttendanceViewModel(application: Application) : AndroidViewModel(applicati
     val subjects: StateFlow<List<Subject>> = repository.actualSubjects
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     
-    val topLevelSubjects: StateFlow<List<Subject>> = repository.topLevelSubjects
+    val allSubjectsIncludingFolders: StateFlow<List<Subject>> = repository.topLevelSubjects
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
 
     val scheduleEntries: StateFlow<List<ScheduleEntry>> = repository.allScheduleEntries
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
