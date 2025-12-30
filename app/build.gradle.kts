@@ -21,6 +21,18 @@ android {
         }
     }
 
+    // Signing configuration for release builds
+    // Environment variables can be set to override default values
+    // For production apps, use secure credential management (e.g., GitHub Secrets)
+    signingConfigs {
+        create("release") {
+            storeFile = file(System.getenv("KEYSTORE_FILE") ?: "release.keystore")
+            storePassword = System.getenv("KEYSTORE_PASSWORD") ?: "android"
+            keyAlias = System.getenv("KEY_ALIAS") ?: "release"
+            keyPassword = System.getenv("KEY_PASSWORD") ?: "android"
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
@@ -28,6 +40,7 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            signingConfig = signingConfigs.getByName("release")
         }
     }
     compileOptions {
