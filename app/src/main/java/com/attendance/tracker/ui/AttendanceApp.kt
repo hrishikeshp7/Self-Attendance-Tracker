@@ -152,6 +152,12 @@ fun AttendanceApp(
                     onAddSubject = { name, required ->
                         viewModel.addSubject(name, required)
                     },
+                    onAddFolder = { name ->
+                        viewModel.addSubjectFolder(name)
+                    },
+                    onAddSubSubject = { name, parentId, required ->
+                        viewModel.addSubSubject(name, parentId, required)
+                    },
                     onUpdateSubject = { subject ->
                         viewModel.updateSubject(subject)
                     },

@@ -23,6 +23,8 @@ import com.attendance.tracker.ui.theme.PresentGreen
 fun SubjectsScreen(
     subjects: List<Subject>,
     onAddSubject: (String, Int) -> Unit,
+    onAddFolder: (String) -> Unit,
+    onAddSubSubject: (String, Long, Int) -> Unit,
     onUpdateSubject: (Subject) -> Unit,
     onDeleteSubject: (Subject) -> Unit,
     onUpdateAttendanceCounts: (Long, Int, Int) -> Unit,
@@ -31,6 +33,8 @@ fun SubjectsScreen(
     var showAddDialog by remember { mutableStateOf(false) }
     var showEditDialog by remember { mutableStateOf(false) }
     var selectedSubject by remember { mutableStateOf<Subject?>(null) }
+    var showAddSubjectToFolderDialog by remember { mutableStateOf(false) }
+    var selectedFolderId by remember { mutableStateOf<Long?>(null) }
 
     Scaffold(
         topBar = {
@@ -99,6 +103,10 @@ fun SubjectsScreen(
             onDismiss = { showAddDialog = false },
             onConfirm = { name, required ->
                 onAddSubject(name, required)
+                showAddDialog = false
+            },
+            onConfirmFolder = { name ->
+                onAddFolder(name)
                 showAddDialog = false
             }
         )
@@ -198,40 +206,62 @@ private fun SubjectListItem(
 @Composable
 private fun AddSubjectDialog(
     onDismiss: () -> Unit,
-    onConfirm: (String, Int) -> Unit
+    onConfirm: (String, Int) -> Unit,
+    onConfirmFolder: (String) -> Unit
 ) {
     var name by remember { mutableStateOf("") }
     var requiredAttendance by remember { mutableStateOf("75") }
+    var isFolder by remember { mutableStateOf(false) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Add Subject") },
+        title = { Text(if (isFolder) "Add Folder" else "Add Subject") },
         text = {
             Column {
+                // Folder/Subject toggle
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Create as folder", modifier = Modifier.weight(1f))
+                    Switch(
+                        checked = isFolder,
+                        onCheckedChanged = { isFolder = it }
+                    )
+                }
+                Spacer(modifier = Modifier.height(16.dp))
+                
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
-                    label = { Text("Subject Name") },
+                    label = { Text(if (isFolder) "Folder Name" else "Subject Name") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
-                Spacer(modifier = Modifier.height(16.dp))
-                OutlinedTextField(
-                    value = requiredAttendance,
-                    onValueChange = { requiredAttendance = it.filter { c -> c.isDigit() } },
-                    label = { Text("Required Attendance (%)") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
+                
+                if (!isFolder) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    OutlinedTextField(
+                        value = requiredAttendance,
+                        onValueChange = { requiredAttendance = it.filter { c -> c.isDigit() } },
+                        label = { Text("Required Attendance (%)") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
             }
         },
         confirmButton = {
             TextButton(
                 onClick = {
                     if (name.isNotBlank()) {
-                        val required = requiredAttendance.toIntOrNull() ?: 75
-                        onConfirm(name.trim(), required.coerceIn(0, 100))
+                        if (isFolder) {
+                            onConfirmFolder(name.trim())
+                        } else {
+                            val required = requiredAttendance.toIntOrNull() ?: 75
+                            onConfirm(name.trim(), required.coerceIn(0, 100))
+                        }
                     }
                 },
                 enabled = name.isNotBlank()
