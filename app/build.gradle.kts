@@ -21,6 +21,9 @@ android {
         }
     }
 
+    // Signing configuration for release builds
+    // Environment variables can be set to override default values
+    // For production apps, use secure credential management (e.g., GitHub Secrets)
     signingConfigs {
         create("release") {
             storeFile = file(System.getenv("KEYSTORE_FILE") ?: "release.keystore")

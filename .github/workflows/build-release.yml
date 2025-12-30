@@ -43,6 +43,9 @@ jobs:
 
       - name: Generate Release Keystore
         run: |
+          # Generate a keystore for signing the release APK
+          # Note: Using simple passwords for demo/open-source app
+          # For production apps, use GitHub Secrets for secure credential management
           keytool -genkeypair -v \
             -keystore app/release.keystore \
             -alias release \
