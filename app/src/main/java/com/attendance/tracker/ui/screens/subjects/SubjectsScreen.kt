@@ -33,8 +33,6 @@ fun SubjectsScreen(
     var showAddDialog by remember { mutableStateOf(false) }
     var showEditDialog by remember { mutableStateOf(false) }
     var selectedSubject by remember { mutableStateOf<Subject?>(null) }
-    var showAddSubjectToFolderDialog by remember { mutableStateOf(false) }
-    var selectedFolderId by remember { mutableStateOf<Long?>(null) }
 
     Scaffold(
         topBar = {

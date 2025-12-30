@@ -64,6 +64,5 @@ data class AttendanceAction(
     val oldStatus: AttendanceStatus?,  // null if no previous status
     val newStatus: AttendanceStatus,
     val oldPresentCount: Int,
-    val oldAbsentCount: Int,
-    val oldTotalCount: Int
+    val oldAbsentCount: Int
 )

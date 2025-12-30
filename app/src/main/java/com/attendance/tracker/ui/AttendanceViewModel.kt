@@ -160,8 +160,7 @@ class AttendanceViewModel(application: Application) : AndroidViewModel(applicati
                     oldStatus = oldRecord?.status,
                     newStatus = status,
                     oldPresentCount = subject.presentLectures,
-                    oldAbsentCount = subject.absentLectures,
-                    oldTotalCount = subject.totalLectures
+                    oldAbsentCount = subject.absentLectures
                 )
                 undoRedoManager.recordAction(action)
                 updateUndoRedoState()
@@ -184,7 +183,7 @@ class AttendanceViewModel(application: Application) : AndroidViewModel(applicati
                 // Restore the old state
                 val subject = repository.getSubjectById(action.subjectId)
                 if (subject != null) {
-                    // Restore attendance counts
+                    // Restore attendance counts first
                     repository.updateAttendanceCounts(
                         action.subjectId,
                         action.oldPresentCount,
@@ -193,18 +192,8 @@ class AttendanceViewModel(application: Application) : AndroidViewModel(applicati
                     
                     // Restore or delete the attendance record
                     if (action.oldStatus != null) {
-                        // There was a previous status, restore it
-                        when (action.oldStatus) {
-                            AttendanceStatus.PRESENT -> repository.markPresent(action.subjectId, action.date)
-                            AttendanceStatus.ABSENT -> repository.markAbsent(action.subjectId, action.date)
-                            AttendanceStatus.NO_CLASS -> repository.markNoClass(action.subjectId, action.date)
-                        }
-                        // Restore counts again since mark* methods modify them
-                        repository.updateAttendanceCounts(
-                            action.subjectId,
-                            action.oldPresentCount,
-                            action.oldAbsentCount
-                        )
+                        // There was a previous status, restore it without modifying counts
+                        repository.setAttendanceStatus(action.subjectId, action.date, action.oldStatus)
                     } else {
                         // No previous status, delete the record
                         repository.deleteAttendanceRecord(action.subjectId, action.date)

@@ -63,6 +63,17 @@ class AttendanceRepository(
             )
         )
     }
+    
+    suspend fun setAttendanceStatus(subjectId: Long, date: LocalDate, status: AttendanceStatus) {
+        // Insert/update attendance record without modifying subject counts
+        attendanceDao.insertAttendance(
+            AttendanceRecord(
+                subjectId = subjectId,
+                date = date,
+                status = status
+            )
+        )
+    }
 
     suspend fun updateAttendanceCounts(subjectId: Long, present: Int, absent: Int) {
         subjectDao.updateAttendanceCounts(subjectId, present, absent)
