@@ -27,10 +27,10 @@ abstract class AttendanceDatabase : RoomDatabase() {
         private var INSTANCE: AttendanceDatabase? = null
 
         private val MIGRATION_1_2 = object : Migration(1, 2) {
-            override fun migrate(database: SupportSQLiteDatabase) {
+            override fun migrate(db: SupportSQLiteDatabase) {
                 // Add new columns to subjects table
-                database.execSQL("ALTER TABLE subjects ADD COLUMN parentSubjectId INTEGER DEFAULT NULL")
-                database.execSQL("ALTER TABLE subjects ADD COLUMN isFolder INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE subjects ADD COLUMN parentSubjectId INTEGER DEFAULT NULL")
+                db.execSQL("ALTER TABLE subjects ADD COLUMN isFolder INTEGER NOT NULL DEFAULT 0")
             }
         }
 

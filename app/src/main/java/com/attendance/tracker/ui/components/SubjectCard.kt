@@ -89,7 +89,6 @@ fun SubjectCard(
             Spacer(modifier = Modifier.height(8.dp))
 
             // Attendance Percentage Text
-            val attendanceColor = if (subject.isAboveRequired) PresentGreen else AbsentRed
             Text(
                 text = "Required: ${subject.requiredAttendance}%",
                 style = MaterialTheme.typography.bodySmall,

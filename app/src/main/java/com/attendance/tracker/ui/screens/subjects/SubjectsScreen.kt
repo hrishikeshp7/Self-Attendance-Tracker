@@ -24,7 +24,6 @@ fun SubjectsScreen(
     subjects: List<Subject>,
     onAddSubject: (String, Int) -> Unit,
     onAddFolder: (String) -> Unit,
-    onAddSubSubject: (String, Long, Int) -> Unit,
     onUpdateSubject: (Subject) -> Unit,
     onDeleteSubject: (Subject) -> Unit,
     onUpdateAttendanceCounts: (Long, Int, Int) -> Unit,
