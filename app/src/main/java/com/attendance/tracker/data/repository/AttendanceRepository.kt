@@ -19,8 +19,12 @@ class AttendanceRepository(
 ) {
     // Subject operations
     val allSubjects: Flow<List<Subject>> = subjectDao.getAllSubjects()
+    val topLevelSubjects: Flow<List<Subject>> = subjectDao.getTopLevelSubjects()
+    val actualSubjects: Flow<List<Subject>> = subjectDao.getActualSubjects()
 
     suspend fun getSubjectById(id: Long): Subject? = subjectDao.getSubjectById(id)
+    
+    fun getSubSubjects(parentId: Long): Flow<List<Subject>> = subjectDao.getSubSubjects(parentId)
 
     suspend fun insertSubject(subject: Subject): Long = subjectDao.insertSubject(subject)
 
@@ -59,6 +63,17 @@ class AttendanceRepository(
             )
         )
     }
+    
+    suspend fun setAttendanceStatus(subjectId: Long, date: LocalDate, status: AttendanceStatus) {
+        // Insert/update attendance record without modifying subject counts
+        attendanceDao.insertAttendance(
+            AttendanceRecord(
+                subjectId = subjectId,
+                date = date,
+                status = status
+            )
+        )
+    }
 
     suspend fun updateAttendanceCounts(subjectId: Long, present: Int, absent: Int) {
         subjectDao.updateAttendanceCounts(subjectId, present, absent)
@@ -80,6 +95,10 @@ class AttendanceRepository(
 
     fun getAttendanceInRange(startDate: LocalDate, endDate: LocalDate): Flow<List<AttendanceRecord>> =
         attendanceDao.getAttendanceInRange(startDate, endDate)
+
+    suspend fun deleteAttendanceRecord(subjectId: Long, date: LocalDate) {
+        attendanceDao.deleteAttendanceForSubjectOnDate(subjectId, date)
+    }
 
     // Schedule operations
     val allScheduleEntries: Flow<List<ScheduleEntry>> = scheduleDao.getAllScheduleEntries()

@@ -14,7 +14,9 @@ data class Subject(
     val requiredAttendance: Int = 75, // Default 75% required attendance
     val totalLectures: Int = 0,
     val presentLectures: Int = 0,
-    val absentLectures: Int = 0
+    val absentLectures: Int = 0,
+    val parentSubjectId: Long? = null, // Null for top-level subjects, or ID of parent subject for sub-subjects
+    val isFolder: Boolean = false // True if this is a folder/group (like "Pathology"), false for actual subjects (like "Pathology - Lecture")
 ) {
     val currentAttendancePercentage: Float
         get() = if (totalLectures > 0) (presentLectures.toFloat() / totalLectures) * 100 else 0f

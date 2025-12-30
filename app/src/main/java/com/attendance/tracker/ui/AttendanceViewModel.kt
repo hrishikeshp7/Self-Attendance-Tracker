@@ -23,8 +23,20 @@ class AttendanceViewModel(application: Application) : AndroidViewModel(applicati
         database.scheduleDao()
     )
 
+    // Undo/Redo Manager
+    private val undoRedoManager = UndoRedoManager()
+    
+    private val _canUndo = MutableStateFlow(false)
+    val canUndo: StateFlow<Boolean> = _canUndo.asStateFlow()
+    
+    private val _canRedo = MutableStateFlow(false)
+    val canRedo: StateFlow<Boolean> = _canRedo.asStateFlow()
+
     // UI State
-    val subjects: StateFlow<List<Subject>> = repository.allSubjects
+    val subjects: StateFlow<List<Subject>> = repository.actualSubjects
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    
+    val topLevelSubjects: StateFlow<List<Subject>> = repository.topLevelSubjects
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val scheduleEntries: StateFlow<List<ScheduleEntry>> = repository.allScheduleEntries
@@ -83,6 +95,31 @@ class AttendanceViewModel(application: Application) : AndroidViewModel(applicati
             )
         }
     }
+    
+    fun addSubjectFolder(name: String) {
+        viewModelScope.launch {
+            repository.insertSubject(
+                Subject(name = name, isFolder = true)
+            )
+        }
+    }
+    
+    fun addSubSubject(name: String, parentSubjectId: Long, requiredAttendance: Int = 75) {
+        viewModelScope.launch {
+            repository.insertSubject(
+                Subject(
+                    name = name, 
+                    requiredAttendance = requiredAttendance,
+                    parentSubjectId = parentSubjectId,
+                    isFolder = false
+                )
+            )
+        }
+    }
+    
+    fun getSubSubjects(parentId: Long): Flow<List<Subject>> {
+        return repository.getSubSubjects(parentId)
+    }
 
     fun updateSubject(subject: Subject) {
         viewModelScope.launch {
@@ -111,13 +148,83 @@ class AttendanceViewModel(application: Application) : AndroidViewModel(applicati
     // Attendance operations
     fun markAttendance(subjectId: Long, status: AttendanceStatus, date: LocalDate = LocalDate.now()) {
         viewModelScope.launch {
-            when (status) {
-                AttendanceStatus.PRESENT -> repository.markPresent(subjectId, date)
-                AttendanceStatus.ABSENT -> repository.markAbsent(subjectId, date)
-                AttendanceStatus.NO_CLASS -> repository.markNoClass(subjectId, date)
+            // Get current state before marking
+            val subject = repository.getSubjectById(subjectId)
+            val oldRecord = repository.getAttendanceRecord(subjectId, date)
+            
+            if (subject != null) {
+                // Record action for undo/redo
+                val action = AttendanceAction(
+                    subjectId = subjectId,
+                    date = date,
+                    oldStatus = oldRecord?.status,
+                    newStatus = status,
+                    oldPresentCount = subject.presentLectures,
+                    oldAbsentCount = subject.absentLectures
+                )
+                undoRedoManager.recordAction(action)
+                updateUndoRedoState()
+                
+                // Mark the new status
+                when (status) {
+                    AttendanceStatus.PRESENT -> repository.markPresent(subjectId, date)
+                    AttendanceStatus.ABSENT -> repository.markAbsent(subjectId, date)
+                    AttendanceStatus.NO_CLASS -> repository.markNoClass(subjectId, date)
+                }
+                loadAttendanceForDate(date)
             }
-            loadAttendanceForDate(date)
         }
+    }
+    
+    fun undo() {
+        viewModelScope.launch {
+            val action = undoRedoManager.undo()
+            if (action != null) {
+                // Restore the old state
+                val subject = repository.getSubjectById(action.subjectId)
+                if (subject != null) {
+                    // Restore attendance counts first
+                    repository.updateAttendanceCounts(
+                        action.subjectId,
+                        action.oldPresentCount,
+                        action.oldAbsentCount
+                    )
+                    
+                    // Restore or delete the attendance record
+                    if (action.oldStatus != null) {
+                        // There was a previous status, restore it without modifying counts
+                        repository.setAttendanceStatus(action.subjectId, action.date, action.oldStatus)
+                    } else {
+                        // No previous status, delete the record
+                        repository.deleteAttendanceRecord(action.subjectId, action.date)
+                    }
+                    
+                    loadAttendanceForDate(action.date)
+                    updateUndoRedoState()
+                }
+            }
+        }
+    }
+    
+    fun redo() {
+        viewModelScope.launch {
+            val action = undoRedoManager.redo()
+            if (action != null) {
+                // Reapply the new status
+                when (action.newStatus) {
+                    AttendanceStatus.PRESENT -> repository.markPresent(action.subjectId, action.date)
+                    AttendanceStatus.ABSENT -> repository.markAbsent(action.subjectId, action.date)
+                    AttendanceStatus.NO_CLASS -> repository.markNoClass(action.subjectId, action.date)
+                }
+                loadAttendanceForDate(action.date)
+                updateUndoRedoState()
+            }
+        }
+    }
+    
+    private fun updateUndoRedoState() {
+        _canUndo.value = undoRedoManager.canUndo
+        _canRedo.value = undoRedoManager.canRedo
     }
 
     // Schedule operations

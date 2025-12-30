@@ -47,11 +47,14 @@ fun AttendanceApp(
     
     // Collect state from ViewModel
     val subjects by viewModel.subjects.collectAsState()
+    val topLevelSubjects by viewModel.topLevelSubjects.collectAsState()
     val scheduleEntries by viewModel.scheduleEntries.collectAsState()
     val selectedDate by viewModel.selectedDate.collectAsState()
     val selectedMonth by viewModel.selectedMonth.collectAsState()
     val todayAttendance by viewModel.todayAttendance.collectAsState()
     val attendanceRecords by viewModel.attendanceRecords.collectAsState()
+    val canUndo by viewModel.canUndo.collectAsState()
+    val canRedo by viewModel.canRedo.collectAsState()
 
     // Variables for navigation to subjects screen
     var showAddSubjectOnSubjectsScreen by remember { mutableStateOf(false) }
@@ -91,9 +94,13 @@ fun AttendanceApp(
                 HomeScreen(
                     subjects = subjects,
                     todayAttendance = todayAttendance,
+                    canUndo = canUndo,
+                    canRedo = canRedo,
                     onMarkAttendance = { subjectId, status ->
                         viewModel.markAttendance(subjectId, status)
                     },
+                    onUndo = { viewModel.undo() },
+                    onRedo = { viewModel.redo() },
                     onAddSubject = {
                         showAddSubjectOnSubjectsScreen = true
                         navController.navigate(Screen.Subjects.route) {
@@ -132,6 +139,9 @@ fun AttendanceApp(
                     },
                     onMonthChanged = { month ->
                         viewModel.setSelectedMonth(month)
+                    },
+                    onMarkAttendance = { subjectId, status, date ->
+                        viewModel.markAttendance(subjectId, status, date)
                     }
                 )
             }
@@ -141,6 +151,12 @@ fun AttendanceApp(
                     subjects = subjects,
                     onAddSubject = { name, required ->
                         viewModel.addSubject(name, required)
+                    },
+                    onAddFolder = { name ->
+                        viewModel.addSubjectFolder(name)
+                    },
+                    onAddSubSubject = { name, parentId, required ->
+                        viewModel.addSubSubject(name, parentId, required)
                     },
                     onUpdateSubject = { subject ->
                         viewModel.updateSubject(subject)
