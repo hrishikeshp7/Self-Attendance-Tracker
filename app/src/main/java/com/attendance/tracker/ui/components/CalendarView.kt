@@ -8,8 +8,8 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -48,14 +48,14 @@ fun CalendarView(
             verticalAlignment = Alignment.CenterVertically
         ) {
             IconButton(onClick = { onMonthChanged(selectedMonth.minusMonths(1)) }) {
-                Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = "Previous Month")
+                Icon(Icons.Filled.KeyboardArrowLeft, contentDescription = "Previous Month")
             }
             Text(
                 text = "${selectedMonth.month.getDisplayName(TextStyle.FULL, Locale.getDefault())} ${selectedMonth.year}",
                 style = MaterialTheme.typography.titleMedium
             )
             IconButton(onClick = { onMonthChanged(selectedMonth.plusMonths(1)) }) {
-                Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = "Next Month")
+                Icon(Icons.Filled.KeyboardArrowRight, contentDescription = "Next Month")
             }
         }
 
