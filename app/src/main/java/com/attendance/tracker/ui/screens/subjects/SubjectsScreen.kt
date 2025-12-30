@@ -153,17 +153,26 @@ private fun SubjectListItem(
                     text = subject.name,
                     style = MaterialTheme.typography.titleMedium
                 )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "Present: ${subject.presentLectures} | Absent: ${subject.absentLectures}",
-                    style = MaterialTheme.typography.bodySmall
-                )
-                val attendanceColor = if (subject.isAboveRequired) PresentGreen else AbsentRed
-                Text(
-                    text = "${"%.1f".format(subject.currentAttendancePercentage)}% (Required: ${subject.requiredAttendance}%)",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = attendanceColor
-                )
+                if (!subject.isFolder) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "Present: ${subject.presentLectures} | Absent: ${subject.absentLectures}",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    val attendanceColor = if (subject.isAboveRequired) PresentGreen else AbsentRed
+                    Text(
+                        text = "${"%.1f".format(subject.currentAttendancePercentage)}% (Required: ${subject.requiredAttendance}%)",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = attendanceColor
+                    )
+                } else {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "Folder",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
             }
             Row {
                 IconButton(onClick = onEditClick) {
@@ -287,46 +296,48 @@ private fun EditSubjectDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Edit Subject") },
+        title = { Text(if (subject.isFolder) "Edit Folder" else "Edit Subject") },
         text = {
             Column {
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
-                    label = { Text("Subject Name") },
+                    label = { Text(if (subject.isFolder) "Folder Name" else "Subject Name") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
-                Spacer(modifier = Modifier.height(12.dp))
-                OutlinedTextField(
-                    value = requiredAttendance,
-                    onValueChange = { requiredAttendance = it.filter { c -> c.isDigit() } },
-                    label = { Text("Required Attendance (%)") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Spacer(modifier = Modifier.height(12.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
+                if (!subject.isFolder) {
+                    Spacer(modifier = Modifier.height(12.dp))
                     OutlinedTextField(
-                        value = presentLectures,
-                        onValueChange = { presentLectures = it.filter { c -> c.isDigit() } },
-                        label = { Text("Present") },
+                        value = requiredAttendance,
+                        onValueChange = { requiredAttendance = it.filter { c -> c.isDigit() } },
+                        label = { Text("Required Attendance (%)") },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         singleLine = true,
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.fillMaxWidth()
                     )
-                    OutlinedTextField(
-                        value = absentLectures,
-                        onValueChange = { absentLectures = it.filter { c -> c.isDigit() } },
-                        label = { Text("Absent") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        singleLine = true,
-                        modifier = Modifier.weight(1f)
-                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedTextField(
+                            value = presentLectures,
+                            onValueChange = { presentLectures = it.filter { c -> c.isDigit() } },
+                            label = { Text("Present") },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            singleLine = true,
+                            modifier = Modifier.weight(1f)
+                        )
+                        OutlinedTextField(
+                            value = absentLectures,
+                            onValueChange = { absentLectures = it.filter { c -> c.isDigit() } },
+                            label = { Text("Absent") },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            singleLine = true,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
                 }
             }
         },
@@ -334,9 +345,9 @@ private fun EditSubjectDialog(
             TextButton(
                 onClick = {
                     if (name.isNotBlank()) {
-                        val required = requiredAttendance.toIntOrNull() ?: 75
-                        val present = presentLectures.toIntOrNull() ?: 0
-                        val absent = absentLectures.toIntOrNull() ?: 0
+                        val required = if (subject.isFolder) subject.requiredAttendance else (requiredAttendance.toIntOrNull() ?: 75)
+                        val present = if (subject.isFolder) subject.presentLectures else (presentLectures.toIntOrNull() ?: 0)
+                        val absent = if (subject.isFolder) subject.absentLectures else (absentLectures.toIntOrNull() ?: 0)
                         val updatedSubject = subject.copy(
                             name = name.trim(),
                             requiredAttendance = required.coerceIn(0, 100)
