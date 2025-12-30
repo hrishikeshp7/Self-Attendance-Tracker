@@ -1,13 +1,16 @@
 package com.attendance.tracker.ui.screens.subjects
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -32,35 +35,42 @@ fun SubjectsScreen(
     var showAddDialog by remember { mutableStateOf(false) }
     var showEditDialog by remember { mutableStateOf(false) }
     var selectedSubject by remember { mutableStateOf<Subject?>(null) }
-    var selectedFolder by remember { mutableStateOf<Subject?>(null) }
+    var currentFolder by remember { mutableStateOf<Subject?>(null) }
     
-    // Separate folders and non-folder top-level subjects
-    val folders = subjects.filter { it.isFolder && it.parentSubjectId == null }
-    val topLevelSubjects = subjects.filter { !it.isFolder && it.parentSubjectId == null }
-    
-    // Tab state
-    var selectedTabIndex by remember { mutableStateOf(0) }
+    // Filter subjects based on current view
+    val displaySubjects = if (currentFolder == null) {
+        // Show top-level items (both folders and subjects)
+        subjects.filter { it.parentSubjectId == null }
+    } else {
+        // Show subjects within the selected folder
+        subjects.filter { it.parentSubjectId == currentFolder?.id }
+    }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Manage Subjects") },
+                title = { 
+                    Text(
+                        currentFolder?.name ?: "Manage Subjects"
+                    ) 
+                },
+                navigationIcon = {
+                    if (currentFolder != null) {
+                        IconButton(onClick = { currentFolder = null }) {
+                            Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        }
+                    }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.primary,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimary
+                    titleContentColor = MaterialTheme.colorScheme.onPrimary,
+                    navigationIconContentColor = MaterialTheme.colorScheme.onPrimary
                 )
             )
         },
         floatingActionButton = {
             FloatingActionButton(
-                onClick = { 
-                    selectedFolder = if (selectedTabIndex > 0 && selectedTabIndex <= folders.size) {
-                        folders[selectedTabIndex - 1]
-                    } else {
-                        null
-                    }
-                    showAddDialog = true 
-                },
+                onClick = { showAddDialog = true },
                 containerColor = MaterialTheme.colorScheme.primary
             ) {
                 Icon(Icons.Default.Add, contentDescription = "Add Subject")
@@ -73,68 +83,20 @@ fun SubjectsScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            // Tabs for folders
-            if (folders.isNotEmpty()) {
-                ScrollableTabRow(
-                    selectedTabIndex = selectedTabIndex,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Tab(
-                        selected = selectedTabIndex == 0,
-                        onClick = { selectedTabIndex = 0 },
-                        text = { Text("All") }
-                    )
-                    folders.forEachIndexed { index, folder ->
-                        Tab(
-                            selected = selectedTabIndex == index + 1,
-                            onClick = { selectedTabIndex = index + 1 },
-                            text = { Text(folder.name) }
-                        )
-                    }
-                }
-            }
             
-            // Content based on selected tab
-            val displaySubjects = when {
-                selectedTabIndex == 0 -> topLevelSubjects
-                selectedTabIndex <= folders.size -> {
-                    val folder = folders[selectedTabIndex - 1]
-                    subjects.filter { it.parentSubjectId == folder.id }
-                }
-                else -> topLevelSubjects
-            }
-            
-            if (displaySubjects.isEmpty() && subjects.isEmpty()) {
+            if (displaySubjects.isEmpty()) {
                 Box(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
-                            text = "No subjects added yet",
+                            text = if (currentFolder != null) "No subjects in this folder" else "No subjects added yet",
                             style = MaterialTheme.typography.titleLarge
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = "Tap + to add a subject",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-            } else if (displaySubjects.isEmpty()) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(
-                            text = "No subjects in this folder",
-                            style = MaterialTheme.typography.titleLarge
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = "Tap + to add a subject to this folder",
+                            text = if (currentFolder != null) "Tap + to add a subject to this folder" else "Tap + to add a subject or folder",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -146,14 +108,26 @@ fun SubjectsScreen(
                     contentPadding = PaddingValues(16.dp)
                 ) {
                     items(displaySubjects, key = { it.id }) { subject ->
-                        SubjectListItem(
-                            subject = subject,
-                            onEditClick = {
-                                selectedSubject = subject
-                                showEditDialog = true
-                            },
-                            onDeleteClick = { onDeleteSubject(subject) }
-                        )
+                        if (subject.isFolder) {
+                            FolderListItem(
+                                folder = subject,
+                                onFolderClick = { currentFolder = it },
+                                onEditClick = {
+                                    selectedSubject = subject
+                                    showEditDialog = true
+                                },
+                                onDeleteClick = { onDeleteSubject(subject) }
+                            )
+                        } else {
+                            SubjectListItem(
+                                subject = subject,
+                                onEditClick = {
+                                    selectedSubject = subject
+                                    showEditDialog = true
+                                },
+                                onDeleteClick = { onDeleteSubject(subject) }
+                            )
+                        }
                     }
                 }
             }
@@ -163,21 +137,15 @@ fun SubjectsScreen(
     // Add Subject Dialog
     if (showAddDialog) {
         AddSubjectDialog(
-            folders = folders,
-            selectedFolder = selectedFolder,
-            onDismiss = { 
-                showAddDialog = false
-                selectedFolder = null
-            },
+            selectedFolder = currentFolder,
+            onDismiss = { showAddDialog = false },
             onConfirm = { name, required, parentId ->
                 onAddSubject(name, required, parentId)
                 showAddDialog = false
-                selectedFolder = null
             },
             onConfirmFolder = { name ->
                 onAddFolder(name)
                 showAddDialog = false
-                selectedFolder = null
             }
         )
     }
@@ -195,6 +163,89 @@ fun SubjectsScreen(
                 onUpdateAttendanceCounts(updatedSubject.id, present, absent)
                 showEditDialog = false
                 selectedSubject = null
+            }
+        )
+    }
+}
+
+@Composable
+private fun FolderListItem(
+    folder: Subject,
+    onFolderClick: (Subject) -> Unit,
+    onEditClick: () -> Unit,
+    onDeleteClick: () -> Unit
+) {
+    var showDeleteConfirmation by remember { mutableStateOf(false) }
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp)
+            .clickable { onFolderClick(folder) },
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(
+                modifier = Modifier.weight(1f),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    Icons.Default.Folder,
+                    contentDescription = "Folder",
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier
+                        .size(40.dp)
+                        .padding(end = 12.dp)
+                )
+                Column {
+                    Text(
+                        text = folder.name,
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "Folder",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+            Row {
+                IconButton(onClick = onEditClick) {
+                    Icon(Icons.Default.Edit, contentDescription = "Edit")
+                }
+                IconButton(onClick = { showDeleteConfirmation = true }) {
+                    Icon(Icons.Default.Delete, contentDescription = "Delete", tint = AbsentRed)
+                }
+            }
+        }
+    }
+
+    if (showDeleteConfirmation) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirmation = false },
+            title = { Text("Delete Folder") },
+            text = { Text("Are you sure you want to delete '${folder.name}'? This action cannot be undone.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        onDeleteClick()
+                        showDeleteConfirmation = false
+                    }
+                ) {
+                    Text("Delete", color = AbsentRed)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirmation = false }) {
+                    Text("Cancel")
+                }
             }
         )
     }
@@ -238,13 +289,6 @@ private fun SubjectListItem(
                         style = MaterialTheme.typography.bodySmall,
                         color = attendanceColor
                     )
-                } else {
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "Folder",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.primary
-                    )
                 }
             }
             Row {
@@ -284,7 +328,6 @@ private fun SubjectListItem(
 
 @Composable
 private fun AddSubjectDialog(
-    folders: List<Subject>,
     selectedFolder: Subject?,
     onDismiss: () -> Unit,
     onConfirm: (String, Int, Long?) -> Unit,
