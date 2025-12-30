@@ -13,6 +13,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.attendance.tracker.data.model.Subject
+import com.attendance.tracker.data.model.getDisplayName
 import com.attendance.tracker.ui.theme.AbsentRed
 import com.attendance.tracker.ui.theme.PresentGreen
 
@@ -20,6 +21,7 @@ import com.attendance.tracker.ui.theme.PresentGreen
 @Composable
 fun SettingsScreen(
     subjects: List<Subject>,
+    allSubjects: List<Subject>,
     onUpdateRequiredAttendance: (Long, Int) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -80,6 +82,7 @@ fun SettingsScreen(
                     items(subjects, key = { it.id }) { subject ->
                         RequiredAttendanceItem(
                             subject = subject,
+                            allSubjects = allSubjects,
                             onEditClick = {
                                 selectedSubject = subject
                                 showEditDialog = true
@@ -111,6 +114,7 @@ fun SettingsScreen(
 @Composable
 private fun RequiredAttendanceItem(
     subject: Subject,
+    allSubjects: List<Subject>,
     onEditClick: () -> Unit
 ) {
     val statusColor = if (subject.isAboveRequired) PresentGreen else AbsentRed
@@ -130,7 +134,7 @@ private fun RequiredAttendanceItem(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = subject.name,
+                    text = subject.getDisplayName(allSubjects),
                     style = MaterialTheme.typography.titleMedium
                 )
                 Spacer(modifier = Modifier.height(4.dp))

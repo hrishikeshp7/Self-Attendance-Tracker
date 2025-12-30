@@ -9,6 +9,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.attendance.tracker.data.model.AttendanceStatus
 import com.attendance.tracker.data.model.Subject
+import com.attendance.tracker.data.model.getDisplayName
 import com.attendance.tracker.ui.theme.AbsentRed
 import com.attendance.tracker.ui.theme.NoClassGray
 import com.attendance.tracker.ui.theme.PresentGreen
@@ -16,6 +17,7 @@ import com.attendance.tracker.ui.theme.PresentGreen
 @Composable
 fun SubjectCard(
     subject: Subject,
+    allSubjects: List<Subject>,
     currentStatus: AttendanceStatus?,
     onMarkPresent: () -> Unit,
     onMarkAbsent: () -> Unit,
@@ -42,7 +44,7 @@ fun SubjectCard(
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = subject.name,
+                        text = subject.getDisplayName(allSubjects),
                         style = MaterialTheme.typography.titleLarge
                     )
                     TextButton(

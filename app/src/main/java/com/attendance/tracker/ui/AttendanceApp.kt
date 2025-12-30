@@ -93,6 +93,7 @@ fun AttendanceApp(
             composable(Screen.Home.route) {
                 HomeScreen(
                     subjects = subjects,
+                    allSubjects = allSubjectsIncludingFolders,
                     todayAttendance = todayAttendance,
                     canUndo = canUndo,
                     canRedo = canRedo,
@@ -133,6 +134,7 @@ fun AttendanceApp(
                     selectedDate = selectedDate,
                     attendanceRecords = attendanceRecords,
                     subjects = subjects,
+                    allSubjects = allSubjectsIncludingFolders,
                     onDateSelected = { date ->
                         viewModel.setSelectedDate(date)
                     },
@@ -173,6 +175,7 @@ fun AttendanceApp(
             composable(Screen.Schedule.route) {
                 ScheduleScreen(
                     subjects = subjects,
+                    allSubjects = allSubjectsIncludingFolders,
                     scheduleEntries = scheduleEntries,
                     onAddScheduleEntry = { subjectId, day ->
                         viewModel.addScheduleEntry(subjectId, day)
@@ -186,6 +189,7 @@ fun AttendanceApp(
             composable(Screen.Settings.route) {
                 SettingsScreen(
                     subjects = subjects,
+                    allSubjects = allSubjectsIncludingFolders,
                     onUpdateRequiredAttendance = { subjectId, required ->
                         viewModel.updateRequiredAttendance(subjectId, required)
                     }

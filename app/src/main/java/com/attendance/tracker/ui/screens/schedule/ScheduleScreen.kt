@@ -10,6 +10,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.attendance.tracker.data.model.ScheduleEntry
 import com.attendance.tracker.data.model.Subject
+import com.attendance.tracker.data.model.getDisplayName
 import java.time.DayOfWeek
 import java.time.format.TextStyle
 import java.util.Locale
@@ -18,6 +19,7 @@ import java.util.Locale
 @Composable
 fun ScheduleScreen(
     subjects: List<Subject>,
+    allSubjects: List<Subject>,
     scheduleEntries: List<ScheduleEntry>,
     onAddScheduleEntry: (Long, DayOfWeek) -> Unit,
     onRemoveScheduleEntry: (ScheduleEntry) -> Unit,
@@ -101,6 +103,7 @@ fun ScheduleScreen(
 
                         ScheduleSubjectItem(
                             subject = subject,
+                            allSubjects = allSubjects,
                             isScheduled = isScheduled,
                             onToggle = { checked ->
                                 if (checked) {
@@ -120,6 +123,7 @@ fun ScheduleScreen(
 @Composable
 private fun ScheduleSubjectItem(
     subject: Subject,
+    allSubjects: List<Subject>,
     isScheduled: Boolean,
     onToggle: (Boolean) -> Unit
 ) {
@@ -137,7 +141,7 @@ private fun ScheduleSubjectItem(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = subject.name,
+                text = subject.getDisplayName(allSubjects),
                 style = MaterialTheme.typography.bodyLarge,
                 modifier = Modifier.weight(1f)
             )
