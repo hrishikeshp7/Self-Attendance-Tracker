@@ -51,8 +51,7 @@ fun SubjectsScreen(
             TopAppBar(
                 title = { 
                     Text(
-                        if (currentFolder != null) currentFolder!!.name 
-                        else "Manage Subjects"
+                        currentFolder?.name ?: "Manage Subjects"
                     ) 
                 },
                 navigationIcon = {
