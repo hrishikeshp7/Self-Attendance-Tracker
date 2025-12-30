@@ -19,8 +19,12 @@ class AttendanceRepository(
 ) {
     // Subject operations
     val allSubjects: Flow<List<Subject>> = subjectDao.getAllSubjects()
+    val topLevelSubjects: Flow<List<Subject>> = subjectDao.getTopLevelSubjects()
+    val actualSubjects: Flow<List<Subject>> = subjectDao.getActualSubjects()
 
     suspend fun getSubjectById(id: Long): Subject? = subjectDao.getSubjectById(id)
+    
+    fun getSubSubjects(parentId: Long): Flow<List<Subject>> = subjectDao.getSubSubjects(parentId)
 
     suspend fun insertSubject(subject: Subject): Long = subjectDao.insertSubject(subject)
 

@@ -11,6 +11,15 @@ interface SubjectDao {
 
     @Query("SELECT * FROM subjects WHERE id = :id")
     suspend fun getSubjectById(id: Long): Subject?
+    
+    @Query("SELECT * FROM subjects WHERE parentSubjectId IS NULL ORDER BY name ASC")
+    fun getTopLevelSubjects(): Flow<List<Subject>>
+    
+    @Query("SELECT * FROM subjects WHERE parentSubjectId = :parentId ORDER BY name ASC")
+    fun getSubSubjects(parentId: Long): Flow<List<Subject>>
+    
+    @Query("SELECT * FROM subjects WHERE isFolder = 0 ORDER BY name ASC")
+    fun getActualSubjects(): Flow<List<Subject>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertSubject(subject: Subject): Long

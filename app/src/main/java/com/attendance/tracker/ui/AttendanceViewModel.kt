@@ -33,7 +33,10 @@ class AttendanceViewModel(application: Application) : AndroidViewModel(applicati
     val canRedo: StateFlow<Boolean> = _canRedo.asStateFlow()
 
     // UI State
-    val subjects: StateFlow<List<Subject>> = repository.allSubjects
+    val subjects: StateFlow<List<Subject>> = repository.actualSubjects
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    
+    val topLevelSubjects: StateFlow<List<Subject>> = repository.topLevelSubjects
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val scheduleEntries: StateFlow<List<ScheduleEntry>> = repository.allScheduleEntries
@@ -91,6 +94,31 @@ class AttendanceViewModel(application: Application) : AndroidViewModel(applicati
                 Subject(name = name, requiredAttendance = requiredAttendance)
             )
         }
+    }
+    
+    fun addSubjectFolder(name: String) {
+        viewModelScope.launch {
+            repository.insertSubject(
+                Subject(name = name, isFolder = true)
+            )
+        }
+    }
+    
+    fun addSubSubject(name: String, parentSubjectId: Long, requiredAttendance: Int = 75) {
+        viewModelScope.launch {
+            repository.insertSubject(
+                Subject(
+                    name = name, 
+                    requiredAttendance = requiredAttendance,
+                    parentSubjectId = parentSubjectId,
+                    isFolder = false
+                )
+            )
+        }
+    }
+    
+    fun getSubSubjects(parentId: Long): Flow<List<Subject>> {
+        return repository.getSubSubjects(parentId)
     }
 
     fun updateSubject(subject: Subject) {
