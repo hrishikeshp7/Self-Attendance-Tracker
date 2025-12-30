@@ -24,3 +24,19 @@ data class Subject(
     val isAboveRequired: Boolean
         get() = currentAttendancePercentage >= requiredAttendance
 }
+
+/**
+ * Get the display name for a subject, including folder name if applicable
+ */
+fun Subject.getDisplayName(allSubjects: List<Subject>): String {
+    return if (parentSubjectId != null) {
+        val folder = allSubjects.find { it.id == parentSubjectId }
+        if (folder != null) {
+            "${folder.name} / $name"
+        } else {
+            name
+        }
+    } else {
+        name
+    }
+}

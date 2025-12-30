@@ -25,6 +25,7 @@ import java.time.format.DateTimeFormatter
 @Composable
 fun HomeScreen(
     subjects: List<Subject>,
+    allSubjects: List<Subject>,
     todayAttendance: Map<Long, AttendanceStatus>,
     canUndo: Boolean,
     canRedo: Boolean,
@@ -159,6 +160,7 @@ fun HomeScreen(
                     items(subjects, key = { it.id }) { subject ->
                         SubjectCard(
                             subject = subject,
+                            allSubjects = allSubjects,
                             currentStatus = todayAttendance[subject.id],
                             onMarkPresent = { 
                                 onMarkAttendance(subject.id, AttendanceStatus.PRESENT)

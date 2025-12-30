@@ -11,6 +11,7 @@ import androidx.compose.ui.unit.dp
 import com.attendance.tracker.data.model.AttendanceRecord
 import com.attendance.tracker.data.model.AttendanceStatus
 import com.attendance.tracker.data.model.Subject
+import com.attendance.tracker.data.model.getDisplayName
 import com.attendance.tracker.ui.components.CalendarView
 import com.attendance.tracker.ui.theme.AbsentRed
 import com.attendance.tracker.ui.theme.NoClassGray
@@ -27,6 +28,7 @@ fun CalendarScreen(
     selectedDate: LocalDate,
     attendanceRecords: List<AttendanceRecord>,
     subjects: List<Subject>,
+    allSubjects: List<Subject>,
     onDateSelected: (LocalDate) -> Unit,
     onMonthChanged: (YearMonth) -> Unit,
     onMarkAttendance: (Long, AttendanceStatus, LocalDate) -> Unit,
@@ -111,6 +113,7 @@ fun CalendarScreen(
                         val record = selectedDateRecords.find { it.subjectId == subject.id }
                         CalendarAttendanceItem(
                             subject = subject,
+                            allSubjects = allSubjects,
                             currentStatus = record?.status,
                             onMarkPresent = { 
                                 onMarkAttendance(subject.id, AttendanceStatus.PRESENT, selectedDate)
@@ -135,6 +138,7 @@ fun CalendarScreen(
 @Composable
 private fun CalendarAttendanceItem(
     subject: Subject,
+    allSubjects: List<Subject>,
     currentStatus: AttendanceStatus?,
     onMarkPresent: () -> Unit,
     onMarkAbsent: () -> Unit,
@@ -152,7 +156,7 @@ private fun CalendarAttendanceItem(
                 .padding(16.dp)
         ) {
             Text(
-                text = subject.name,
+                text = subject.getDisplayName(allSubjects),
                 style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.padding(bottom = 8.dp)
             )
