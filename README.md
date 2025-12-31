@@ -156,7 +156,6 @@ You can download the latest APK from the [Releases page](https://github.com/hris
 
 ### Automated Releases
 APK releases are automatically created:
-- When a pull request is merged to main
 - Via manual workflow dispatch from the Actions tab
 
 ## Author
