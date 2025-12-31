@@ -76,7 +76,7 @@ fun AboutScreen(
             
             Spacer(modifier = Modifier.height(8.dp))
             
-            Divider()
+            HorizontalDivider()
             
             Spacer(modifier = Modifier.height(8.dp))
             
@@ -122,7 +122,7 @@ fun AboutScreen(
             
             Spacer(modifier = Modifier.height(8.dp))
             
-            Divider()
+            HorizontalDivider()
             
             Spacer(modifier = Modifier.height(8.dp))
             
