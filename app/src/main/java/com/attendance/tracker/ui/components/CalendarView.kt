@@ -16,6 +16,10 @@ import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -48,8 +52,8 @@ fun CalendarView(
     val CALENDAR_MAX_PAGES = 20000
     
     // Track base month for offset calculations - updates when month changes externally
-    var baseMonth by remember { mutableStateOf(selectedMonth) }
-    var lastPagerPage by remember { mutableStateOf(CALENDAR_INITIAL_PAGE) }
+    var baseMonth by rememberSaveable { mutableStateOf(selectedMonth) }
+    var lastPagerPage by rememberSaveable { mutableStateOf(CALENDAR_INITIAL_PAGE) }
     
     // Initialize pager state centered at a large value to allow bidirectional swiping
     val pagerState = rememberPagerState(
