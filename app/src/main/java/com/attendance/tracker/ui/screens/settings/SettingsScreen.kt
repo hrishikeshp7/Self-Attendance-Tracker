@@ -23,6 +23,7 @@ fun SettingsScreen(
     subjects: List<Subject>,
     allSubjects: List<Subject>,
     onUpdateRequiredAttendance: (Long, Int) -> Unit,
+    onNavigateToAbout: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     var selectedSubject by remember { mutableStateOf<Subject?>(null) }
@@ -58,6 +59,34 @@ fun SettingsScreen(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = 16.dp)
             )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // About Option
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
+                onClick = onNavigateToAbout
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "About",
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                    Text(
+                        text = "→",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
 
             Spacer(modifier = Modifier.height(16.dp))
 
