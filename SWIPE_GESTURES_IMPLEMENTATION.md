@@ -21,26 +21,44 @@ Implemented `HorizontalPager` from Jetpack Compose Foundation library to enable 
 - Added `HorizontalPager` wrapper around the calendar grid
 - Implemented "infinite scrolling" using a large page count (20000) centered at page 10000
 - Created separate `MonthCalendarGrid` composable for better code organization
-- Used `LaunchedEffect` with `snapshotFlow` to sync swipe state with month changes
+- Used `LaunchedEffect` to sync swipe state with month changes
+- Track base month and last pager page to handle external month changes
 
 #### How It Works
 ```kotlin
-val initialPage = 10000
-val pagerState = rememberPagerState(
-    initialPage = initialPage,
-    pageCount = { 20000 }
-)
+// Constants for pager configuration
+val CALENDAR_INITIAL_PAGE = 10000
+val CALENDAR_MAX_PAGES = 20000
 
-// Remember the base month for offset calculations
-val baseMonth = remember { selectedMonth }
+// Track base month for offset calculations
+var baseMonth by remember { mutableStateOf(selectedMonth) }
+var lastPagerPage by remember { mutableStateOf(CALENDAR_INITIAL_PAGE) }
+
+val pagerState = rememberPagerState(
+    initialPage = CALENDAR_INITIAL_PAGE,
+    pageCount = { CALENDAR_MAX_PAGES }
+)
 
 // Track month changes from swipe gestures
 LaunchedEffect(pagerState.currentPage) {
-    val offset = pagerState.currentPage - initialPage
-    if (offset != 0) {
-        val newMonth = baseMonth.plusMonths(offset.toLong())
-        if (newMonth != selectedMonth) {
-            onMonthChanged(newMonth)
+    if (pagerState.currentPage != lastPagerPage) {
+        lastPagerPage = pagerState.currentPage
+        val offset = pagerState.currentPage - CALENDAR_INITIAL_PAGE
+        if (offset != 0) {
+            val newMonth = baseMonth.plusMonths(offset.toLong())
+            if (newMonth != selectedMonth) {
+                onMonthChanged(newMonth)
+            }
+        }
+    }
+}
+
+// Reset base and pager when month changes externally
+LaunchedEffect(selectedMonth) {
+    if (selectedMonth != baseMonth) {
+        baseMonth = selectedMonth
+        if (pagerState.currentPage != CALENDAR_INITIAL_PAGE) {
+            pagerState.animateScrollToPage(CALENDAR_INITIAL_PAGE)
         }
     }
 }
