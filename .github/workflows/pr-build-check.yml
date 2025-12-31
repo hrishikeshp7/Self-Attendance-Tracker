@@ -35,13 +35,23 @@ jobs:
           # Retry build up to 3 times in case of transient network issues
           max_attempts=3
           attempt=1
-          until ./gradlew assembleDebug --refresh-dependencies || [ $attempt -eq $max_attempts ]; do
-            echo "Build attempt $attempt failed. Retrying..."
+          success=false
+          
+          while [ $attempt -le $max_attempts ]; do
+            echo "Build attempt $attempt of $max_attempts"
+            if ./gradlew assembleDebug --refresh-dependencies; then
+              success=true
+              break
+            fi
+            
+            if [ $attempt -lt $max_attempts ]; then
+              echo "Build failed. Retrying in 10 seconds..."
+              sleep 10
+            fi
             attempt=$((attempt + 1))
-            sleep 10
           done
           
-          if [ $attempt -eq $max_attempts ] && ! ./gradlew assembleDebug; then
+          if [ "$success" = false ]; then
             echo "Build failed after $max_attempts attempts"
             exit 1
           fi
