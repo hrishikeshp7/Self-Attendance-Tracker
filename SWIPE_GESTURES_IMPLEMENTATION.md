@@ -31,8 +31,8 @@ val CALENDAR_INITIAL_PAGE = 10000
 val CALENDAR_MAX_PAGES = 20000
 
 // Track base month for offset calculations
-var baseMonth by remember { mutableStateOf(selectedMonth) }
-var lastPagerPage by remember { mutableStateOf(CALENDAR_INITIAL_PAGE) }
+var baseMonth by rememberSaveable { mutableStateOf(selectedMonth) }
+var lastPagerPage by rememberSaveable { mutableStateOf(CALENDAR_INITIAL_PAGE) }
 
 val pagerState = rememberPagerState(
     initialPage = CALENDAR_INITIAL_PAGE,
@@ -76,23 +76,28 @@ LaunchedEffect(selectedMonth) {
 - Added `HorizontalPager` for days of the week (7 pages)
 - Implemented bidirectional sync between tab selection and pager state
 - Created `DayScheduleContent` composable to render each day's schedule
-- Used `rememberCoroutineScope` to animate pager when tabs are clicked
+- Used `LaunchedEffect` with proper keys to sync state changes
 
 #### How It Works
 ```kotlin
+var selectedDay by remember { mutableStateOf(DayOfWeek.MONDAY) }
+
 val pagerState = rememberPagerState(
     initialPage = DayOfWeek.MONDAY.ordinal,
     pageCount = { DayOfWeek.entries.size }
 )
 
-// Sync pager state with selected day
+// Sync selected day with pager state changes (from swipe)
 LaunchedEffect(pagerState.currentPage) {
-    selectedDay = DayOfWeek.entries[pagerState.currentPage]
+    val newDay = DayOfWeek.entries[pagerState.currentPage]
+    if (selectedDay != newDay) {
+        selectedDay = newDay
+    }
 }
 
-// Sync selected day with pager when tabs are clicked
-LaunchedEffect(selectedDay) {
-    if (pagerState.currentPage != selectedDay.ordinal) {
+// Sync pager with selected day changes (from tab clicks)
+LaunchedEffect(selectedDay, pagerState.isScrollInProgress) {
+    if (pagerState.currentPage != selectedDay.ordinal && !pagerState.isScrollInProgress) {
         pagerState.animateScrollToPage(selectedDay.ordinal)
     }
 }
@@ -106,9 +111,8 @@ LaunchedEffect(selectedDay) {
 
 ## Technical Stack
 - **Jetpack Compose Foundation**: `HorizontalPager`, `rememberPagerState`
-- **Compose Runtime**: `LaunchedEffect`, `snapshotFlow`
+- **Compose Runtime**: `LaunchedEffect`, `rememberSaveable`
 - **Material3**: For UI components and theming
-- **Kotlin Coroutines**: For async state synchronization
 
 ## Testing Guide
 

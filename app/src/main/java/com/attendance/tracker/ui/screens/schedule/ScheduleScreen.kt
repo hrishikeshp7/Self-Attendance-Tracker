@@ -37,7 +37,7 @@ fun ScheduleScreen(
     )
     
     // Sync selected day with pager state changes (from swipe)
-    LaunchedEffect(pagerState.currentPage, selectedDay) {
+    LaunchedEffect(pagerState.currentPage) {
         val newDay = DayOfWeek.entries[pagerState.currentPage]
         if (selectedDay != newDay) {
             selectedDay = newDay
@@ -45,7 +45,7 @@ fun ScheduleScreen(
     }
     
     // Sync pager with selected day changes (from tab clicks)
-    LaunchedEffect(selectedDay, pagerState.currentPage, pagerState.isScrollInProgress) {
+    LaunchedEffect(selectedDay, pagerState.isScrollInProgress) {
         if (pagerState.currentPage != selectedDay.ordinal && !pagerState.isScrollInProgress) {
             pagerState.animateScrollToPage(selectedDay.ordinal)
         }
