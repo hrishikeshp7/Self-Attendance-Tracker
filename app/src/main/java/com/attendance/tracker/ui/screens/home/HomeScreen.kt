@@ -15,7 +15,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.attendance.tracker.data.model.AttendanceStatus
 import com.attendance.tracker.data.model.Subject
-import com.attendance.tracker.ui.components.GitHubFooter
+import com.attendance.tracker.ui.components.AttendanceWidget
+import com.attendance.tracker.ui.components.CompactAttendanceWidget
 import com.attendance.tracker.ui.components.SubjectCard
 import kotlinx.coroutines.launch
 import java.time.LocalDate
@@ -157,6 +158,31 @@ fun HomeScreen(
                         .fillMaxWidth(),
                     contentPadding = PaddingValues(bottom = 88.dp)
                 ) {
+                    // Compact Widget at the top
+                    item {
+                        CompactAttendanceWidget(
+                            subjects = subjects,
+                            allSubjects = allSubjects
+                        )
+                    }
+                    
+                    // Large Widget
+                    item {
+                        AttendanceWidget(
+                            subjects = subjects,
+                            allSubjects = allSubjects,
+                            todayAttendance = todayAttendance,
+                            onMarkAttendance = { subjectId, status ->
+                                onMarkAttendance(subjectId, status)
+                                val subject = subjects.find { it.id == subjectId }
+                                if (subject != null) {
+                                    showAttendanceSnackbar(subject.name, status)
+                                }
+                            }
+                        )
+                    }
+                    
+                    // Subject Cards
                     items(subjects, key = { it.id }) { subject ->
                         SubjectCard(
                             subject = subject,
@@ -179,9 +205,6 @@ fun HomeScreen(
                     }
                 }
             }
-            
-            // GitHub Footer
-            GitHubFooter()
         }
     }
 }

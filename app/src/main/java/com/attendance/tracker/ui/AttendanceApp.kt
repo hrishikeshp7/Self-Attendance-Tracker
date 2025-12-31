@@ -19,6 +19,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.attendance.tracker.data.model.AttendanceStatus
+import com.attendance.tracker.ui.screens.about.AboutScreen
 import com.attendance.tracker.ui.screens.calendar.CalendarScreen
 import com.attendance.tracker.ui.screens.home.HomeScreen
 import com.attendance.tracker.ui.screens.schedule.ScheduleScreen
@@ -192,6 +193,17 @@ fun AttendanceApp(
                     allSubjects = allSubjectsIncludingFolders,
                     onUpdateRequiredAttendance = { subjectId, required ->
                         viewModel.updateRequiredAttendance(subjectId, required)
+                    },
+                    onNavigateToAbout = {
+                        navController.navigate(Screen.About.route)
+                    }
+                )
+            }
+
+            composable(Screen.About.route) {
+                AboutScreen(
+                    onNavigateBack = {
+                        navController.popBackStack()
                     }
                 )
             }
