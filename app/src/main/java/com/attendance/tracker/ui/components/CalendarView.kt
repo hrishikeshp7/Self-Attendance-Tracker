@@ -51,11 +51,14 @@ fun CalendarView(
         pageCount = { 20000 } // Large number to simulate infinite scrolling
     )
     
-    // Track month changes from swipe
-    LaunchedEffect(pagerState) {
-        snapshotFlow { pagerState.currentPage }.collect { page ->
-            val offset = page - initialPage
-            val newMonth = selectedMonth.plusMonths(offset.toLong())
+    // Remember the base month for offset calculations
+    val baseMonth = remember { selectedMonth }
+    
+    // Track month changes from swipe gestures
+    LaunchedEffect(pagerState.currentPage) {
+        val offset = pagerState.currentPage - initialPage
+        if (offset != 0) {
+            val newMonth = baseMonth.plusMonths(offset.toLong())
             if (newMonth != selectedMonth) {
                 onMonthChanged(newMonth)
             }
@@ -89,7 +92,7 @@ fun CalendarView(
             modifier = Modifier.fillMaxWidth()
         ) { page ->
             val offset = page - initialPage
-            val monthToDisplay = selectedMonth.plusMonths(offset.toLong())
+            val monthToDisplay = baseMonth.plusMonths(offset.toLong())
             
             MonthCalendarGrid(
                 month = monthToDisplay,
