@@ -31,7 +31,20 @@ jobs:
         run: chmod +x gradlew
 
       - name: Build Debug APK
-        run: ./gradlew assembleDebug
+        run: |
+          # Retry build up to 3 times in case of transient network issues
+          max_attempts=3
+          attempt=1
+          until ./gradlew assembleDebug --refresh-dependencies || [ $attempt -eq $max_attempts ]; do
+            echo "Build attempt $attempt failed. Retrying..."
+            attempt=$((attempt + 1))
+            sleep 10
+          done
+          
+          if [ $attempt -eq $max_attempts ] && ! ./gradlew assembleDebug; then
+            echo "Build failed after $max_attempts attempts"
+            exit 1
+          fi
 
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4
