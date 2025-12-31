@@ -1,17 +1,25 @@
 package com.attendance.tracker.ui.components
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -29,6 +37,7 @@ import java.time.YearMonth
 import java.time.format.TextStyle
 import java.util.Locale
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun CalendarView(
     selectedMonth: YearMonth,
@@ -38,6 +47,44 @@ fun CalendarView(
     onMonthChanged: (YearMonth) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    // Constants for pager configuration
+    val CALENDAR_INITIAL_PAGE = 10000
+    val CALENDAR_MAX_PAGES = 20000
+    
+    // Track base month for offset calculations - updates when month changes externally
+    var baseMonth by rememberSaveable { mutableStateOf(selectedMonth) }
+    var lastPagerPage by rememberSaveable { mutableStateOf(CALENDAR_INITIAL_PAGE) }
+    
+    // Initialize pager state centered at a large value to allow bidirectional swiping
+    val pagerState = rememberPagerState(
+        initialPage = CALENDAR_INITIAL_PAGE,
+        pageCount = { CALENDAR_MAX_PAGES } // Large number to simulate infinite scrolling
+    )
+    
+    // Track month changes from swipe gestures
+    LaunchedEffect(pagerState.currentPage) {
+        if (pagerState.currentPage != lastPagerPage) {
+            lastPagerPage = pagerState.currentPage
+            val offset = pagerState.currentPage - CALENDAR_INITIAL_PAGE
+            if (offset != 0) {
+                val newMonth = baseMonth.plusMonths(offset.toLong())
+                if (newMonth != selectedMonth) {
+                    onMonthChanged(newMonth)
+                }
+            }
+        }
+    }
+    
+    // Reset base and pager when month changes externally (e.g., arrow buttons)
+    LaunchedEffect(selectedMonth) {
+        if (selectedMonth != baseMonth) {
+            baseMonth = selectedMonth
+            if (pagerState.currentPage != CALENDAR_INITIAL_PAGE) {
+                pagerState.animateScrollToPage(CALENDAR_INITIAL_PAGE)
+            }
+        }
+    }
+    
     Column(modifier = modifier.fillMaxWidth()) {
         // Month Navigation Header
         Row(
@@ -59,6 +106,32 @@ fun CalendarView(
             }
         }
 
+        // Horizontal Pager for swipeable months
+        HorizontalPager(
+            state = pagerState,
+            modifier = Modifier.fillMaxWidth()
+        ) { page ->
+            val offset = page - CALENDAR_INITIAL_PAGE
+            val monthToDisplay = baseMonth.plusMonths(offset.toLong())
+            
+            MonthCalendarGrid(
+                month = monthToDisplay,
+                selectedDate = selectedDate,
+                attendanceRecords = attendanceRecords,
+                onDateSelected = onDateSelected
+            )
+        }
+    }
+}
+
+@Composable
+private fun MonthCalendarGrid(
+    month: YearMonth,
+    selectedDate: LocalDate,
+    attendanceRecords: List<AttendanceRecord>,
+    onDateSelected: (LocalDate) -> Unit
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
         // Day of Week Headers
         Row(
             modifier = Modifier
@@ -83,8 +156,8 @@ fun CalendarView(
         Spacer(modifier = Modifier.height(8.dp))
 
         // Calendar Grid
-        val firstDayOfMonth = selectedMonth.atDay(1)
-        val lastDayOfMonth = selectedMonth.atEndOfMonth()
+        val firstDayOfMonth = month.atDay(1)
+        val lastDayOfMonth = month.atEndOfMonth()
         // DayOfWeek.value: Monday=1, Tuesday=2, ..., Sunday=7
         // For Sunday-first calendar: Sunday=0, Monday=1, ..., Saturday=6
         val startOffset = if (firstDayOfMonth.dayOfWeek == DayOfWeek.SUNDAY) 0 
@@ -96,7 +169,7 @@ fun CalendarView(
             repeat(startOffset) { add(null) }
             // Add days of the month
             for (day in 1..daysInMonth) {
-                add(selectedMonth.atDay(day))
+                add(month.atDay(day))
             }
         }
 
