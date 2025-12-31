@@ -16,7 +16,6 @@ import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -44,24 +43,31 @@ fun CalendarView(
     onMonthChanged: (YearMonth) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    // Initialize pager state centered at a large value to allow bidirectional swiping
-    val initialPage = 10000
-    val pagerState = rememberPagerState(
-        initialPage = initialPage,
-        pageCount = { 20000 } // Large number to simulate infinite scrolling
-    )
+    // Constants for pager configuration
+    val CALENDAR_INITIAL_PAGE = 10000
+    val CALENDAR_MAX_PAGES = 20000
     
-    // Remember the base month for offset calculations
-    val baseMonth = remember { selectedMonth }
+    // Initialize pager state centered at a large value to allow bidirectional swiping
+    val pagerState = rememberPagerState(
+        initialPage = CALENDAR_INITIAL_PAGE,
+        pageCount = { CALENDAR_MAX_PAGES } // Large number to simulate infinite scrolling
+    )
     
     // Track month changes from swipe gestures
     LaunchedEffect(pagerState.currentPage) {
-        val offset = pagerState.currentPage - initialPage
+        val offset = pagerState.currentPage - CALENDAR_INITIAL_PAGE
         if (offset != 0) {
-            val newMonth = baseMonth.plusMonths(offset.toLong())
+            val newMonth = selectedMonth.plusMonths(offset.toLong())
             if (newMonth != selectedMonth) {
                 onMonthChanged(newMonth)
             }
+        }
+    }
+    
+    // Reset pager to center when month changes externally (e.g., arrow buttons)
+    LaunchedEffect(selectedMonth) {
+        if (pagerState.currentPage != CALENDAR_INITIAL_PAGE) {
+            pagerState.scrollToPage(CALENDAR_INITIAL_PAGE)
         }
     }
     
@@ -91,8 +97,8 @@ fun CalendarView(
             state = pagerState,
             modifier = Modifier.fillMaxWidth()
         ) { page ->
-            val offset = page - initialPage
-            val monthToDisplay = baseMonth.plusMonths(offset.toLong())
+            val offset = page - CALENDAR_INITIAL_PAGE
+            val monthToDisplay = selectedMonth.plusMonths(offset.toLong())
             
             MonthCalendarGrid(
                 month = monthToDisplay,

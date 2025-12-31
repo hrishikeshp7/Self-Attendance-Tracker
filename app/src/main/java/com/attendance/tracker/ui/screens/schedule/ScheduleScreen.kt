@@ -14,7 +14,6 @@ import androidx.compose.ui.unit.dp
 import com.attendance.tracker.data.model.ScheduleEntry
 import com.attendance.tracker.data.model.Subject
 import com.attendance.tracker.data.model.getDisplayName
-import kotlinx.coroutines.launch
 import java.time.DayOfWeek
 import java.time.format.TextStyle
 import java.util.Locale
@@ -30,7 +29,6 @@ fun ScheduleScreen(
     modifier: Modifier = Modifier
 ) {
     var selectedDay by remember { mutableStateOf(DayOfWeek.MONDAY) }
-    val scope = rememberCoroutineScope()
     
     // Initialize pager state for days of the week
     val pagerState = rememberPagerState(
@@ -38,14 +36,17 @@ fun ScheduleScreen(
         pageCount = { DayOfWeek.entries.size }
     )
     
-    // Sync pager state with selected day
+    // Sync selected day with pager state changes (from swipe)
     LaunchedEffect(pagerState.currentPage) {
-        selectedDay = DayOfWeek.entries[pagerState.currentPage]
+        val newDay = DayOfWeek.entries[pagerState.currentPage]
+        if (selectedDay != newDay) {
+            selectedDay = newDay
+        }
     }
     
-    // Sync selected day with pager when tabs are clicked
+    // Sync pager with selected day changes (from tab clicks)
     LaunchedEffect(selectedDay) {
-        if (pagerState.currentPage != selectedDay.ordinal) {
+        if (pagerState.currentPage != selectedDay.ordinal && !pagerState.isScrollInProgress) {
             pagerState.animateScrollToPage(selectedDay.ordinal)
         }
     }
@@ -76,12 +77,7 @@ fun ScheduleScreen(
                 DayOfWeek.entries.forEach { day ->
                     Tab(
                         selected = selectedDay == day,
-                        onClick = { 
-                            selectedDay = day
-                            scope.launch {
-                                pagerState.animateScrollToPage(day.ordinal)
-                            }
-                        },
+                        onClick = { selectedDay = day },
                         text = {
                             Text(
                                 text = day.getDisplayName(TextStyle.SHORT, Locale.getDefault())
