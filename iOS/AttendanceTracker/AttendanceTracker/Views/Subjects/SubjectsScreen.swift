@@ -269,5 +269,6 @@ struct EditSubjectSheet: View {
 }
 
 #Preview {
-    SubjectsScreen(viewModel: AttendanceViewModel(modelContext: try! ModelContainer(for: Subject.self, AttendanceRecord.self, ScheduleEntry.self).mainContext))
+    SubjectsScreen(viewModel: PreviewHelpers.previewViewModel())
+        .previewContainer()
 }

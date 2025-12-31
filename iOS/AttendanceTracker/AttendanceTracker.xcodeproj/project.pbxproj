@@ -25,6 +25,7 @@
 		016 /* SettingsScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 115 /* SettingsScreen.swift */; };
 		017 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 200 /* Assets.xcassets */; };
 		018 /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 201 /* Preview Assets.xcassets */; };
+		019 /* PreviewHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 116 /* PreviewHelpers.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -44,6 +45,7 @@
 		113 /* SubjectsScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubjectsScreen.swift; sourceTree = "<group>"; };
 		114 /* ScheduleScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScheduleScreen.swift; sourceTree = "<group>"; };
 		115 /* SettingsScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsScreen.swift; sourceTree = "<group>"; };
+		116 /* PreviewHelpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreviewHelpers.swift; sourceTree = "<group>"; };
 		200 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		201 /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
 		300 /* AttendanceTracker.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = AttendanceTracker.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -145,6 +147,7 @@
 				108 /* AttendanceChart.swift */,
 				109 /* CalendarView.swift */,
 				110 /* GitHubFooter.swift */,
+				116 /* PreviewHelpers.swift */,
 			);
 			path = Components;
 			sourceTree = "<group>";
@@ -275,6 +278,7 @@
 				014 /* SubjectsScreen.swift in Sources */,
 				015 /* ScheduleScreen.swift in Sources */,
 				016 /* SettingsScreen.swift in Sources */,
+				019 /* PreviewHelpers.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

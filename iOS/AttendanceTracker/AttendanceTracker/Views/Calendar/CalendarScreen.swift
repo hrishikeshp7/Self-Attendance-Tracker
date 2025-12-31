@@ -150,5 +150,6 @@ struct CalendarAttendanceButton: View {
 }
 
 #Preview {
-    CalendarScreen(viewModel: AttendanceViewModel(modelContext: try! ModelContainer(for: Subject.self, AttendanceRecord.self, ScheduleEntry.self).mainContext))
+    CalendarScreen(viewModel: PreviewHelpers.previewViewModel())
+        .previewContainer()
 }

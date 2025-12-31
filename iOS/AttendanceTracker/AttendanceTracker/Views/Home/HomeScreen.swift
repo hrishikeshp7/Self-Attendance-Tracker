@@ -160,5 +160,6 @@ struct AddSubjectSheet: View {
 }
 
 #Preview {
-    HomeScreen(viewModel: AttendanceViewModel(modelContext: try! ModelContainer(for: Subject.self, AttendanceRecord.self, ScheduleEntry.self).mainContext))
+    HomeScreen(viewModel: PreviewHelpers.previewViewModel())
+        .previewContainer()
 }

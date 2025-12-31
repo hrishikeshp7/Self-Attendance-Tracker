@@ -164,5 +164,6 @@ struct EditRequiredAttendanceSheet: View {
 }
 
 #Preview {
-    SettingsScreen(viewModel: AttendanceViewModel(modelContext: try! ModelContainer(for: Subject.self, AttendanceRecord.self, ScheduleEntry.self).mainContext))
+    SettingsScreen(viewModel: PreviewHelpers.previewViewModel())
+        .previewContainer()
 }

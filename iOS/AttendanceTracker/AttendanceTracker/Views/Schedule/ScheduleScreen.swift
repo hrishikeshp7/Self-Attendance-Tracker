@@ -142,5 +142,6 @@ struct ScheduleSubjectItem: View {
 }
 
 #Preview {
-    ScheduleScreen(viewModel: AttendanceViewModel(modelContext: try! ModelContainer(for: Subject.self, AttendanceRecord.self, ScheduleEntry.self).mainContext))
+    ScheduleScreen(viewModel: PreviewHelpers.previewViewModel())
+        .previewContainer()
 }

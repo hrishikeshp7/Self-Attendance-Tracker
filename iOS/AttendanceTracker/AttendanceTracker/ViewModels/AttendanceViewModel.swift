@@ -207,12 +207,13 @@ class AttendanceViewModel: ObservableObject {
             )
             let existingRecords = try modelContext.fetch(descriptor)
             let oldRecord = existingRecords.first
+            let oldStatus = oldRecord?.status
             
             // Record action for undo/redo
             let action = AttendanceAction(
                 subjectId: subjectId,
                 date: date,
-                oldStatus: oldRecord?.status,
+                oldStatus: oldStatus,
                 newStatus: status,
                 oldPresentCount: subject.presentLectures,
                 oldAbsentCount: subject.absentLectures
@@ -223,21 +224,48 @@ class AttendanceViewModel: ObservableObject {
             // Update or create attendance record
             if let existingRecord = oldRecord {
                 existingRecord.status = status
+                
+                // Only update counts if status is changing
+                if oldStatus != status {
+                    // Reverse the old status counts
+                    switch oldStatus {
+                    case .present:
+                        subject.presentLectures = max(0, subject.presentLectures - 1)
+                        subject.totalLectures = max(0, subject.totalLectures - 1)
+                    case .absent:
+                        subject.absentLectures = max(0, subject.absentLectures - 1)
+                        subject.totalLectures = max(0, subject.totalLectures - 1)
+                    case .noClass, .none:
+                        break
+                    }
+                    
+                    // Apply the new status counts
+                    switch status {
+                    case .present:
+                        subject.presentLectures += 1
+                        subject.totalLectures += 1
+                    case .absent:
+                        subject.absentLectures += 1
+                        subject.totalLectures += 1
+                    case .noClass:
+                        break
+                    }
+                }
             } else {
                 let record = AttendanceRecord(subjectId: subjectId, date: date, status: status)
                 modelContext.insert(record)
-            }
-            
-            // Update subject counts
-            switch status {
-            case .present:
-                subject.presentLectures += 1
-                subject.totalLectures += 1
-            case .absent:
-                subject.absentLectures += 1
-                subject.totalLectures += 1
-            case .noClass:
-                break
+                
+                // Update subject counts for new record
+                switch status {
+                case .present:
+                    subject.presentLectures += 1
+                    subject.totalLectures += 1
+                case .absent:
+                    subject.absentLectures += 1
+                    subject.totalLectures += 1
+                case .noClass:
+                    break
+                }
             }
             
             saveContext()
