@@ -1,10 +1,6 @@
 name: Build and Release APK
 
 on:
-  pull_request:
-    types: [closed]
-    branches:
-      - main
   workflow_dispatch:
     inputs:
       release_name:
@@ -14,8 +10,6 @@ on:
 
 jobs:
   build:
-    # Only run on merged PRs or workflow_dispatch
-    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
     runs-on: ubuntu-latest
     
     permissions:
