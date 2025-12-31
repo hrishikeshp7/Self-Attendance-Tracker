@@ -1,10 +1,6 @@
 name: Build and Release APK
 
 on:
-  pull_request:
-    types: [closed]
-    branches:
-      - main
   workflow_dispatch:
     inputs:
       release_name:
@@ -14,8 +10,6 @@ on:
 
 jobs:
   build:
-    # Only run on merged PRs or workflow_dispatch
-    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
     runs-on: ubuntu-latest
     
     permissions:
@@ -61,9 +55,6 @@ jobs:
           KEY_PASSWORD: android
         run: ./gradlew assembleRelease
 
-      - name: Build Debug APK
-        run: ./gradlew assembleDebug
-
       - name: Get version info
         id: version
         run: |
@@ -76,19 +67,12 @@ jobs:
       - name: Rename APK files
         run: |
           mv app/build/outputs/apk/release/app-release.apk app/build/outputs/apk/release/AttendanceTracker-v${{ steps.version.outputs.version_name }}-release.apk || true
-          mv app/build/outputs/apk/debug/app-debug.apk app/build/outputs/apk/debug/AttendanceTracker-v${{ steps.version.outputs.version_name }}-debug.apk || true
 
       - name: Upload Release APK
         uses: actions/upload-artifact@v4
         with:
           name: release-apk
           path: app/build/outputs/apk/release/*.apk
-
-      - name: Upload Debug APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: debug-apk
-          path: app/build/outputs/apk/debug/*.apk
 
       - name: Create Release
         if: github.event_name == 'workflow_dispatch'
@@ -103,9 +87,8 @@ jobs:
             **Build:** ${{ steps.version.outputs.version_code }}
             **Date:** ${{ steps.version.outputs.date }}
             
-            ### Downloads
+            ### Download
             - **Release APK** - Production-ready build
-            - **Debug APK** - Development build with debugging enabled
             
             ### Features
             - 📱 Track attendance for multiple subjects
@@ -114,9 +97,7 @@ jobs:
             - 🌙 Dark mode support
             - ⚙️ Customizable required attendance per subject
             - 📆 Weekly schedule management
-          files: |
-            app/build/outputs/apk/release/*.apk
-            app/build/outputs/apk/debug/*.apk
+          files: app/build/outputs/apk/release/*.apk
           draft: false
           prerelease: false
         env:
