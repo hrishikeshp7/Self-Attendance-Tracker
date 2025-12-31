@@ -138,7 +138,7 @@ struct DayCell: View {
                 
                 Text("\(dayNumber)")
                     .font(.subheadline)
-                    .foregroundColor(isSelected ? .white : (attendanceColor != nil ? attendanceColor! : .primary))
+                    .foregroundColor(isSelected ? .white : (attendanceColor ?? .primary))
             }
         }
         .buttonStyle(PlainButtonStyle())

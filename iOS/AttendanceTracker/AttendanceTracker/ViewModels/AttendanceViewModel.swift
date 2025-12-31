@@ -60,6 +60,48 @@ class AttendanceViewModel: ObservableObject {
         loadAttendanceForDate(Date())
     }
     
+    // MARK: - Helper Methods
+    
+    /// Get the start and end of day for a given date
+    private func dayRange(for date: Date) -> (start: Date, end: Date) {
+        let calendar = Calendar.current
+        let startOfDay = calendar.startOfDay(for: date)
+        let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay) ?? startOfDay
+        return (startOfDay, endOfDay)
+    }
+    
+    /// Update subject attendance counts based on status change
+    private func updateSubjectCounts(_ subject: Subject, oldStatus: AttendanceStatus?, newStatus: AttendanceStatus) {
+        // Only update if status is changing
+        guard oldStatus != newStatus else { return }
+        
+        // Reverse the old status counts
+        if let oldStatus = oldStatus {
+            switch oldStatus {
+            case .present:
+                subject.presentLectures = max(0, subject.presentLectures - 1)
+                subject.totalLectures = max(0, subject.totalLectures - 1)
+            case .absent:
+                subject.absentLectures = max(0, subject.absentLectures - 1)
+                subject.totalLectures = max(0, subject.totalLectures - 1)
+            case .noClass:
+                break
+            }
+        }
+        
+        // Apply the new status counts
+        switch newStatus {
+        case .present:
+            subject.presentLectures += 1
+            subject.totalLectures += 1
+        case .absent:
+            subject.absentLectures += 1
+            subject.totalLectures += 1
+        case .noClass:
+            break
+        }
+    }
+    
     // MARK: - Data Loading
     
     func loadData() {
@@ -89,9 +131,9 @@ class AttendanceViewModel: ObservableObject {
     
     func loadAttendanceForDate(_ date: Date) {
         do {
-            let calendar = Calendar.current
-            let startOfDay = calendar.startOfDay(for: date)
-            let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay)!
+            let range = dayRange(for: date)
+            let startOfDay = range.start
+            let endOfDay = range.end
             
             let descriptor = FetchDescriptor<AttendanceRecord>(
                 predicate: #Predicate { record in
@@ -195,9 +237,9 @@ class AttendanceViewModel: ObservableObject {
         guard let subject = allSubjectsIncludingFolders.first(where: { $0.id == subjectId }) else { return }
         
         // Get existing record for this date
-        let calendar = Calendar.current
-        let startOfDay = calendar.startOfDay(for: date)
-        let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay)!
+        let range = dayRange(for: date)
+        let startOfDay = range.start
+        let endOfDay = range.end
         
         do {
             let descriptor = FetchDescriptor<AttendanceRecord>(
@@ -224,48 +266,11 @@ class AttendanceViewModel: ObservableObject {
             // Update or create attendance record
             if let existingRecord = oldRecord {
                 existingRecord.status = status
-                
-                // Only update counts if status is changing
-                if oldStatus != status {
-                    // Reverse the old status counts
-                    switch oldStatus {
-                    case .present:
-                        subject.presentLectures = max(0, subject.presentLectures - 1)
-                        subject.totalLectures = max(0, subject.totalLectures - 1)
-                    case .absent:
-                        subject.absentLectures = max(0, subject.absentLectures - 1)
-                        subject.totalLectures = max(0, subject.totalLectures - 1)
-                    case .noClass, .none:
-                        break
-                    }
-                    
-                    // Apply the new status counts
-                    switch status {
-                    case .present:
-                        subject.presentLectures += 1
-                        subject.totalLectures += 1
-                    case .absent:
-                        subject.absentLectures += 1
-                        subject.totalLectures += 1
-                    case .noClass:
-                        break
-                    }
-                }
+                updateSubjectCounts(subject, oldStatus: oldStatus, newStatus: status)
             } else {
                 let record = AttendanceRecord(subjectId: subjectId, date: date, status: status)
                 modelContext.insert(record)
-                
-                // Update subject counts for new record
-                switch status {
-                case .present:
-                    subject.presentLectures += 1
-                    subject.totalLectures += 1
-                case .absent:
-                    subject.absentLectures += 1
-                    subject.totalLectures += 1
-                case .noClass:
-                    break
-                }
+                updateSubjectCounts(subject, oldStatus: nil, newStatus: status)
             }
             
             saveContext()
@@ -286,9 +291,9 @@ class AttendanceViewModel: ObservableObject {
             subject.totalLectures = action.oldPresentCount + action.oldAbsentCount
             
             // Restore or delete attendance record
-            let calendar = Calendar.current
-            let startOfDay = calendar.startOfDay(for: action.date)
-            let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay)!
+            let range = dayRange(for: action.date)
+            let startOfDay = range.start
+            let endOfDay = range.end
             
             do {
                 let descriptor = FetchDescriptor<AttendanceRecord>(
@@ -319,9 +324,9 @@ class AttendanceViewModel: ObservableObject {
         
         if let subject = allSubjectsIncludingFolders.first(where: { $0.id == action.subjectId }) {
             // Reapply the attendance
-            let calendar = Calendar.current
-            let startOfDay = calendar.startOfDay(for: action.date)
-            let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay)!
+            let range = dayRange(for: action.date)
+            let startOfDay = range.start
+            let endOfDay = range.end
             
             do {
                 let descriptor = FetchDescriptor<AttendanceRecord>(
@@ -338,17 +343,8 @@ class AttendanceViewModel: ObservableObject {
                     modelContext.insert(record)
                 }
                 
-                // Update subject counts
-                switch action.newStatus {
-                case .present:
-                    subject.presentLectures += 1
-                    subject.totalLectures += 1
-                case .absent:
-                    subject.absentLectures += 1
-                    subject.totalLectures += 1
-                case .noClass:
-                    break
-                }
+                // Update subject counts using helper
+                updateSubjectCounts(subject, oldStatus: action.oldStatus, newStatus: action.newStatus)
                 
                 saveContext()
                 loadAttendanceForDate(action.date)
