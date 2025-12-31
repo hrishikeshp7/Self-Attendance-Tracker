@@ -1,15 +1,6 @@
-# Attendance Tracker
+# Attendance Tracker - iOS
 
-A cross-platform application for tracking and managing class attendance. Available for both Android and iOS.
-
-## Platforms
-
-| Platform | Technology | Directory |
-|----------|------------|-----------|
-| **Android** | Kotlin, Jetpack Compose, Room | `/app` |
-| **iOS** | Swift, SwiftUI, SwiftData | `/iOS` |
-
-[![Build and Release APK](https://github.com/hrishikeshp7/web-sf-hf/actions/workflows/build-release.yml/badge.svg)](https://github.com/hrishikeshp7/web-sf-hf/actions/workflows/build-release.yml)
+An iOS application for tracking and managing class attendance. Built with Swift, SwiftUI, and SwiftData.
 
 ## Features
 
@@ -22,17 +13,18 @@ A cross-platform application for tracking and managing class attendance. Availab
   - **No Class** - Mark as no class scheduled
 - Real-time attendance percentage calculation
 - Visual indicators for attendance status (green for above required, red for below)
+- Undo/Redo support for attendance marking
 
 ### 🌙 Dark Mode Support
 - Automatic dark mode based on system settings
-- Beautiful Material 3 theming in both light and dark modes
-- Dynamic colors on Android 12+ devices
+- Beautiful SwiftUI styling in both light and dark modes
 
 ### 📅 Calendar View
 - Monthly calendar with attendance history
 - Color-coded days showing attendance status
 - View detailed attendance records for any selected day
 - Easy month navigation
+- Mark attendance for past dates
 
 ### 📚 Subject Management
 - Add new subjects with custom names
@@ -42,11 +34,12 @@ A cross-platform application for tracking and managing class attendance. Availab
   - Required attendance percentage
   - Present/Absent lecture counts
 - Delete subjects with confirmation
+- **Folder organization** - Group subjects into folders (like "Pathology")
 
 ### 📆 Weekly Schedule
 - Set which subjects occur on which days of the week
 - Toggle subjects on/off for each day
-- Visual schedule overview
+- Visual schedule overview with swipeable day tabs
 
 ### ⚙️ Settings
 - View and modify required attendance baseline for each subject
@@ -55,16 +48,6 @@ A cross-platform application for tracking and managing class attendance. Availab
 
 ## Tech Stack
 
-### Android
-- **Language**: Kotlin
-- **UI Framework**: Jetpack Compose with Material 3
-- **Database**: Room (SQLite)
-- **Architecture**: MVVM (Model-View-ViewModel)
-- **Navigation**: Jetpack Navigation Compose
-- **Minimum SDK**: 26 (Android 8.0)
-- **Target SDK**: 36 (Android 16)
-
-### iOS
 - **Language**: Swift 5.9+
 - **UI Framework**: SwiftUI
 - **Database**: SwiftData
@@ -74,44 +57,6 @@ A cross-platform application for tracking and managing class attendance. Availab
 
 ## Project Structure
 
-### Android Project
-
-```
-app/src/main/java/com/attendance/tracker/
-├── data/
-│   ├── database/
-│   │   ├── AttendanceDatabase.kt    # Room database configuration
-│   │   ├── Converters.kt            # Type converters for Room
-│   │   ├── AttendanceDao.kt         # DAO for attendance records
-│   │   ├── ScheduleDao.kt           # DAO for schedule entries
-│   │   └── SubjectDao.kt            # DAO for subjects
-│   ├── model/
-│   │   ├── Subject.kt               # Subject data model
-│   │   ├── AttendanceRecord.kt      # Attendance record model
-│   │   └── ScheduleEntry.kt         # Schedule entry model
-│   └── repository/
-│       └── AttendanceRepository.kt  # Repository pattern implementation
-├── ui/
-│   ├── components/
-│   │   ├── SubjectCard.kt           # Reusable subject card component
-│   │   └── CalendarView.kt          # Custom calendar component
-│   ├── screens/
-│   │   ├── home/HomeScreen.kt       # Home screen
-│   │   ├── calendar/CalendarScreen.kt
-│   │   ├── subjects/SubjectsScreen.kt
-│   │   ├── schedule/ScheduleScreen.kt
-│   │   └── settings/SettingsScreen.kt
-│   ├── theme/
-│   │   ├── Color.kt                 # App color definitions
-│   │   ├── Theme.kt                 # Material theme setup
-│   │   └── Type.kt                  # Typography definitions
-│   ├── AttendanceApp.kt             # Main app composable with navigation
-│   ├── AttendanceViewModel.kt       # Main ViewModel
-│   └── Screen.kt                    # Navigation routes
-└── MainActivity.kt                  # Main activity entry point
-```
-
-### iOS Project
 ```
 iOS/AttendanceTracker/AttendanceTracker/
 ├── Models/
@@ -126,11 +71,16 @@ iOS/AttendanceTracker/AttendanceTracker/
 │   │   ├── AttendanceChart.swift   # Pie chart component
 │   │   ├── CalendarView.swift      # Custom calendar component
 │   │   └── GitHubFooter.swift      # Footer with GitHub link
-│   ├── Home/HomeScreen.swift       # Home screen
-│   ├── Calendar/CalendarScreen.swift
-│   ├── Subjects/SubjectsScreen.swift
-│   ├── Schedule/ScheduleScreen.swift
-│   └── Settings/SettingsScreen.swift
+│   ├── Home/
+│   │   └── HomeScreen.swift        # Home screen
+│   ├── Calendar/
+│   │   └── CalendarScreen.swift    # Calendar screen
+│   ├── Subjects/
+│   │   └── SubjectsScreen.swift    # Subjects management screen
+│   ├── Schedule/
+│   │   └── ScheduleScreen.swift    # Weekly schedule screen
+│   └── Settings/
+│       └── SettingsScreen.swift    # Settings screen
 ├── Theme/
 │   └── AppColors.swift             # App color definitions
 ├── AttendanceTrackerApp.swift      # Main app entry point
@@ -139,40 +89,12 @@ iOS/AttendanceTracker/AttendanceTracker/
 
 ## Building the Project
 
-### Android
-
-#### Prerequisites
-- Android Studio Hedgehog or newer
-- JDK 17
-- Android SDK 36
-
-#### Build Steps
-
-1. Clone the repository:
-```bash
-git clone https://github.com/hrishikeshp7/web-sf-hf.git
-cd web-sf-hf
-```
-
-2. Open the project in Android Studio
-
-3. Sync Gradle files
-
-4. Build and run on an emulator or physical device:
-```bash
-./gradlew assembleDebug
-```
-
-Or use Android Studio's Run button.
-
-### iOS
-
-#### Prerequisites
+### Prerequisites
 - Xcode 15.0 or newer
 - macOS Sonoma or newer
 - iOS 17.0+ SDK
 
-#### Build Steps
+### Build Steps
 
 1. Clone the repository:
 ```bash
@@ -193,7 +115,7 @@ open AttendanceTracker.xcodeproj
 
 ### Adding Your First Subject
 1. Open the app
-2. Tap the **+** floating action button on the home screen
+2. Tap the **+** button in the navigation bar
 3. Enter the subject name and required attendance percentage
 4. Tap "Add"
 
@@ -201,10 +123,11 @@ open AttendanceTracker.xcodeproj
 1. On the home screen, each subject shows three buttons: Present, Absent, No Class
 2. Tap the appropriate button for each subject
 3. The attendance statistics update automatically
+4. Use the Undo/Redo buttons to correct mistakes
 
 ### Setting Up Weekly Schedule
 1. Navigate to the "Schedule" tab
-2. Select a day of the week
+2. Select a day of the week from the tabs
 3. Toggle on/off which subjects occur on that day
 
 ### Viewing Attendance History
@@ -216,18 +139,33 @@ open AttendanceTracker.xcodeproj
    - 🔴 Red: At least one class marked as Absent
    - ⚫ Gray: No Class marked
 
+### Creating Folders
+1. Navigate to the "Subjects" tab
+2. Tap the + button
+3. Toggle "Create as folder" switch ON
+4. Enter folder name (e.g., "Pathology")
+5. Tap "Add"
+6. Tap on the folder to navigate into it and add subjects
+
 ### Editing Subject Settings
 1. Navigate to the "Subjects" tab to edit subject details
 2. Or use the "Settings" tab to adjust only the required attendance percentage
 
-## Download
+## Comparison with Android Version
 
-You can download the latest APK from the [Releases page](https://github.com/hrishikeshp7/web-sf-hf/releases).
+This iOS app is a direct port of the Android Attendance Tracker app, maintaining feature parity:
 
-### Automated Releases
-APK releases are automatically created:
-- When a pull request is merged to main
-- Via manual workflow dispatch from the Actions tab
+| Feature | Android | iOS |
+|---------|---------|-----|
+| Language | Kotlin | Swift |
+| UI Framework | Jetpack Compose | SwiftUI |
+| Database | Room | SwiftData |
+| Architecture | MVVM | MVVM |
+| Dark Mode | ✅ | ✅ |
+| Folders | ✅ | ✅ |
+| Undo/Redo | ✅ | ✅ |
+| Calendar | ✅ | ✅ |
+| Schedule | ✅ | ✅ |
 
 ## Author
 
@@ -236,4 +174,3 @@ Made with ❤️ by [hrishikeshp7](https://github.com/hrishikeshp7)
 ## License
 
 This project is open source and available under the MIT License.
-
