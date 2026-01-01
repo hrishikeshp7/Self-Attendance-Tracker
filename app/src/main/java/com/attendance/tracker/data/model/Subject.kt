@@ -34,6 +34,16 @@ data class Subject(
         get() {
             if (isAboveRequired || totalLectures == 0) return 0
             
+            // Edge case: if 100% required and already missed classes, impossible to reach
+            if (requiredAttendance >= 100) {
+                return if (presentLectures < totalLectures) {
+                    // Can't reach 100% if already missed classes - return a large number to indicate impossibility
+                    999
+                } else {
+                    0
+                }
+            }
+            
             // Formula: (P + x) / (T + x) = R/100
             // Where P = present, T = total, R = required%, x = classes to attend
             // Solving: x = (R*T - 100*P) / (100 - R)
@@ -54,6 +64,9 @@ data class Subject(
     val classesCanBunk: Int
         get() {
             if (!isAboveRequired || totalLectures == 0) return 0
+            
+            // Edge case: if required attendance is 0 or negative (invalid), can bunk all future classes
+            if (requiredAttendance <= 0) return 999
             
             // Formula: (P) / (T + x) = R/100
             // Where P = present, T = total, R = required%, x = classes can bunk
