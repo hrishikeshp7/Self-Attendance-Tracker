@@ -83,21 +83,21 @@ fun CustomizationsScreen(
                             selected = currentThemeMode == ThemeMode.SYSTEM,
                             onClick = { onThemeModeChange(ThemeMode.SYSTEM) }
                         )
-                        HorizontalDivider()
+                        Divider()
                         ThemeModeOption(
                             title = "Light",
                             description = "Light theme with bright colors",
                             selected = currentThemeMode == ThemeMode.LIGHT,
                             onClick = { onThemeModeChange(ThemeMode.LIGHT) }
                         )
-                        HorizontalDivider()
+                        Divider()
                         ThemeModeOption(
                             title = "Dark",
                             description = "Dark theme for low-light environments",
                             selected = currentThemeMode == ThemeMode.DARK,
                             onClick = { onThemeModeChange(ThemeMode.DARK) }
                         )
-                        HorizontalDivider()
+                        Divider()
                         ThemeModeOption(
                             title = "AMOLED",
                             description = "Pure black theme for battery saving on AMOLED displays",
@@ -140,7 +140,7 @@ fun CustomizationsScreen(
                             }
                         )
 
-                        HorizontalDivider()
+                        Divider()
 
                         // Secondary Color
                         ColorCustomizationRow(
@@ -185,7 +185,7 @@ fun CustomizationsScreen(
                                 onCustomColorsChange(0xFF0277BD, 0xFF00ACC1)
                             }
                         )
-                        HorizontalDivider()
+                        Divider()
                         PrebuiltSchemeOption(
                             title = "Forest Green",
                             primaryColor = Color(0xFF388E3C),
@@ -194,7 +194,7 @@ fun CustomizationsScreen(
                                 onCustomColorsChange(0xFF388E3C, 0xFF66BB6A)
                             }
                         )
-                        HorizontalDivider()
+                        Divider()
                         PrebuiltSchemeOption(
                             title = "Purple Dream",
                             primaryColor = Color(0xFF7B1FA2),
@@ -203,7 +203,7 @@ fun CustomizationsScreen(
                                 onCustomColorsChange(0xFF7B1FA2, 0xFFAB47BC)
                             }
                         )
-                        HorizontalDivider()
+                        Divider()
                         PrebuiltSchemeOption(
                             title = "Sunset Orange",
                             primaryColor = Color(0xFFE64A19),
@@ -212,7 +212,7 @@ fun CustomizationsScreen(
                                 onCustomColorsChange(0xFFE64A19, 0xFFFF6F00)
                             }
                         )
-                        HorizontalDivider()
+                        Divider()
                         PrebuiltSchemeOption(
                             title = "Default",
                             primaryColor = Color(0xFF1976D2),

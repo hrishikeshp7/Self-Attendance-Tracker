@@ -116,8 +116,6 @@ class AttendanceGlanceWidget : GlanceAppWidget() {
 
     @Composable
     private fun SubjectWidgetRow(subject: Subject, textColor: ColorProvider, isAmoled: Boolean) {
-    @Composable
-    private fun SubjectWidgetRow(subject: Subject, textColor: ColorProvider, isAmoled: Boolean) {
         Row(
             modifier = GlanceModifier
                 .fillMaxWidth()
