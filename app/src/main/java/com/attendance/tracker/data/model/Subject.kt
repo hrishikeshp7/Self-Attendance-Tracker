@@ -23,6 +23,44 @@ data class Subject(
     
     val isAboveRequired: Boolean
         get() = currentAttendancePercentage >= requiredAttendance
+    
+    /**
+     * Calculate how many classes need to be attended to meet the required attendance
+     * Returns 0 if already above required attendance
+     */
+    val classesToAttend: Int
+        get() {
+            if (isAboveRequired || totalLectures == 0) return 0
+            
+            // Formula: (P + x) / (T + x) = R/100
+            // Where P = present, T = total, R = required%, x = classes to attend
+            // Solving: x = (R*T - 100*P) / (100 - R)
+            val numerator = (requiredAttendance * totalLectures) - (100 * presentLectures)
+            val denominator = 100 - requiredAttendance
+            
+            return if (denominator > 0) {
+                kotlin.math.ceil(numerator.toDouble() / denominator).toInt().coerceAtLeast(0)
+            } else {
+                0
+            }
+        }
+    
+    /**
+     * Calculate how many classes can be bunked while maintaining required attendance
+     * Returns 0 if below required attendance or at the threshold
+     */
+    val classesCanBunk: Int
+        get() {
+            if (!isAboveRequired || totalLectures == 0) return 0
+            
+            // Formula: (P) / (T + x) = R/100
+            // Where P = present, T = total, R = required%, x = classes can bunk
+            // Solving: x = (100*P/R) - T
+            val maxTotalWithBunks = (100.0 * presentLectures) / requiredAttendance
+            val canBunk = kotlin.math.floor(maxTotalWithBunks - totalLectures).toInt()
+            
+            return canBunk.coerceAtLeast(0)
+        }
 }
 
 /**

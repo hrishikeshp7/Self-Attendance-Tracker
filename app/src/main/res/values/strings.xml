@@ -31,4 +31,9 @@
     <string name="sunday">Sunday</string>
     <string name="no_subjects">No subjects added yet</string>
     <string name="add_first_subject">Add your first subject to start tracking attendance</string>
+    <string name="widget_description">View your attendance at a glance</string>
+    <string name="loading">Loading…</string>
+    <string name="attendance_overview">Attendance Overview</string>
+    <string name="classes_to_attend">Classes to attend: %1$d</string>
+    <string name="classes_can_bunk">Classes can bunk: %1$d</string>
 </resources>
