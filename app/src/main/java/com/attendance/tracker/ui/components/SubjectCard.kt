@@ -30,9 +30,12 @@ fun SubjectCard(
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
-        onClick = onCardClick
+            .padding(horizontal = 16.dp, vertical = 6.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
+        onClick = onCardClick,
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
+        )
     ) {
         Column(
             modifier = Modifier
@@ -48,13 +51,19 @@ fun SubjectCard(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = subject.getDisplayName(allSubjects),
-                        style = MaterialTheme.typography.titleLarge
+                        style = MaterialTheme.typography.titleLarge,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = "Tap to view calendar",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     TextButton(
                         onClick = onEditClick,
                         contentPadding = PaddingValues(0.dp)
                     ) {
-                        Text("Edit")
+                        Text("Edit Subject")
                     }
                 }
                 
@@ -62,12 +71,15 @@ fun SubjectCard(
                 AttendancePieChart(
                     percentage = subject.currentAttendancePercentage,
                     requiredPercentage = subject.requiredAttendance,
-                    size = 70.dp,
-                    strokeWidth = 8.dp
+                    size = 80.dp,
+                    strokeWidth = 9.dp
                 )
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Divider(
+                modifier = Modifier.padding(vertical = 12.dp),
+                color = MaterialTheme.colorScheme.outlineVariant
+            )
 
             // Attendance Statistics
             Row(
@@ -95,8 +107,8 @@ fun SubjectCard(
 
             // Attendance Percentage Text
             Text(
-                text = "Required: ${subject.requiredAttendance}%",
-                style = MaterialTheme.typography.bodySmall,
+                text = "Target: ${subject.requiredAttendance}%",
+                style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.fillMaxWidth(),
                 textAlign = TextAlign.Center
