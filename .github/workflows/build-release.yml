@@ -32,12 +32,19 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
-      - name: Setup Release Keystore
+      - name: Setup Release Keystore from Secrets
+        if: ${{ secrets.RELEASE_KEYSTORE_BASE64 != '' }}
         run: |
-          # Use persistent keystore from GitHub Secrets to ensure consistent signing across releases
+          echo "Using persistent keystore from secrets..."
+          echo "${{ secrets.RELEASE_KEYSTORE_BASE64 }}" | base64 -d > app/release.keystore
+
+      - name: Generate Temporary Keystore (Fallback)
+        if: ${{ secrets.RELEASE_KEYSTORE_BASE64 == '' }}
+        run: |
+          # Fallback: Generate a temporary keystore for forks/testing
           # This prevents "app not installed - conflicts with other package" errors during upgrades
           # 
-          # Setup Instructions:
+          # For production releases, configure GitHub Secrets:
           # 1. Generate a keystore once: keytool -genkeypair -v -keystore release.keystore -alias release \
           #    -keyalg RSA -keysize 2048 -validity 10000 -storepass <password> -keypass <password>
           # 2. Encode it: base64 release.keystore > release.keystore.base64
@@ -46,25 +53,18 @@ jobs:
           #    - RELEASE_KEYSTORE_PASSWORD: your keystore password
           #    - RELEASE_KEY_ALIAS: your key alias (usually "release")
           #    - RELEASE_KEY_PASSWORD: your key password
-          #
-          # Fallback: If secrets are not set, generate a temporary keystore (for forks/testing)
-          if [ -n "${{ secrets.RELEASE_KEYSTORE_BASE64 }}" ]; then
-            echo "Using persistent keystore from secrets..."
-            echo "${{ secrets.RELEASE_KEYSTORE_BASE64 }}" | base64 -d > app/release.keystore
-          else
-            echo "WARNING: RELEASE_KEYSTORE_BASE64 secret not found."
-            echo "Generating temporary keystore. This will cause signature conflicts between releases!"
-            echo "For production releases, please configure the keystore secrets as described above."
-            keytool -genkeypair -v \
-              -keystore app/release.keystore \
-              -alias release \
-              -keyalg RSA \
-              -keysize 2048 \
-              -validity 10000 \
-              -storepass android \
-              -keypass android \
-              -dname "CN=AttendanceTracker, OU=Development, O=AttendanceTracker, L=Unknown, ST=Unknown, C=US"
-          fi
+          echo "WARNING: RELEASE_KEYSTORE_BASE64 secret not found."
+          echo "Generating temporary keystore. This will cause signature conflicts between releases!"
+          echo "For production releases, please configure the keystore secrets as described above."
+          keytool -genkeypair -v \
+            -keystore app/release.keystore \
+            -alias release \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000 \
+            -storepass android \
+            -keypass android \
+            -dname "CN=AttendanceTracker, OU=Development, O=AttendanceTracker, L=Unknown, ST=Unknown, C=US"
 
       - name: Build Release APK
         env:
