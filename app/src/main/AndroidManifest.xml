@@ -23,7 +23,7 @@
             </intent-filter>
         </activity>
 
-        <!-- Widget Receiver -->
+        <!-- Widget Receivers -->
         <receiver
             android:name=".widget.AttendanceWidgetReceiver"
             android:exported="true">
@@ -33,6 +33,28 @@
             <meta-data
                 android:name="android.appwidget.provider"
                 android:resource="@xml/attendance_widget_info" />
+        </receiver>
+        
+        <receiver
+            android:name=".widget.CompactWidgetReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/compact_widget_info" />
+        </receiver>
+        
+        <receiver
+            android:name=".widget.LargeWidgetReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/large_widget_info" />
         </receiver>
     </application>
 

@@ -32,6 +32,8 @@
     <string name="no_subjects">No subjects added yet</string>
     <string name="add_first_subject">Add your first subject to start tracking attendance</string>
     <string name="widget_description">View your attendance at a glance</string>
+    <string name="compact_widget_description">Compact attendance overview</string>
+    <string name="large_widget_description">Quick attendance marking</string>
     <string name="loading">Loading…</string>
     <string name="attendance_overview">Attendance Overview</string>
     <string name="classes_to_attend">Classes to attend: %1$d</string>
