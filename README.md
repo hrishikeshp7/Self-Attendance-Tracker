@@ -119,6 +119,49 @@ cd web-sf-hf
 
 Or use Android Studio's Run button.
 
+### Release Builds and Keystore Setup
+
+To ensure that users can upgrade between releases without "app not installed - conflicts with other package" errors, all release builds **must be signed with the same keystore**. 
+
+#### For Repository Maintainers
+
+If you're building releases via GitHub Actions, configure the following secrets:
+
+1. Generate a keystore file once (only needs to be done once):
+```bash
+keytool -genkeypair -v -keystore release.keystore -alias release \
+  -keyalg RSA -keysize 2048 -validity 10000 \
+  -storepass YourSecurePassword -keypass YourSecureKeyPassword \
+  -dname "CN=AttendanceTracker, OU=Development, O=AttendanceTracker, L=City, ST=State, C=US"
+```
+
+2. Encode the keystore to base64:
+```bash
+base64 release.keystore > release.keystore.base64
+```
+
+3. Add the following secrets to your GitHub repository (Settings → Secrets and variables → Actions):
+   - `RELEASE_KEYSTORE_BASE64`: Contents of `release.keystore.base64`
+   - `RELEASE_KEYSTORE_PASSWORD`: The password you used for `-storepass`
+   - `RELEASE_KEY_ALIAS`: The alias you used (e.g., "release")
+   - `RELEASE_KEY_PASSWORD`: The password you used for `-keypass`
+
+4. **Important**: Keep the original `release.keystore` file in a secure location as a backup. If you lose it, you won't be able to update the app for existing users.
+
+#### For Local Release Builds
+
+If building locally, you can:
+1. Use the same keystore file and set environment variables:
+```bash
+export KEYSTORE_FILE=path/to/release.keystore
+export KEYSTORE_PASSWORD=your_password
+export KEY_ALIAS=release
+export KEY_PASSWORD=your_key_password
+./gradlew assembleRelease
+```
+
+2. Or let the build script use the default temporary keystore (not recommended for production).
+
 ## Usage Guide
 
 ### Adding Your First Subject
