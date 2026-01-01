@@ -2,6 +2,8 @@ package com.attendance.tracker.data.model
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey
+import kotlin.math.ceil
+import kotlin.math.floor
 
 /**
  * Represents a subject/course for attendance tracking
@@ -39,7 +41,7 @@ data class Subject(
             val denominator = 100 - requiredAttendance
             
             return if (denominator > 0) {
-                kotlin.math.ceil(numerator.toDouble() / denominator).toInt().coerceAtLeast(0)
+                ceil(numerator.toDouble() / denominator).toInt().coerceAtLeast(0)
             } else {
                 0
             }
@@ -57,7 +59,7 @@ data class Subject(
             // Where P = present, T = total, R = required%, x = classes can bunk
             // Solving: x = (100*P/R) - T
             val maxTotalWithBunks = (100.0 * presentLectures) / requiredAttendance
-            val canBunk = kotlin.math.floor(maxTotalWithBunks - totalLectures).toInt()
+            val canBunk = floor(maxTotalWithBunks - totalLectures).toInt()
             
             return canBunk.coerceAtLeast(0)
         }

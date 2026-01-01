@@ -18,6 +18,7 @@ import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
 import androidx.glance.unit.ColorProvider
 import com.attendance.tracker.data.database.AttendanceDatabase
+import com.attendance.tracker.data.model.Subject
 import com.attendance.tracker.data.repository.AttendanceRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
@@ -45,7 +46,7 @@ class AttendanceGlanceWidget : GlanceAppWidget() {
     }
 
     @Composable
-    private fun AttendanceWidgetContent(subjects: List<com.attendance.tracker.data.model.Subject>) {
+    private fun AttendanceWidgetContent(subjects: List<Subject>) {
         Column(
             modifier = GlanceModifier
                 .fillMaxSize()
@@ -94,7 +95,7 @@ class AttendanceGlanceWidget : GlanceAppWidget() {
     }
 
     @Composable
-    private fun SubjectWidgetRow(subject: com.attendance.tracker.data.model.Subject) {
+    private fun SubjectWidgetRow(subject: Subject) {
         Row(
             modifier = GlanceModifier
                 .fillMaxWidth()
