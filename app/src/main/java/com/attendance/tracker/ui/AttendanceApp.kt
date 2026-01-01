@@ -57,6 +57,7 @@ fun AttendanceApp(
     val canUndo by viewModel.canUndo.collectAsState()
     val canRedo by viewModel.canRedo.collectAsState()
     val themePreference by viewModel.themePreference.collectAsState()
+    val notificationPreference by viewModel.notificationPreference.collectAsState()
 
     // Variables for navigation to subjects screen
     var showAddSubjectOnSubjectsScreen by remember { mutableStateOf(false) }
@@ -192,8 +193,12 @@ fun AttendanceApp(
                 SettingsScreen(
                     subjects = subjects,
                     allSubjects = allSubjectsIncludingFolders,
+                    notificationPreference = notificationPreference,
                     onUpdateRequiredAttendance = { subjectId, required ->
                         viewModel.updateRequiredAttendance(subjectId, required)
+                    },
+                    onUpdateNotificationPreference = { enabled, hour, minute, message ->
+                        viewModel.updateNotificationPreference(enabled, hour, minute, message)
                     },
                     onNavigateToAbout = {
                         navController.navigate(Screen.About.route)

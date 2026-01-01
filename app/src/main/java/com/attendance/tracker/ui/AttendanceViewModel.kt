@@ -25,6 +25,9 @@ class AttendanceViewModel(application: Application) : AndroidViewModel(applicati
     private val themeRepository = com.attendance.tracker.data.repository.ThemePreferenceRepository(
         database.themePreferenceDao()
     )
+    private val notificationRepository = com.attendance.tracker.data.repository.NotificationPreferenceRepository(
+        database.notificationPreferenceDao()
+    )
 
     // Undo/Redo Manager
     private val undoRedoManager = UndoRedoManager()
@@ -62,12 +65,20 @@ class AttendanceViewModel(application: Application) : AndroidViewModel(applicati
     val themePreference = themeRepository.themePreference
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
+    // Notification preferences
+    val notificationPreference = notificationRepository.notificationPreference
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
     init {
         // Load today's attendance when ViewModel is created
         loadAttendanceForDate(LocalDate.now())
         // Initialize theme preferences
         viewModelScope.launch {
             themeRepository.initializeDefaultIfNeeded()
+        }
+        // Initialize notification preferences
+        viewModelScope.launch {
+            notificationRepository.initializeDefaultIfNeeded()
         }
     }
 
@@ -272,6 +283,19 @@ class AttendanceViewModel(application: Application) : AndroidViewModel(applicati
     fun updateCustomColors(primaryColor: Long?, secondaryColor: Long?) {
         viewModelScope.launch {
             themeRepository.updateCustomColors(primaryColor, secondaryColor)
+        }
+    }
+
+    // Notification operations
+    fun updateNotificationPreference(enabled: Boolean, hour: Int, minute: Int, message: String) {
+        viewModelScope.launch {
+            notificationRepository.updateNotificationPreference(enabled, hour, minute, message)
+        }
+    }
+    
+    fun setNotificationEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            notificationRepository.setEnabled(enabled)
         }
     }
 }

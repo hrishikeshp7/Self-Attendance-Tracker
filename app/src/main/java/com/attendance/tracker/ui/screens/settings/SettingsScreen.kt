@@ -1,5 +1,7 @@
 package com.attendance.tracker.ui.screens.settings
 
+import android.Manifest
+import android.os.Build
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -10,25 +12,42 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.attendance.tracker.data.model.NotificationPreference
 import com.attendance.tracker.data.model.Subject
 import com.attendance.tracker.data.model.getDisplayName
+import com.attendance.tracker.notification.AttendanceNotificationManager
 import com.attendance.tracker.ui.theme.AbsentRed
 import com.attendance.tracker.ui.theme.PresentGreen
+import com.google.accompanist.permissions.ExperimentalPermissionsApi
+import com.google.accompanist.permissions.rememberPermissionState
+import com.google.accompanist.permissions.isGranted
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalPermissionsApi::class)
 @Composable
 fun SettingsScreen(
     subjects: List<Subject>,
     allSubjects: List<Subject>,
+    notificationPreference: NotificationPreference?,
     onUpdateRequiredAttendance: (Long, Int) -> Unit,
+    onUpdateNotificationPreference: (Boolean, Int, Int, String) -> Unit,
     onNavigateToAbout: () -> Unit,
     onNavigateToCustomizations: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     var selectedSubject by remember { mutableStateOf<Subject?>(null) }
     var showEditDialog by remember { mutableStateOf(false) }
+    var showNotificationDialog by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    
+    // Request notification permission for Android 13+
+    val notificationPermissionState = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        rememberPermissionState(Manifest.permission.POST_NOTIFICATIONS)
+    } else {
+        null
+    }
 
     Scaffold(
         topBar = {
@@ -270,6 +289,123 @@ private fun EditRequiredAttendanceDialog(
                 onClick = {
                     val required = requiredAttendance.toIntOrNull() ?: 75
                     onConfirm(required.coerceIn(0, 100))
+                }
+            ) {
+                Text("Save")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
+}
+
+@Composable
+private fun NotificationSettingsDialog(
+    notificationPreference: NotificationPreference?,
+    onDismiss: () -> Unit,
+    onSave: (Boolean, Int, Int, String) -> Unit
+) {
+    var enabled by remember { mutableStateOf(notificationPreference?.enabled ?: false) }
+    var hour by remember { mutableStateOf((notificationPreference?.startTimeHour ?: 9).toString()) }
+    var minute by remember { mutableStateOf((notificationPreference?.startTimeMinute ?: 0).toString()) }
+    var message by remember { mutableStateOf(notificationPreference?.message ?: "Time to mark your attendance!") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Notification Settings") },
+        text = {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                // Enable/Disable Switch
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Enable Notifications",
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                    Switch(
+                        checked = enabled,
+                        onCheckedChange = { enabled = it }
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Time Picker
+                Text(
+                    text = "Notification Time",
+                    style = MaterialTheme.typography.titleSmall,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+                
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedTextField(
+                        value = hour,
+                        onValueChange = { 
+                            if (it.all { c -> c.isDigit() } && it.length <= 2) {
+                                hour = it
+                            }
+                        },
+                        label = { Text("Hour") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        singleLine = true,
+                        modifier = Modifier.weight(1f),
+                        enabled = enabled,
+                        supportingText = { Text("0-23") }
+                    )
+                    OutlinedTextField(
+                        value = minute,
+                        onValueChange = { 
+                            if (it.all { c -> c.isDigit() } && it.length <= 2) {
+                                minute = it
+                            }
+                        },
+                        label = { Text("Minute") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        singleLine = true,
+                        modifier = Modifier.weight(1f),
+                        enabled = enabled,
+                        supportingText = { Text("0-59") }
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Message
+                OutlinedTextField(
+                    value = message,
+                    onValueChange = { message = it },
+                    label = { Text("Notification Message") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = enabled
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                Text(
+                    text = "Notification will persist until attendance is marked for all subjects.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    val h = hour.toIntOrNull()?.coerceIn(0, 23) ?: 9
+                    val m = minute.toIntOrNull()?.coerceIn(0, 59) ?: 0
+                    onSave(enabled, h, m, message)
                 }
             ) {
                 Text("Save")

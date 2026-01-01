@@ -18,6 +18,10 @@ import com.attendance.tracker.ui.theme.AttendanceTrackerTheme
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        
+        // Create notification channel
+        com.attendance.tracker.notification.AttendanceNotificationManager.createNotificationChannel(this)
+        
         setContent {
             val viewModel: AttendanceViewModel = viewModel()
             val themePreference by viewModel.themePreference.collectAsState(initial = null)
