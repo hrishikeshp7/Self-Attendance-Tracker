@@ -2,7 +2,6 @@ package com.attendance.tracker.ui
 
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Settings
@@ -14,13 +13,15 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.attendance.tracker.data.model.AttendanceStatus
 import com.attendance.tracker.ui.screens.about.AboutScreen
-import com.attendance.tracker.ui.screens.calendar.CalendarScreen
+import com.attendance.tracker.ui.screens.calendar.SubjectCalendarScreen
 import com.attendance.tracker.ui.screens.home.HomeScreen
 import com.attendance.tracker.ui.screens.schedule.ScheduleScreen
 import com.attendance.tracker.ui.screens.settings.SettingsScreen
@@ -34,7 +35,6 @@ data class BottomNavItem(
 
 val bottomNavItems = listOf(
     BottomNavItem(Screen.Home, Icons.Default.Home, "Home"),
-    BottomNavItem(Screen.Calendar, Icons.Default.CalendarMonth, "Calendar"),
     BottomNavItem(Screen.Subjects, Icons.Default.Subject, "Subjects"),
     BottomNavItem(Screen.Schedule, Icons.Default.Schedule, "Schedule"),
     BottomNavItem(Screen.Settings, Icons.Default.Settings, "Settings")
@@ -121,30 +121,42 @@ fun AttendanceApp(
                             }
                             launchSingleTop = true
                         }
+                    },
+                    onSubjectClick = { subject ->
+                        navController.navigate(Screen.SubjectCalendar.createRoute(subject.id))
                     }
                 )
             }
 
-            composable(Screen.Calendar.route) {
+            composable(
+                route = Screen.SubjectCalendar.route,
+                arguments = listOf(navArgument("subjectId") { type = NavType.LongType })
+            ) { backStackEntry ->
+                val subjectId = backStackEntry.arguments?.getLong("subjectId") ?: return@composable
+                val subject = allSubjectsIncludingFolders.find { it.id == subjectId } ?: return@composable
+                
                 // Load attendance for selected month when entering calendar screen
                 LaunchedEffect(selectedMonth) {
                     viewModel.loadAttendanceForMonth(selectedMonth)
                 }
 
-                CalendarScreen(
+                SubjectCalendarScreen(
+                    subject = subject,
+                    allSubjects = allSubjectsIncludingFolders,
                     selectedMonth = selectedMonth,
                     selectedDate = selectedDate,
                     attendanceRecords = attendanceRecords,
-                    subjects = subjects,
-                    allSubjects = allSubjectsIncludingFolders,
                     onDateSelected = { date ->
                         viewModel.setSelectedDate(date)
                     },
                     onMonthChanged = { month ->
                         viewModel.setSelectedMonth(month)
                     },
-                    onMarkAttendance = { subjectId, status, date ->
+                    onMarkAttendance = { status, date ->
                         viewModel.markAttendance(subjectId, status, date)
+                    },
+                    onNavigateBack = {
+                        navController.popBackStack()
                     }
                 )
             }

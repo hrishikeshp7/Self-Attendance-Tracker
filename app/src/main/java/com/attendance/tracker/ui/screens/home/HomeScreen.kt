@@ -15,8 +15,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.attendance.tracker.data.model.AttendanceStatus
 import com.attendance.tracker.data.model.Subject
-import com.attendance.tracker.ui.components.AttendanceWidget
-import com.attendance.tracker.ui.components.CompactAttendanceWidget
 import com.attendance.tracker.ui.components.SubjectCard
 import kotlinx.coroutines.launch
 import java.time.LocalDate
@@ -35,6 +33,7 @@ fun HomeScreen(
     onRedo: () -> Unit,
     onAddSubject: () -> Unit,
     onEditSubject: (Subject) -> Unit,
+    onSubjectClick: (Subject) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val today = LocalDate.now()
@@ -113,41 +112,63 @@ fun HomeScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            // Today's Date Header
-            Text(
-                text = today.format(dateFormatter),
-                style = MaterialTheme.typography.titleMedium,
+            // Today's Date Header with improved styling
+            Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(16.dp),
-                textAlign = TextAlign.Center,
-                color = MaterialTheme.colorScheme.primary
-            )
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer
+                )
+            ) {
+                Text(
+                    text = today.format(dateFormatter),
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    textAlign = TextAlign.Center,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+            }
 
             if (subjects.isEmpty()) {
-                // Empty State
+                // Empty State with improved styling
                 Box(
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxWidth(),
                     contentAlignment = Alignment.Center
                 ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier.padding(32.dp)
+                    Card(
+                        modifier = Modifier.padding(32.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.secondaryContainer
+                        )
                     ) {
-                        Text(
-                            text = "No subjects added yet",
-                            style = MaterialTheme.typography.titleLarge,
-                            textAlign = TextAlign.Center
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = "Tap the + button to add your first subject",
-                            style = MaterialTheme.typography.bodyMedium,
-                            textAlign = TextAlign.Center,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            modifier = Modifier.padding(32.dp)
+                        ) {
+                            Text(
+                                text = "📚",
+                                style = MaterialTheme.typography.displayLarge
+                            )
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text(
+                                text = "No subjects yet",
+                                style = MaterialTheme.typography.titleLarge,
+                                textAlign = TextAlign.Center,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = "Tap the + button to add your first subject and start tracking attendance",
+                                style = MaterialTheme.typography.bodyMedium,
+                                textAlign = TextAlign.Center,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                        }
                     }
                 }
             } else {
@@ -158,30 +179,6 @@ fun HomeScreen(
                         .fillMaxWidth(),
                     contentPadding = PaddingValues(bottom = 88.dp)
                 ) {
-                    // Compact Widget at the top
-                    item {
-                        CompactAttendanceWidget(
-                            subjects = subjects,
-                            allSubjects = allSubjects
-                        )
-                    }
-                    
-                    // Large Widget
-                    item {
-                        AttendanceWidget(
-                            subjects = subjects,
-                            allSubjects = allSubjects,
-                            todayAttendance = todayAttendance,
-                            onMarkAttendance = { subjectId, status ->
-                                onMarkAttendance(subjectId, status)
-                                val subject = subjects.find { it.id == subjectId }
-                                if (subject != null) {
-                                    showAttendanceSnackbar(subject.name, status)
-                                }
-                            }
-                        )
-                    }
-                    
                     // Subject Cards
                     items(subjects, key = { it.id }) { subject ->
                         SubjectCard(
@@ -200,7 +197,8 @@ fun HomeScreen(
                                 onMarkAttendance(subject.id, AttendanceStatus.NO_CLASS)
                                 showAttendanceSnackbar(subject.name, AttendanceStatus.NO_CLASS)
                             },
-                            onEditClick = { onEditSubject(subject) }
+                            onEditClick = { onEditSubject(subject) },
+                            onCardClick = { onSubjectClick(subject) }
                         )
                     }
                 }
