@@ -204,7 +204,7 @@ private fun CalendarDay(
     onClick: () -> Unit
 ) {
     if (date == null) {
-        Box(modifier = Modifier.size(40.dp))
+        Box(modifier = Modifier.size(48.dp))
         return
     }
 
@@ -220,17 +220,14 @@ private fun CalendarDay(
         else -> MaterialTheme.colorScheme.onSurface
     }
 
-    // Determine overall attendance status for the day
-    val attendanceColor = when {
-        attendanceRecords.any { it.status == AttendanceStatus.ABSENT } -> AbsentRed
-        attendanceRecords.any { it.status == AttendanceStatus.PRESENT } -> PresentGreen
-        attendanceRecords.any { it.status == AttendanceStatus.NO_CLASS } -> NoClassGray
-        else -> null
-    }
+    // Determine attendance statuses for the day (can have multiple)
+    val hasPresent = attendanceRecords.any { it.status == AttendanceStatus.PRESENT }
+    val hasAbsent = attendanceRecords.any { it.status == AttendanceStatus.ABSENT }
+    val hasNoClass = attendanceRecords.any { it.status == AttendanceStatus.NO_CLASS }
 
     Column(
         modifier = Modifier
-            .size(40.dp)
+            .size(48.dp)
             .clip(CircleShape)
             .background(backgroundColor)
             .clickable(onClick = onClick),
@@ -239,16 +236,44 @@ private fun CalendarDay(
     ) {
         Text(
             text = date.dayOfMonth.toString(),
-            style = MaterialTheme.typography.bodySmall,
+            style = MaterialTheme.typography.bodyMedium,
             color = textColor
         )
-        if (attendanceColor != null) {
-            Box(
-                modifier = Modifier
-                    .size(6.dp)
-                    .clip(CircleShape)
-                    .background(attendanceColor)
-            )
+        
+        // Show attendance indicator dots
+        if (hasPresent || hasAbsent || hasNoClass) {
+            Spacer(modifier = Modifier.height(2.dp))
+            Row(
+                horizontalArrangement = Arrangement.Center,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                if (hasPresent) {
+                    Box(
+                        modifier = Modifier
+                            .size(4.dp)
+                            .clip(CircleShape)
+                            .background(PresentGreen)
+                    )
+                    if (hasAbsent || hasNoClass) Spacer(modifier = Modifier.width(2.dp))
+                }
+                if (hasAbsent) {
+                    Box(
+                        modifier = Modifier
+                            .size(4.dp)
+                            .clip(CircleShape)
+                            .background(AbsentRed)
+                    )
+                    if (hasNoClass) Spacer(modifier = Modifier.width(2.dp))
+                }
+                if (hasNoClass) {
+                    Box(
+                        modifier = Modifier
+                            .size(4.dp)
+                            .clip(CircleShape)
+                            .background(NoClassGray)
+                    )
+                }
+            }
         }
     }
 }

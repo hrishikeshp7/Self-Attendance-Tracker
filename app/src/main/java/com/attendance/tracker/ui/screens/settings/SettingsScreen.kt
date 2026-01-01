@@ -24,6 +24,7 @@ fun SettingsScreen(
     allSubjects: List<Subject>,
     onUpdateRequiredAttendance: (Long, Int) -> Unit,
     onNavigateToAbout: () -> Unit,
+    onNavigateToCustomizations: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     var selectedSubject by remember { mutableStateOf<Subject?>(null) }
@@ -59,6 +60,41 @@ fun SettingsScreen(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = 16.dp)
             )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Customizations Option
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
+                onClick = onNavigateToCustomizations
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text(
+                            text = "Customizations",
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                        Text(
+                            text = "Themes and color settings",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Text(
+                        text = "→",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
 
             Spacer(modifier = Modifier.height(8.dp))
 

@@ -22,6 +22,9 @@ class AttendanceViewModel(application: Application) : AndroidViewModel(applicati
         database.attendanceDao(),
         database.scheduleDao()
     )
+    private val themeRepository = com.attendance.tracker.data.repository.ThemePreferenceRepository(
+        database.themePreferenceDao()
+    )
 
     // Undo/Redo Manager
     private val undoRedoManager = UndoRedoManager()
@@ -55,9 +58,17 @@ class AttendanceViewModel(application: Application) : AndroidViewModel(applicati
     private val _attendanceRecords = MutableStateFlow<List<AttendanceRecord>>(emptyList())
     val attendanceRecords: StateFlow<List<AttendanceRecord>> = _attendanceRecords.asStateFlow()
 
+    // Theme preferences
+    val themePreference = themeRepository.themePreference
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
     init {
         // Load today's attendance when ViewModel is created
         loadAttendanceForDate(LocalDate.now())
+        // Initialize theme preferences
+        viewModelScope.launch {
+            themeRepository.initializeDefaultIfNeeded()
+        }
     }
 
     fun loadAttendanceForDate(date: LocalDate) {
@@ -249,5 +260,18 @@ class AttendanceViewModel(application: Application) : AndroidViewModel(applicati
 
     fun getScheduleForDay(dayOfWeek: DayOfWeek): Flow<List<ScheduleEntry>> {
         return repository.getScheduleForDay(dayOfWeek)
+    }
+
+    // Theme operations
+    fun updateThemeMode(themeMode: com.attendance.tracker.data.model.ThemeMode) {
+        viewModelScope.launch {
+            themeRepository.updateThemeMode(themeMode)
+        }
+    }
+
+    fun updateCustomColors(primaryColor: Long?, secondaryColor: Long?) {
+        viewModelScope.launch {
+            themeRepository.updateCustomColors(primaryColor, secondaryColor)
+        }
     }
 }

@@ -33,31 +33,51 @@ class AttendanceGlanceWidget : GlanceAppWidget() {
         // Load data from database
         val database = AttendanceDatabase.getDatabase(context)
         val repository = AttendanceRepository(database.subjectDao(), database.attendanceDao(), database.scheduleDao())
+        val themeRepository = com.attendance.tracker.data.repository.ThemePreferenceRepository(database.themePreferenceDao())
         
         val subjects = withContext(Dispatchers.IO) {
             repository.actualSubjects.first()
         }
+        
+        val themePreference = withContext(Dispatchers.IO) {
+            themeRepository.getThemePreferenceOnce()
+        }
 
         provideContent {
             GlanceTheme {
-                AttendanceWidgetContent(subjects = subjects)
+                AttendanceWidgetContent(
+                    subjects = subjects,
+                    isAmoled = themePreference.themeMode == com.attendance.tracker.data.model.ThemeMode.AMOLED
+                )
             }
         }
     }
 
     @Composable
-    private fun AttendanceWidgetContent(subjects: List<Subject>) {
+    private fun AttendanceWidgetContent(subjects: List<Subject>, isAmoled: Boolean) {
+        val backgroundColor = if (isAmoled) {
+            ColorProvider(Color(0xFF000000)) // Pure black for AMOLED
+        } else {
+            GlanceTheme.colors.background
+        }
+        
+        val textColor = if (isAmoled) {
+            ColorProvider(Color(0xFFE0E0E0)) // Dimmed white for AMOLED
+        } else {
+            GlanceTheme.colors.onBackground
+        }
+        
         Column(
             modifier = GlanceModifier
                 .fillMaxSize()
-                .background(GlanceTheme.colors.background)
+                .background(backgroundColor)
                 .padding(12.dp)
         ) {
             // Title
             Text(
                 text = "Attendance",
                 style = TextStyle(
-                    color = GlanceTheme.colors.onBackground,
+                    color = textColor,
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold
                 ),
@@ -69,14 +89,14 @@ class AttendanceGlanceWidget : GlanceAppWidget() {
                 Text(
                     text = "No subjects added yet",
                     style = TextStyle(
-                        color = GlanceTheme.colors.onBackground,
+                        color = textColor,
                         fontSize = 12.sp
                     )
                 )
             } else {
                 // Show up to 3 subjects in the widget
                 subjects.take(3).forEach { subject ->
-                    SubjectWidgetRow(subject = subject)
+                    SubjectWidgetRow(subject = subject, textColor = textColor, isAmoled = isAmoled)
                     Spacer(modifier = GlanceModifier.height(4.dp))
                 }
 
@@ -85,7 +105,7 @@ class AttendanceGlanceWidget : GlanceAppWidget() {
                     Text(
                         text = "+${subjects.size - 3} more subjects",
                         style = TextStyle(
-                            color = GlanceTheme.colors.secondary,
+                            color = if (isAmoled) ColorProvider(Color(0xFF64B5F6)) else GlanceTheme.colors.secondary,
                             fontSize = 10.sp
                         )
                     )
@@ -95,7 +115,7 @@ class AttendanceGlanceWidget : GlanceAppWidget() {
     }
 
     @Composable
-    private fun SubjectWidgetRow(subject: Subject) {
+    private fun SubjectWidgetRow(subject: Subject, textColor: ColorProvider, isAmoled: Boolean) {
         Row(
             modifier = GlanceModifier
                 .fillMaxWidth()
@@ -110,7 +130,7 @@ class AttendanceGlanceWidget : GlanceAppWidget() {
                 Text(
                     text = subject.name,
                     style = TextStyle(
-                        color = GlanceTheme.colors.onBackground,
+                        color = textColor,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Medium
                     )
@@ -119,7 +139,7 @@ class AttendanceGlanceWidget : GlanceAppWidget() {
                 Text(
                     text = "${subject.presentLectures}/${subject.totalLectures} attended",
                     style = TextStyle(
-                        color = GlanceTheme.colors.onSurfaceVariant,
+                        color = if (isAmoled) ColorProvider(Color(0xFFB0B0B0)) else GlanceTheme.colors.onSurfaceVariant,
                         fontSize = 10.sp
                     )
                 )

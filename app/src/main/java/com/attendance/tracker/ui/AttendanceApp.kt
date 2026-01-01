@@ -56,6 +56,7 @@ fun AttendanceApp(
     val attendanceRecords by viewModel.attendanceRecords.collectAsState()
     val canUndo by viewModel.canUndo.collectAsState()
     val canRedo by viewModel.canRedo.collectAsState()
+    val themePreference by viewModel.themePreference.collectAsState()
 
     // Variables for navigation to subjects screen
     var showAddSubjectOnSubjectsScreen by remember { mutableStateOf(false) }
@@ -196,6 +197,33 @@ fun AttendanceApp(
                     },
                     onNavigateToAbout = {
                         navController.navigate(Screen.About.route)
+                    },
+                    onNavigateToCustomizations = {
+                        navController.navigate(Screen.Customizations.route)
+                    }
+                )
+            }
+
+            composable(Screen.Customizations.route) {
+                val currentPrimary = themePreference?.customPrimaryColor?.let { 
+                    androidx.compose.ui.graphics.Color(it.toULong()) 
+                }
+                val currentSecondary = themePreference?.customSecondaryColor?.let { 
+                    androidx.compose.ui.graphics.Color(it.toULong()) 
+                }
+                
+                com.attendance.tracker.ui.screens.customizations.CustomizationsScreen(
+                    currentThemeMode = themePreference?.themeMode ?: com.attendance.tracker.data.model.ThemeMode.SYSTEM,
+                    currentPrimaryColor = currentPrimary,
+                    currentSecondaryColor = currentSecondary,
+                    onThemeModeChange = { mode ->
+                        viewModel.updateThemeMode(mode)
+                    },
+                    onCustomColorsChange = { primary, secondary ->
+                        viewModel.updateCustomColors(primary, secondary)
+                    },
+                    onNavigateBack = {
+                        navController.popBackStack()
                     }
                 )
             }
