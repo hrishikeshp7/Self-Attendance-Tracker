@@ -2,6 +2,8 @@ package com.attendance.tracker.data.model
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey
+import kotlin.math.ceil
+import kotlin.math.floor
 
 /**
  * Represents a subject/course for attendance tracking
@@ -23,6 +25,57 @@ data class Subject(
     
     val isAboveRequired: Boolean
         get() = currentAttendancePercentage >= requiredAttendance
+    
+    /**
+     * Calculate how many classes need to be attended to meet the required attendance
+     * Returns 0 if already above required attendance
+     */
+    val classesToAttend: Int
+        get() {
+            if (isAboveRequired || totalLectures == 0) return 0
+            
+            // Edge case: if 100% required and already missed classes, impossible to reach
+            if (requiredAttendance >= 100) {
+                return if (presentLectures < totalLectures) {
+                    // Can't reach 100% if already missed classes - return a large number to indicate impossibility
+                    999
+                } else {
+                    0
+                }
+            }
+            
+            // Formula: (P + x) / (T + x) = R/100
+            // Where P = present, T = total, R = required%, x = classes to attend
+            // Solving: x = (R*T - 100*P) / (100 - R)
+            val numerator = (requiredAttendance * totalLectures) - (100 * presentLectures)
+            val denominator = 100 - requiredAttendance
+            
+            return if (denominator > 0) {
+                ceil(numerator.toDouble() / denominator).toInt().coerceAtLeast(0)
+            } else {
+                0
+            }
+        }
+    
+    /**
+     * Calculate how many classes can be bunked while maintaining required attendance
+     * Returns 0 if below required attendance or at the threshold
+     */
+    val classesCanBunk: Int
+        get() {
+            if (!isAboveRequired || totalLectures == 0) return 0
+            
+            // Edge case: if required attendance is 0 or negative (invalid), can bunk all future classes
+            if (requiredAttendance <= 0) return 999
+            
+            // Formula: (P) / (T + x) = R/100
+            // Where P = present, T = total, R = required%, x = classes can bunk
+            // Solving: x = (100*P/R) - T
+            val maxTotalWithBunks = (100.0 * presentLectures) / requiredAttendance
+            val canBunk = floor(maxTotalWithBunks - totalLectures).toInt()
+            
+            return canBunk.coerceAtLeast(0)
+        }
 }
 
 /**

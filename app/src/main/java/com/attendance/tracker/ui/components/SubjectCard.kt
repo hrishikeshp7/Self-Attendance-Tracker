@@ -99,6 +99,43 @@ fun SubjectCard(
                 textAlign = TextAlign.Center
             )
 
+            // Bunk Help Information
+            if (subject.totalLectures > 0) {
+                Spacer(modifier = Modifier.height(4.dp))
+                
+                if (subject.isAboveRequired) {
+                    val canBunk = subject.classesCanBunk
+                    if (canBunk > 0) {
+                        Text(
+                            text = "✓ You can bunk $canBunk ${if (canBunk == 1) "class" else "classes"}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = PresentGreen,
+                            modifier = Modifier.fillMaxWidth(),
+                            textAlign = TextAlign.Center
+                        )
+                    } else {
+                        Text(
+                            text = "✓ At threshold - attend next class",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.fillMaxWidth(),
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                } else {
+                    val needToAttend = subject.classesToAttend
+                    if (needToAttend > 0) {
+                        Text(
+                            text = "⚠ Attend next $needToAttend ${if (needToAttend == 1) "class" else "classes"}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = AbsentRed,
+                            modifier = Modifier.fillMaxWidth(),
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+            }
+
             Spacer(modifier = Modifier.height(12.dp))
 
             // Attendance Action Buttons
