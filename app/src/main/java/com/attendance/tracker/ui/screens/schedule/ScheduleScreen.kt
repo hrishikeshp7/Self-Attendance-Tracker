@@ -190,54 +190,6 @@ fun ScheduleScreen(
         )
     }
 }
-                )
-            )
-        },
-        modifier = modifier
-    ) { paddingValues ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-        ) {
-            // Day Selector
-            ScrollableTabRow(
-                selectedTabIndex = selectedDay.ordinal,
-                modifier = Modifier.fillMaxWidth(),
-                edgePadding = 8.dp
-            ) {
-                DayOfWeek.entries.forEach { day ->
-                    Tab(
-                        selected = selectedDay == day,
-                        onClick = { selectedDay = day },
-                        text = {
-                            Text(
-                                text = day.getDisplayName(TextStyle.SHORT, Locale.getDefault())
-                            )
-                        }
-                    )
-                }
-            }
-
-            // Horizontal Pager for swipeable days
-            HorizontalPager(
-                state = pagerState,
-                modifier = Modifier.fillMaxSize()
-            ) { page ->
-                val day = DayOfWeek.entries[page]
-                
-                DayScheduleContent(
-                    day = day,
-                    subjects = subjects,
-                    allSubjects = allSubjects,
-                    scheduleEntries = scheduleEntries,
-                    onAddScheduleEntry = onAddScheduleEntry,
-                    onRemoveScheduleEntry = onRemoveScheduleEntry
-                )
-            }
-        }
-    }
-}
 
 @Composable
 private fun DayScheduleContent(
@@ -374,6 +326,7 @@ private fun ScheduleEntryCard(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun AddScheduleEntryDialog(
     subjects: List<Subject>,

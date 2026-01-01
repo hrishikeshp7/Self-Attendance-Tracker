@@ -36,3 +36,4 @@ Thumbs.db
 
 # Log files
 *.log
+*.keystore

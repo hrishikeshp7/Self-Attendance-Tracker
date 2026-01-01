@@ -193,6 +193,33 @@ fun SettingsScreen(
             }
         )
     }
+
+    // Notification Settings Dialog
+    if (showNotificationDialog) {
+        NotificationSettingsDialog(
+            notificationPreference = notificationPreference,
+            onDismiss = { showNotificationDialog = false },
+            onSave = { enabled, hour, minute, message ->
+                onUpdateNotificationPreference(enabled, hour, minute, message)
+                
+                // Schedule or cancel notification based on enabled state
+                AttendanceNotificationManager.createNotificationChannel(context)
+                if (enabled) {
+                    // Request permission if needed
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        if (notificationPermissionState?.status?.isGranted == false) {
+                            notificationPermissionState.launchPermissionRequest()
+                        }
+                    }
+                    AttendanceNotificationManager.scheduleNotification(context, hour, minute)
+                } else {
+                    AttendanceNotificationManager.cancelNotification(context)
+                }
+                
+                showNotificationDialog = false
+            }
+        )
+    }
 }
 
 @Composable
