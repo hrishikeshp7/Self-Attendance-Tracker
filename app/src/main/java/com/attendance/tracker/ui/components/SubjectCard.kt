@@ -14,6 +14,7 @@ import com.attendance.tracker.ui.theme.AbsentRed
 import com.attendance.tracker.ui.theme.NoClassGray
 import com.attendance.tracker.ui.theme.PresentGreen
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SubjectCard(
     subject: Subject,
@@ -23,13 +24,15 @@ fun SubjectCard(
     onMarkAbsent: () -> Unit,
     onMarkNoClass: () -> Unit,
     onEditClick: () -> Unit,
+    onCardClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Card(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 8.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+        onClick = onCardClick
     ) {
         Column(
             modifier = Modifier
