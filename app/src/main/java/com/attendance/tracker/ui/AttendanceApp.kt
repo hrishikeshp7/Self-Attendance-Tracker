@@ -42,9 +42,19 @@ val bottomNavItems = listOf(
 
 @Composable
 fun AttendanceApp(
-    viewModel: AttendanceViewModel = viewModel()
+    viewModel: AttendanceViewModel = viewModel(),
+    shortcutAction: String? = null
 ) {
     val navController = rememberNavController()
+    
+    // Handle shortcut actions
+    LaunchedEffect(shortcutAction) {
+        when (shortcutAction) {
+            "mark_attendance" -> navController.navigate(Screen.Home.route)
+            "open_calendar" -> navController.navigate(Screen.Home.route) // Calendar is accessed from home
+            "add_subject" -> navController.navigate(Screen.Subjects.route)
+        }
+    }
     
     // Collect state from ViewModel
     val subjects by viewModel.subjects.collectAsState()
@@ -219,6 +229,9 @@ fun AttendanceApp(
                     onNavigateToCustomizations = {
                         navController.navigate(Screen.Customizations.route)
                     },
+                    onNavigateToExportBackup = {
+                        navController.navigate(Screen.ExportBackup.route)
+                    },
                     onUpdateNotificationsEnabled = { enabled ->
                         viewModel.updateNotificationsEnabled(enabled)
                     },
@@ -252,6 +265,18 @@ fun AttendanceApp(
                     onCustomColorsChange = { primary, secondary ->
                         viewModel.updateCustomColors(primary, secondary)
                     },
+                    onNavigateBack = {
+                        navController.popBackStack()
+                    }
+                )
+            }
+            
+            composable(Screen.ExportBackup.route) {
+                val allRecords by viewModel.getAllAttendanceRecords().collectAsState(initial = emptyList())
+                
+                com.attendance.tracker.ui.screens.exportbackup.ExportBackupScreen(
+                    subjects = subjects,
+                    allAttendanceRecords = allRecords,
                     onNavigateBack = {
                         navController.popBackStack()
                     }

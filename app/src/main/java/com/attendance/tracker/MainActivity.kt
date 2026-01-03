@@ -1,5 +1,6 @@
 package com.attendance.tracker
 
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -14,6 +15,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.attendance.tracker.ui.AttendanceApp
 import com.attendance.tracker.ui.AttendanceViewModel
 import com.attendance.tracker.ui.theme.AttendanceTrackerTheme
+import com.attendance.tracker.utils.AppShortcutsHelper
 import com.attendance.tracker.utils.NotificationHelper
 
 class MainActivity : ComponentActivity() {
@@ -22,6 +24,14 @@ class MainActivity : ComponentActivity() {
         
         // Initialize notification channels
         NotificationHelper.createNotificationChannels(this)
+        
+        // Initialize app shortcuts
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N_MR1) {
+            AppShortcutsHelper.updateShortcuts(this)
+        }
+        
+        // Handle shortcut intent
+        val shortcutAction = intent.getStringExtra("shortcut_action")
         
         setContent {
             val viewModel: AttendanceViewModel = viewModel()
@@ -40,7 +50,10 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    AttendanceApp(viewModel = viewModel)
+                    AttendanceApp(
+                        viewModel = viewModel,
+                        shortcutAction = shortcutAction
+                    )
                 }
             }
         }
