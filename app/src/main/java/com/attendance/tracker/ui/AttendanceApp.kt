@@ -57,6 +57,7 @@ fun AttendanceApp(
     val canUndo by viewModel.canUndo.collectAsState()
     val canRedo by viewModel.canRedo.collectAsState()
     val themePreference by viewModel.themePreference.collectAsState()
+    val notificationPreferences by viewModel.notificationPreferences.collectAsState()
 
     // Variables for navigation to subjects screen
     var showAddSubjectOnSubjectsScreen by remember { mutableStateOf(false) }
@@ -140,12 +141,16 @@ fun AttendanceApp(
                     viewModel.loadAttendanceForMonth(selectedMonth)
                 }
 
+                // Get analytics for this subject
+                val analytics by viewModel.getAttendanceAnalytics(subjectId).collectAsState(initial = null)
+
                 SubjectCalendarScreen(
                     subject = subject,
                     allSubjects = allSubjectsIncludingFolders,
                     selectedMonth = selectedMonth,
                     selectedDate = selectedDate,
                     attendanceRecords = attendanceRecords,
+                    analytics = analytics,
                     onDateSelected = { date ->
                         viewModel.setSelectedDate(date)
                     },
@@ -204,6 +209,7 @@ fun AttendanceApp(
                 SettingsScreen(
                     subjects = subjects,
                     allSubjects = allSubjectsIncludingFolders,
+                    notificationPreferences = notificationPreferences,
                     onUpdateRequiredAttendance = { subjectId, required ->
                         viewModel.updateRequiredAttendance(subjectId, required)
                     },
@@ -212,6 +218,18 @@ fun AttendanceApp(
                     },
                     onNavigateToCustomizations = {
                         navController.navigate(Screen.Customizations.route)
+                    },
+                    onUpdateNotificationsEnabled = { enabled ->
+                        viewModel.updateNotificationsEnabled(enabled)
+                    },
+                    onUpdateReminderMinutes = { minutes ->
+                        viewModel.updateReminderMinutes(minutes)
+                    },
+                    onUpdateLowAttendanceWarnings = { enabled ->
+                        viewModel.updateLowAttendanceWarnings(enabled)
+                    },
+                    onUpdateLowAttendanceThreshold = { threshold ->
+                        viewModel.updateLowAttendanceThreshold(threshold)
                     }
                 )
             }

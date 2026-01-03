@@ -26,6 +26,11 @@ An Android application for tracking and managing class attendance. Built with Ko
 - Color-coded days showing attendance status
 - View detailed attendance records for any selected day
 - Easy month navigation
+- **Predictive analytics dashboard** showing:
+  - Current and predicted semester-end attendance
+  - Attendance streaks (current and longest)
+  - Weekly trend graphs
+  - Remaining classes and recommendations
 
 ### 📚 Subject Management
 - Add new subjects with custom names
@@ -45,6 +50,23 @@ An Android application for tracking and managing class attendance. Built with Ko
 - View and modify required attendance baseline for each subject
 - Individual settings per subject
 - Preview how current attendance compares to requirements
+- **Push Notifications and Reminders**:
+  - Enable/disable notifications for upcoming classes
+  - Configurable reminder time (5-60 minutes before class)
+  - Low attendance warnings when percentage drops below threshold
+  - Customizable warning threshold percentage
+
+### 📊 Predictive Analytics
+- **Smart attendance predictions**:
+  - Calculate how many classes needed to reach required attendance
+  - Predict semester-end attendance based on schedule
+  - Visualize attendance trends with weekly graphs
+  - Track attendance streaks (current and best)
+  - See remaining scheduled classes for the semester
+- **Actionable insights**:
+  - "Attend next X classes" recommendations
+  - "You can skip X classes" safe bunking calculator
+  - Visual trend indicators for performance tracking
 
 ## Tech Stack
 
@@ -53,6 +75,7 @@ An Android application for tracking and managing class attendance. Built with Ko
 - **Database**: Room (SQLite)
 - **Architecture**: MVVM (Model-View-ViewModel)
 - **Navigation**: Jetpack Navigation Compose
+- **Background Tasks**: WorkManager for notification scheduling
 - **Minimum SDK**: 26 (Android 8.0)
 - **Target SDK**: 36 (Android 16)
 

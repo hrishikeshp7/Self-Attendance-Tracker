@@ -12,8 +12,8 @@ import com.attendance.tracker.data.model.ScheduleEntry
 import com.attendance.tracker.data.model.Subject
 
 @Database(
-    entities = [Subject::class, AttendanceRecord::class, ScheduleEntry::class, com.attendance.tracker.data.model.ThemePreference::class],
-    version = 3,
+    entities = [Subject::class, AttendanceRecord::class, ScheduleEntry::class, com.attendance.tracker.data.model.ThemePreference::class, com.attendance.tracker.data.model.NotificationPreferences::class],
+    version = 4,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -22,6 +22,7 @@ abstract class AttendanceDatabase : RoomDatabase() {
     abstract fun attendanceDao(): AttendanceDao
     abstract fun scheduleDao(): ScheduleDao
     abstract fun themePreferenceDao(): ThemePreferenceDao
+    abstract fun notificationPreferencesDao(): NotificationPreferencesDao
 
     companion object {
         @Volatile
@@ -51,6 +52,23 @@ abstract class AttendanceDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // Create notification_preferences table
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS notification_preferences (
+                        id INTEGER PRIMARY KEY NOT NULL,
+                        notificationsEnabled INTEGER NOT NULL DEFAULT 1,
+                        reminderMinutesBefore INTEGER NOT NULL DEFAULT 15,
+                        lowAttendanceWarnings INTEGER NOT NULL DEFAULT 1,
+                        lowAttendanceThreshold INTEGER NOT NULL DEFAULT 75
+                    )
+                """)
+                // Insert default notification preferences
+                db.execSQL("INSERT INTO notification_preferences (id, notificationsEnabled, reminderMinutesBefore, lowAttendanceWarnings, lowAttendanceThreshold) VALUES (1, 1, 15, 1, 75)")
+            }
+        }
+
         fun getDatabase(context: Context): AttendanceDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -58,7 +76,7 @@ abstract class AttendanceDatabase : RoomDatabase() {
                     AttendanceDatabase::class.java,
                     "attendance_database"
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
                     .build()
                 INSTANCE = instance
                 instance

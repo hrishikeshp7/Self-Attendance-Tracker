@@ -31,6 +31,7 @@ fun SubjectCalendarScreen(
     selectedMonth: YearMonth,
     selectedDate: LocalDate,
     attendanceRecords: List<AttendanceRecord>,
+    analytics: com.attendance.tracker.utils.AttendanceAnalytics?,
     onDateSelected: (LocalDate) -> Unit,
     onMonthChanged: (YearMonth) -> Unit,
     onMarkAttendance: (AttendanceStatus, LocalDate) -> Unit,
@@ -80,29 +81,46 @@ fun SubjectCalendarScreen(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         modifier = modifier
     ) { paddingValues ->
-        Column(
+        LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
+            // Analytics Card
+            if (analytics != null) {
+                item {
+                    com.attendance.tracker.ui.components.AttendanceStatsCard(
+                        analytics = analytics,
+                        modifier = Modifier.padding(16.dp)
+                    )
+                }
+            }
+            
             // Calendar View
-            CalendarView(
-                selectedMonth = selectedMonth,
-                selectedDate = selectedDate,
-                attendanceRecords = subjectRecords,
-                onDateSelected = onDateSelected,
-                onMonthChanged = onMonthChanged
-            )
+            item {
+                CalendarView(
+                    selectedMonth = selectedMonth,
+                    selectedDate = selectedDate,
+                    attendanceRecords = subjectRecords,
+                    onDateSelected = onDateSelected,
+                    onMonthChanged = onMonthChanged
+                )
+            }
 
-            Divider(modifier = Modifier.padding(vertical = 8.dp))
+            item {
+                Divider(modifier = Modifier.padding(vertical = 8.dp))
+            }
 
             // Selected Date Attendance Details
+            item {
             Text(
                 text = selectedDate.format(dateFormatter),
                 style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
             )
+        }
 
+        item {
             val selectedDateRecord = subjectRecords.find { it.date == selectedDate }
             
             Card(
@@ -157,6 +175,7 @@ fun SubjectCalendarScreen(
                     }
                 }
             }
+        }
         }
     }
 }

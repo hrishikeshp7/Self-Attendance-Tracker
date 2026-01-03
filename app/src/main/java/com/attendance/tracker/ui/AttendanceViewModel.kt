@@ -25,6 +25,9 @@ class AttendanceViewModel(application: Application) : AndroidViewModel(applicati
     private val themeRepository = com.attendance.tracker.data.repository.ThemePreferenceRepository(
         database.themePreferenceDao()
     )
+    private val notificationPreferencesRepository = com.attendance.tracker.data.repository.NotificationPreferencesRepository(
+        database.notificationPreferencesDao()
+    )
 
     // Undo/Redo Manager
     private val undoRedoManager = UndoRedoManager()
@@ -62,12 +65,17 @@ class AttendanceViewModel(application: Application) : AndroidViewModel(applicati
     val themePreference = themeRepository.themePreference
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
+    // Notification preferences
+    val notificationPreferences = notificationPreferencesRepository.preferences
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
     init {
         // Load today's attendance when ViewModel is created
         loadAttendanceForDate(LocalDate.now())
         // Initialize theme preferences
         viewModelScope.launch {
             themeRepository.initializeDefaultIfNeeded()
+            notificationPreferencesRepository.initializeDefaultIfNeeded()
         }
     }
 
@@ -262,6 +270,26 @@ class AttendanceViewModel(application: Application) : AndroidViewModel(applicati
         return repository.getScheduleForDay(dayOfWeek)
     }
 
+    // Analytics operations
+    fun getAttendanceAnalytics(subjectId: Long): Flow<com.attendance.tracker.utils.AttendanceAnalytics?> {
+        return combine(
+            repository.getAttendanceForSubject(subjectId),
+            repository.getScheduleForSubject(subjectId),
+            allSubjectsIncludingFolders
+        ) { attendanceRecords, scheduleEntries, allSubjects ->
+            val subject = allSubjects.find { it.id == subjectId }
+            if (subject != null && !subject.isFolder) {
+                com.attendance.tracker.utils.AttendanceAnalyticsHelper.buildAnalytics(
+                    subject,
+                    attendanceRecords,
+                    scheduleEntries
+                )
+            } else {
+                null
+            }
+        }
+    }
+
     // Theme operations
     fun updateThemeMode(themeMode: com.attendance.tracker.data.model.ThemeMode) {
         viewModelScope.launch {
@@ -272,6 +300,31 @@ class AttendanceViewModel(application: Application) : AndroidViewModel(applicati
     fun updateCustomColors(primaryColor: Long?, secondaryColor: Long?) {
         viewModelScope.launch {
             themeRepository.updateCustomColors(primaryColor, secondaryColor)
+        }
+    }
+
+    // Notification preference operations
+    fun updateNotificationsEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            notificationPreferencesRepository.updateNotificationsEnabled(enabled)
+        }
+    }
+
+    fun updateReminderMinutes(minutes: Int) {
+        viewModelScope.launch {
+            notificationPreferencesRepository.updateReminderMinutes(minutes)
+        }
+    }
+
+    fun updateLowAttendanceWarnings(enabled: Boolean) {
+        viewModelScope.launch {
+            notificationPreferencesRepository.updateLowAttendanceWarnings(enabled)
+        }
+    }
+
+    fun updateLowAttendanceThreshold(threshold: Int) {
+        viewModelScope.launch {
+            notificationPreferencesRepository.updateLowAttendanceThreshold(threshold)
         }
     }
 }
