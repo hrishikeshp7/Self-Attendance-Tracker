@@ -141,12 +141,16 @@ fun AttendanceApp(
                     viewModel.loadAttendanceForMonth(selectedMonth)
                 }
 
+                // Get analytics for this subject
+                val analytics by viewModel.getAttendanceAnalytics(subjectId).collectAsState(initial = null)
+
                 SubjectCalendarScreen(
                     subject = subject,
                     allSubjects = allSubjectsIncludingFolders,
                     selectedMonth = selectedMonth,
                     selectedDate = selectedDate,
                     attendanceRecords = attendanceRecords,
+                    analytics = analytics,
                     onDateSelected = { date ->
                         viewModel.setSelectedDate(date)
                     },

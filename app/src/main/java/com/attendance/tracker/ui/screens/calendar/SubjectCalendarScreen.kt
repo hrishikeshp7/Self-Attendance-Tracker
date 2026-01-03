@@ -31,6 +31,7 @@ fun SubjectCalendarScreen(
     selectedMonth: YearMonth,
     selectedDate: LocalDate,
     attendanceRecords: List<AttendanceRecord>,
+    analytics: com.attendance.tracker.utils.AttendanceAnalytics?,
     onDateSelected: (LocalDate) -> Unit,
     onMonthChanged: (YearMonth) -> Unit,
     onMarkAttendance: (AttendanceStatus, LocalDate) -> Unit,
@@ -80,32 +81,46 @@ fun SubjectCalendarScreen(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         modifier = modifier
     ) { paddingValues ->
-        Column(
+        LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
+            // Analytics Card
+            if (analytics != null) {
+                item {
+                    com.attendance.tracker.ui.components.AttendanceStatsCard(
+                        analytics = analytics,
+                        modifier = Modifier.padding(16.dp)
+                    )
+                }
+            }
+            
             // Calendar View
-            CalendarView(
-                selectedMonth = selectedMonth,
-                selectedDate = selectedDate,
-                attendanceRecords = subjectRecords,
-                onDateSelected = onDateSelected,
-                onMonthChanged = onMonthChanged
-            )
+            item {
+                CalendarView(
+                    selectedMonth = selectedMonth,
+                    selectedDate = selectedDate,
+                    attendanceRecords = subjectRecords,
+                    onDateSelected = onDateSelected,
+                    onMonthChanged = onMonthChanged
+                )
+            }
 
-            Divider(modifier = Modifier.padding(vertical = 8.dp))
+            item {
+                Divider(modifier = Modifier.padding(vertical = 8.dp))
+            }
 
             // Selected Date Attendance Details
-            Text(
-                text = selectedDate.format(dateFormatter),
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-            )
+            item {
+                Text(
+                    text = selectedDate.format(dateFormatter),
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                )
+            }
 
-            val selectedDateRecord = subjectRecords.find { it.date == selectedDate }
-            
-            Card(
+            item {
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(16.dp),
@@ -145,15 +160,59 @@ fun SubjectCalendarScreen(
                                 showAttendanceSnackbar(AttendanceStatus.ABSENT)
                             }
                         )
-                        SubjectCalendarAttendanceButton(
-                            text = "No Class",
-                            isSelected = selectedDateRecord?.status == AttendanceStatus.NO_CLASS,
-                            color = NoClassGray,
-                            onClick = { 
-                                onMarkAttendance(AttendanceStatus.NO_CLASS, selectedDate)
-                                showAttendanceSnackbar(AttendanceStatus.NO_CLASS)
-                            }
+            item {
+                val selectedDateRecord = subjectRecords.find { it.date == selectedDate }
+                
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp)
+                    ) {
+                        Text(
+                            text = "Mark Attendance",
+                            style = MaterialTheme.typography.titleMedium,
+                            modifier = Modifier.padding(bottom = 12.dp)
                         )
+                        
+                        // Attendance Action Buttons
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceEvenly
+                        ) {
+                            SubjectCalendarAttendanceButton(
+                                text = "Present",
+                                isSelected = selectedDateRecord?.status == AttendanceStatus.PRESENT,
+                                color = PresentGreen,
+                                onClick = { 
+                                    onMarkAttendance(AttendanceStatus.PRESENT, selectedDate)
+                                    showAttendanceSnackbar(AttendanceStatus.PRESENT)
+                                }
+                            )
+                            SubjectCalendarAttendanceButton(
+                                text = "Absent",
+                                isSelected = selectedDateRecord?.status == AttendanceStatus.ABSENT,
+                                color = AbsentRed,
+                                onClick = { 
+                                    onMarkAttendance(AttendanceStatus.ABSENT, selectedDate)
+                                    showAttendanceSnackbar(AttendanceStatus.ABSENT)
+                                }
+                            )
+                            SubjectCalendarAttendanceButton(
+                                text = "No Class",
+                                isSelected = selectedDateRecord?.status == AttendanceStatus.NO_CLASS,
+                                color = NoClassGray,
+                                onClick = { 
+                                    onMarkAttendance(AttendanceStatus.NO_CLASS, selectedDate)
+                                    showAttendanceSnackbar(AttendanceStatus.NO_CLASS)
+                                }
+                            )
+                        }
                     }
                 }
             }

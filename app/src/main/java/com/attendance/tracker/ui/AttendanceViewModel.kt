@@ -270,6 +270,26 @@ class AttendanceViewModel(application: Application) : AndroidViewModel(applicati
         return repository.getScheduleForDay(dayOfWeek)
     }
 
+    // Analytics operations
+    fun getAttendanceAnalytics(subjectId: Long): Flow<com.attendance.tracker.utils.AttendanceAnalytics?> {
+        return combine(
+            repository.getAttendanceForSubject(subjectId),
+            repository.getScheduleForSubject(subjectId),
+            allSubjectsIncludingFolders
+        ) { attendanceRecords, scheduleEntries, allSubjects ->
+            val subject = allSubjects.find { it.id == subjectId }
+            if (subject != null && !subject.isFolder) {
+                com.attendance.tracker.utils.AttendanceAnalyticsHelper.buildAnalytics(
+                    subject,
+                    attendanceRecords,
+                    scheduleEntries
+                )
+            } else {
+                null
+            }
+        }
+    }
+
     // Theme operations
     fun updateThemeMode(themeMode: com.attendance.tracker.data.model.ThemeMode) {
         viewModelScope.launch {
