@@ -14,10 +14,15 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.attendance.tracker.ui.AttendanceApp
 import com.attendance.tracker.ui.AttendanceViewModel
 import com.attendance.tracker.ui.theme.AttendanceTrackerTheme
+import com.attendance.tracker.utils.NotificationHelper
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        
+        // Initialize notification channels
+        NotificationHelper.createNotificationChannels(this)
+        
         setContent {
             val viewModel: AttendanceViewModel = viewModel()
             val themePreference by viewModel.themePreference.collectAsState(initial = null)
