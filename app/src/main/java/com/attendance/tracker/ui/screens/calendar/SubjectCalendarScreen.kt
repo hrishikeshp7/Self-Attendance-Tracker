@@ -113,14 +113,17 @@ fun SubjectCalendarScreen(
 
             // Selected Date Attendance Details
             item {
-                Text(
-                    text = selectedDate.format(dateFormatter),
-                    style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-                )
-            }
+            Text(
+                text = selectedDate.format(dateFormatter),
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+            )
+        }
 
-            item {
+        item {
+            val selectedDateRecord = subjectRecords.find { it.date == selectedDate }
+            
+            Card(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(16.dp),
@@ -160,62 +163,19 @@ fun SubjectCalendarScreen(
                                 showAttendanceSnackbar(AttendanceStatus.ABSENT)
                             }
                         )
-            item {
-                val selectedDateRecord = subjectRecords.find { it.date == selectedDate }
-                
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp)
-                    ) {
-                        Text(
-                            text = "Mark Attendance",
-                            style = MaterialTheme.typography.titleMedium,
-                            modifier = Modifier.padding(bottom = 12.dp)
+                        SubjectCalendarAttendanceButton(
+                            text = "No Class",
+                            isSelected = selectedDateRecord?.status == AttendanceStatus.NO_CLASS,
+                            color = NoClassGray,
+                            onClick = { 
+                                onMarkAttendance(AttendanceStatus.NO_CLASS, selectedDate)
+                                showAttendanceSnackbar(AttendanceStatus.NO_CLASS)
+                            }
                         )
-                        
-                        // Attendance Action Buttons
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceEvenly
-                        ) {
-                            SubjectCalendarAttendanceButton(
-                                text = "Present",
-                                isSelected = selectedDateRecord?.status == AttendanceStatus.PRESENT,
-                                color = PresentGreen,
-                                onClick = { 
-                                    onMarkAttendance(AttendanceStatus.PRESENT, selectedDate)
-                                    showAttendanceSnackbar(AttendanceStatus.PRESENT)
-                                }
-                            )
-                            SubjectCalendarAttendanceButton(
-                                text = "Absent",
-                                isSelected = selectedDateRecord?.status == AttendanceStatus.ABSENT,
-                                color = AbsentRed,
-                                onClick = { 
-                                    onMarkAttendance(AttendanceStatus.ABSENT, selectedDate)
-                                    showAttendanceSnackbar(AttendanceStatus.ABSENT)
-                                }
-                            )
-                            SubjectCalendarAttendanceButton(
-                                text = "No Class",
-                                isSelected = selectedDateRecord?.status == AttendanceStatus.NO_CLASS,
-                                color = NoClassGray,
-                                onClick = { 
-                                    onMarkAttendance(AttendanceStatus.NO_CLASS, selectedDate)
-                                    showAttendanceSnackbar(AttendanceStatus.NO_CLASS)
-                                }
-                            )
-                        }
                     }
                 }
             }
+        }
         }
     }
 }

@@ -164,10 +164,10 @@ object AttendanceAnalyticsHelper {
         }
         
         val futureTotal = currentTotal + remainingClasses
-        val futurePresent = currentPresent + futurePresent
+        val futurePresentTotal = currentPresent + futurePresent
         
         return if (futureTotal > 0) {
-            (futurePresent.toFloat() / futureTotal) * 100
+            (futurePresentTotal.toFloat() / futureTotal) * 100
         } else {
             null
         }
