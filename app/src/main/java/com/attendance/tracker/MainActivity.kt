@@ -28,12 +28,16 @@ class MainActivity : ComponentActivity() {
     private val requestPermissionsLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
-        // Handle permission results if needed
-        permissions.entries.forEach { entry ->
-            val permission = entry.key
-            val isGranted = entry.value
-            // Log or handle individual permission results if needed
+        // Check if critical permissions were denied
+        val notificationsDenied = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            permissions[Manifest.permission.POST_NOTIFICATIONS] == false
+        } else {
+            false
         }
+        
+        // Note: We don't block functionality if permissions are denied.
+        // Features requiring permissions will handle their own permission checks.
+        // This initial request is to improve first-time user experience.
     }
     
     override fun onCreate(savedInstanceState: Bundle?) {
