@@ -68,6 +68,47 @@ An Android application for tracking and managing class attendance. Built with Ko
   - "You can skip X classes" safe bunking calculator
   - Visual trend indicators for performance tracking
 
+### 📤 Data Export and Backup
+- **Export attendance records**:
+  - Export to CSV format for spreadsheet analysis
+  - Export to PDF format for printing or sharing
+  - Subject-wise summary export
+  - Share exported files via Android's share intent
+- **Cloud backup and restore**:
+  - Secure backup to Google Drive
+  - Easy restore from previous backups
+  - Automatic database backup
+  - Keep your data safe across devices
+
+### 🏠 Home Screen Widgets
+- **Multiple widget options**:
+  - Compact widget for quick attendance overview
+  - Large widget with visual statistics
+  - Interactive widget with quick action buttons
+- **Quick attendance marking**:
+  - Mark Present/Absent/No Class directly from widget
+  - Real-time updates with ViewModel integration
+  - Beautiful Material 3 design
+
+### 🚀 App Shortcuts
+- **Quick actions from launcher**:
+  - "Mark Today's Attendance" shortcut
+  - "Open Calendar" shortcut
+  - "Add New Subject" shortcut
+- Long-press app icon to access shortcuts
+- Fast access to common tasks
+
+### 📆 Calendar Integration
+- **Sync with device calendar**:
+  - Export class schedule to device calendar
+  - Create recurring events for weekly schedule
+  - Import calendar events to auto-populate schedule
+  - Customizable event duration and timing
+- **Calendar permissions**:
+  - Request READ_CALENDAR and WRITE_CALENDAR permissions
+  - Secure access to calendar data
+  - Proper error handling
+
 ## Tech Stack
 
 - **Language**: Kotlin
@@ -76,6 +117,10 @@ An Android application for tracking and managing class attendance. Built with Ko
 - **Architecture**: MVVM (Model-View-ViewModel)
 - **Navigation**: Jetpack Navigation Compose
 - **Background Tasks**: WorkManager for notification scheduling
+- **Widgets**: Glance for AppWidgets
+- **Export**: iText7 for PDF generation
+- **Cloud**: Google Drive API for backup/restore
+- **Calendar**: Android Calendar Provider API
 - **Minimum SDK**: 26 (Android 8.0)
 - **Target SDK**: 36 (Android 16)
 
@@ -215,6 +260,51 @@ export KEY_PASSWORD=your_key_password
 ### Editing Subject Settings
 1. Navigate to the "Subjects" tab to edit subject details
 2. Or use the "Settings" tab to adjust only the required attendance percentage
+
+### Using Home Screen Widgets
+1. Long-press on home screen
+2. Select "Widgets"
+3. Find "Attendance Tracker" widgets
+4. Choose from:
+   - Compact widget for overview
+   - Interactive widget for quick marking
+   - Large widget for detailed stats
+5. Drag the widget to your home screen
+6. Use Present/Absent/No Class buttons on interactive widget to mark attendance
+
+### Using App Shortcuts
+1. Long-press the app icon on your launcher
+2. Select quick action:
+   - "Mark Today's Attendance"
+   - "Open Calendar"
+   - "Add New Subject"
+
+### Exporting Data
+1. Navigate to Settings → Export & Backup
+2. Tap "Export to CSV/PDF"
+3. Select format (CSV, PDF, or Summary)
+4. Tap "Export & Share"
+5. Choose app to share the exported file
+
+### Cloud Backup
+1. Navigate to Settings → Export & Backup
+2. Tap "Backup" under Cloud Backup section
+3. Sign in with your Google account
+4. Your database will be backed up to Google Drive
+
+### Restoring from Backup
+1. Navigate to Settings → Export & Backup
+2. Tap "Restore" under Cloud Backup section
+3. Sign in with your Google account
+4. Select a backup to restore
+5. Confirm restoration (current data will be replaced)
+
+### Calendar Sync
+1. Navigate to Settings → Export & Backup
+2. Tap "Export Schedule to Calendar"
+3. Grant calendar permissions if prompted
+4. Your class schedule will be exported as recurring events
+5. Events are created for the next 3 months
 
 ## Download
 
