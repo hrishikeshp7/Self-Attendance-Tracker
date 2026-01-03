@@ -327,4 +327,13 @@ class AttendanceViewModel(application: Application) : AndroidViewModel(applicati
             notificationPreferencesRepository.updateLowAttendanceThreshold(threshold)
         }
     }
+    
+    // Export and backup operations
+    fun getAllAttendanceRecords(): Flow<List<AttendanceRecord>> {
+        return repository.allAttendanceRecords()
+    }
+    
+    suspend fun getAttendanceRecordsInRange(startDate: LocalDate, endDate: LocalDate): List<AttendanceRecord> {
+        return repository.getAttendanceInRange(startDate, endDate).first()
+    }
 }

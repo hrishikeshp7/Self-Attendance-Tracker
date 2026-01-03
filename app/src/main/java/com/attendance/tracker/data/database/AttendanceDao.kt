@@ -20,6 +20,9 @@ interface AttendanceDao {
     @Query("SELECT * FROM attendance_records WHERE date BETWEEN :startDate AND :endDate ORDER BY date ASC")
     fun getAttendanceInRange(startDate: LocalDate, endDate: LocalDate): Flow<List<AttendanceRecord>>
 
+    @Query("SELECT * FROM attendance_records ORDER BY date DESC")
+    fun getAllAttendance(): Flow<List<AttendanceRecord>>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAttendance(record: AttendanceRecord): Long
 

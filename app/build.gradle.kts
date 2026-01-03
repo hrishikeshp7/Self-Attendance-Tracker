@@ -59,6 +59,12 @@ android {
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
+            excludes += "META-INF/DEPENDENCIES"
+            excludes += "META-INF/LICENSE"
+            excludes += "META-INF/LICENSE.txt"
+            excludes += "META-INF/NOTICE"
+            excludes += "META-INF/NOTICE.txt"
+            excludes += "META-INF/INDEX.LIST"
         }
     }
 }
@@ -95,6 +101,14 @@ dependencies {
 
     // WorkManager for notifications
     implementation("androidx.work:work-runtime-ktx:2.9.0")
+
+    // Google Play Services for Drive API
+    implementation("com.google.android.gms:play-services-auth:21.0.0")
+    implementation("com.google.apis:google-api-services-drive:v3-rev20240914-2.0.0")
+    implementation("com.google.api-client:google-api-client-android:2.2.0")
+
+    // Apache POI for PDF generation (lightweight version for Android)
+    implementation("com.itextpdf:itext7-core:7.2.5")
 
     // Testing
     testImplementation("junit:junit:4.13.2")

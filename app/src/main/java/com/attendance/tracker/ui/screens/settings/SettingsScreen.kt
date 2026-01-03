@@ -24,6 +24,7 @@ fun SettingsScreen(
     onUpdateRequiredAttendance: (Long, Int) -> Unit,
     onNavigateToAbout: () -> Unit,
     onNavigateToCustomizations: () -> Unit,
+    onNavigateToExportBackup: () -> Unit,
     onUpdateNotificationsEnabled: (Boolean) -> Unit,
     onUpdateReminderMinutes: (Int) -> Unit,
     onUpdateLowAttendanceWarnings: (Boolean) -> Unit,
@@ -204,6 +205,37 @@ fun SettingsScreen(
                         )
                         Text(
                             text = "Themes and color settings",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Text(
+                        text = "→",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+            
+            // Export & Backup Option
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                onClick = onNavigateToExportBackup
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text(
+                            text = "Export & Backup",
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                        Text(
+                            text = "Export data, cloud backup, calendar sync",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
