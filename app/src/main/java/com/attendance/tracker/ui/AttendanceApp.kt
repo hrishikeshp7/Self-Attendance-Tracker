@@ -143,8 +143,25 @@ fun AttendanceApp(
                 route = Screen.SubjectCalendar.route,
                 arguments = listOf(navArgument("subjectId") { type = NavType.LongType })
             ) { backStackEntry ->
-                val subjectId = backStackEntry.arguments?.getLong("subjectId") ?: return@composable
-                val subject = allSubjectsIncludingFolders.find { it.id == subjectId } ?: return@composable
+                val subjectId = backStackEntry.arguments?.getLong("subjectId")
+                
+                if (subjectId == null) {
+                    // Navigate back if subjectId is invalid
+                    LaunchedEffect(Unit) {
+                        navController.popBackStack()
+                    }
+                    return@composable
+                }
+                
+                val subject = allSubjectsIncludingFolders.find { it.id == subjectId }
+                
+                if (subject == null) {
+                    // Navigate back if subject is not found
+                    LaunchedEffect(Unit) {
+                        navController.popBackStack()
+                    }
+                    return@composable
+                }
                 
                 // Load attendance for selected month when entering calendar screen
                 LaunchedEffect(selectedMonth) {
