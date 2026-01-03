@@ -33,27 +33,6 @@ class NotificationWorker(
             
             val preferences = notificationPrefsRepo.getPreferencesOnce()
             
-            // Check if notifications are enabled
-            if (preferences?.notificationsEnabled == true) {
-                // Get today's day of week
-                val today = DayOfWeek.from(java.time.LocalDate.now())
-                
-                // Get schedule for today
-                val scheduleEntries = attendanceRepo.getScheduleForDay(today).first()
-                
-                // For each scheduled subject, you could check if a class is about to start
-                // This is a simplified version - in production, you'd want to store class times
-                // and calculate when to send notifications based on the actual time
-                
-                // For now, we'll just check if there are scheduled classes
-                if (scheduleEntries.isNotEmpty()) {
-                    // This is a placeholder - in a real implementation, you'd need to:
-                    // 1. Store actual class times in the schedule
-                    // 2. Calculate when to send notifications
-                    // 3. Schedule WorkManager tasks at specific times
-                }
-            }
-
             // Check for low attendance warnings
             if (preferences?.lowAttendanceWarnings == true) {
                 val subjects = attendanceRepo.actualSubjects.first()
