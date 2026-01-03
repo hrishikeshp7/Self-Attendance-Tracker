@@ -2,7 +2,7 @@
 
 An Android application for tracking and managing class attendance. Built with Kotlin, Jetpack Compose, and Room Database.
 
-[![Build and Release APK](https://github.com/hrishikeshp7/web-sf-hf/actions/workflows/build-release.yml/badge.svg)](https://github.com/hrishikeshp7/web-sf-hf/actions/workflows/build-release.yml)
+[![Build and Release APK](https://github.com/hrishikeshp7/Self-Attendance-Tracker/actions/workflows/build-release.yml/badge.svg)](https://github.com/hrishikeshp7/Self-Attendance-Tracker/actions/workflows/build-release.yml)
 
 ## Features
 
@@ -104,8 +104,8 @@ app/src/main/java/com/attendance/tracker/
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/hrishikeshp7/web-sf-hf.git
-cd web-sf-hf
+git clone https://github.com/hrishikeshp7/Self-Attendance-Tracker.git
+cd Self-Attendance-Tracker
 ```
 
 2. Open the project in Android Studio
@@ -195,7 +195,7 @@ export KEY_PASSWORD=your_key_password
 
 ## Download
 
-You can download the latest APK from the [Releases page](https://github.com/hrishikeshp7/web-sf-hf/releases).
+You can download the latest APK from the [Releases page](https://github.com/hrishikeshp7/Self-Attendance-Tracker/releases).
 
 ### Automated Releases
 APK releases are automatically created:

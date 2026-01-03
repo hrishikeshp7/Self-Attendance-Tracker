@@ -26,7 +26,7 @@ fun AboutScreen(
 ) {
     val context = LocalContext.current
     val githubUrl = "https://github.com/hrishikeshp7"
-    val repoUrl = "https://github.com/hrishikeshp7/web-sf-hf"
+    val repoUrl = "https://github.com/hrishikeshp7/Self-Attendance-Tracker"
     
     Scaffold(
         topBar = {
