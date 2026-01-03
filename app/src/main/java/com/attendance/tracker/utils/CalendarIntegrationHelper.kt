@@ -235,6 +235,8 @@ object CalendarIntegrationHelper {
                         val description = cursor.getString(descIndex) ?: ""
                         val rrule = cursor.getString(rruleIndex)
                         
+                        // Extract only the date part as we're only interested in which day the event occurs on
+                        // Time information is not needed for schedule import purposes
                         val startLocalDateTime = LocalDate.ofInstant(
                             java.time.Instant.ofEpochMilli(startTime),
                             ZoneId.systemDefault()

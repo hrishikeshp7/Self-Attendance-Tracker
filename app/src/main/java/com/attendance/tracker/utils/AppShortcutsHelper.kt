@@ -54,7 +54,7 @@ object AppShortcutsHelper {
         
         shortcuts.add(calendarShortcut)
         
-        // Add Subje shortcut
+        // Add Subject shortcut
         val addSubjectIntent = Intent(context, MainActivity::class.java).apply {
             action = Intent.ACTION_VIEW
             putExtra("shortcut_action", "add_subject")

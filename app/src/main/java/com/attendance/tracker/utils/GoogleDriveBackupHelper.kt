@@ -23,6 +23,7 @@ import java.io.FileOutputStream
 object GoogleDriveBackupHelper {
     
     private const val BACKUP_FOLDER_NAME = "AttendanceTrackerBackups"
+    // Database name must match the name in AttendanceDatabase.getDatabase()
     private const val DATABASE_NAME = "attendance_database"
     
     /**
