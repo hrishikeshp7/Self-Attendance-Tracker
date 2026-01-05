@@ -63,7 +63,7 @@ class AttendanceRepository(
                     subject?.let {
                         subjectDao.updateAttendanceCounts(
                             subjectId,
-                            it.presentLectures + 1,
+                            it.presentLectures + existingRecord.count,
                             it.absentLectures
                         )
                     }
@@ -125,7 +125,7 @@ class AttendanceRepository(
                         subjectDao.updateAttendanceCounts(
                             subjectId,
                             it.presentLectures,
-                            it.absentLectures + 1
+                            it.absentLectures + existingRecord.count
                         )
                     }
                 }
