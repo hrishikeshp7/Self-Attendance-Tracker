@@ -62,7 +62,9 @@ data class AttendanceAction(
     val subjectId: Long,
     val date: LocalDate,
     val oldStatus: AttendanceStatus?,  // null if no previous status
+    val oldCount: Int,  // count of old status
     val newStatus: AttendanceStatus,
+    val newCount: Int,  // count of new status
     val oldPresentCount: Int,
     val oldAbsentCount: Int
 )
