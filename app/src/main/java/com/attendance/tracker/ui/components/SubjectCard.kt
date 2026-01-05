@@ -7,6 +7,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.attendance.tracker.data.model.AttendanceRecord
 import com.attendance.tracker.data.model.AttendanceStatus
 import com.attendance.tracker.data.model.Subject
 import com.attendance.tracker.data.model.getDisplayName
@@ -19,7 +20,7 @@ import com.attendance.tracker.ui.theme.PresentGreen
 fun SubjectCard(
     subject: Subject,
     allSubjects: List<Subject>,
-    currentStatus: AttendanceStatus?,
+    currentRecord: AttendanceRecord?,
     onMarkPresent: () -> Unit,
     onMarkAbsent: () -> Unit,
     onMarkNoClass: () -> Unit,
@@ -160,19 +161,22 @@ fun SubjectCard(
             ) {
                 AttendanceButton(
                     text = "Present",
-                    isSelected = currentStatus == AttendanceStatus.PRESENT,
+                    count = if (currentRecord?.status == AttendanceStatus.PRESENT) currentRecord.count else null,
+                    isSelected = currentRecord?.status == AttendanceStatus.PRESENT,
                     color = PresentGreen,
                     onClick = onMarkPresent
                 )
                 AttendanceButton(
                     text = "Absent",
-                    isSelected = currentStatus == AttendanceStatus.ABSENT,
+                    count = if (currentRecord?.status == AttendanceStatus.ABSENT) currentRecord.count else null,
+                    isSelected = currentRecord?.status == AttendanceStatus.ABSENT,
                     color = AbsentRed,
                     onClick = onMarkAbsent
                 )
                 AttendanceButton(
                     text = "No Class",
-                    isSelected = currentStatus == AttendanceStatus.NO_CLASS,
+                    count = if (currentRecord?.status == AttendanceStatus.NO_CLASS) currentRecord.count else null,
+                    isSelected = currentRecord?.status == AttendanceStatus.NO_CLASS,
                     color = NoClassGray,
                     onClick = onMarkNoClass
                 )
@@ -204,6 +208,7 @@ private fun AttendanceStatItem(
 @Composable
 private fun AttendanceButton(
     text: String,
+    count: Int?,
     isSelected: Boolean,
     color: androidx.compose.ui.graphics.Color,
     onClick: () -> Unit
@@ -217,7 +222,7 @@ private fun AttendanceButton(
         modifier = Modifier.width(100.dp)
     ) {
         Text(
-            text = text,
+            text = if (count != null && count > 1) "$text ($count)" else text,
             style = MaterialTheme.typography.labelMedium
         )
     }

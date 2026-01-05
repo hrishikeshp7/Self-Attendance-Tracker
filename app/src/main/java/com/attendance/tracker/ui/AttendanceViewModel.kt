@@ -52,8 +52,8 @@ class AttendanceViewModel(application: Application) : AndroidViewModel(applicati
     private val _selectedMonth = MutableStateFlow(YearMonth.now())
     val selectedMonth: StateFlow<YearMonth> = _selectedMonth.asStateFlow()
 
-    private val _todayAttendance = MutableStateFlow<Map<Long, AttendanceStatus>>(emptyMap())
-    val todayAttendance: StateFlow<Map<Long, AttendanceStatus>> = _todayAttendance.asStateFlow()
+    private val _todayAttendance = MutableStateFlow<Map<Long, AttendanceRecord>>(emptyMap())
+    val todayAttendance: StateFlow<Map<Long, AttendanceRecord>> = _todayAttendance.asStateFlow()
 
     private val _attendanceRecords = MutableStateFlow<List<AttendanceRecord>>(emptyList())
     val attendanceRecords: StateFlow<List<AttendanceRecord>> = _attendanceRecords.asStateFlow()
@@ -74,7 +74,7 @@ class AttendanceViewModel(application: Application) : AndroidViewModel(applicati
     fun loadAttendanceForDate(date: LocalDate) {
         viewModelScope.launch {
             repository.getAttendanceForDate(date).collect { records ->
-                _todayAttendance.value = records.associate { it.subjectId to it.status }
+                _todayAttendance.value = records.associateBy { it.subjectId }
             }
         }
     }
@@ -165,24 +165,33 @@ class AttendanceViewModel(application: Application) : AndroidViewModel(applicati
             val oldRecord = repository.getAttendanceRecord(subjectId, date)
             
             if (subject != null) {
-                // Record action for undo/redo
-                val action = AttendanceAction(
-                    subjectId = subjectId,
-                    date = date,
-                    oldStatus = oldRecord?.status,
-                    newStatus = status,
-                    oldPresentCount = subject.presentLectures,
-                    oldAbsentCount = subject.absentLectures
-                )
-                undoRedoManager.recordAction(action)
-                updateUndoRedoState()
-                
-                // Mark the new status
+                // Mark the new status first to get the new count
                 when (status) {
                     AttendanceStatus.PRESENT -> repository.markPresent(subjectId, date)
                     AttendanceStatus.ABSENT -> repository.markAbsent(subjectId, date)
                     AttendanceStatus.NO_CLASS -> repository.markNoClass(subjectId, date)
                 }
+                
+                // Get the updated record to capture the new count
+                val newRecord = repository.getAttendanceRecord(subjectId, date)
+                val updatedSubject = repository.getSubjectById(subjectId)
+                
+                if (newRecord != null && updatedSubject != null) {
+                    // Record action for undo/redo
+                    val action = AttendanceAction(
+                        subjectId = subjectId,
+                        date = date,
+                        oldStatus = oldRecord?.status,
+                        oldCount = oldRecord?.count ?: 0,
+                        newStatus = newRecord.status,
+                        newCount = newRecord.count,
+                        oldPresentCount = subject.presentLectures,
+                        oldAbsentCount = subject.absentLectures
+                    )
+                    undoRedoManager.recordAction(action)
+                    updateUndoRedoState()
+                }
+                
                 loadAttendanceForDate(date)
             }
         }
@@ -203,9 +212,9 @@ class AttendanceViewModel(application: Application) : AndroidViewModel(applicati
                     )
                     
                     // Restore or delete the attendance record
-                    if (action.oldStatus != null) {
-                        // There was a previous status, restore it without modifying counts
-                        repository.setAttendanceStatus(action.subjectId, action.date, action.oldStatus)
+                    if (action.oldStatus != null && action.oldCount > 0) {
+                        // There was a previous status, restore it with the count
+                        repository.setAttendanceStatus(action.subjectId, action.date, action.oldStatus, action.oldCount)
                     } else {
                         // No previous status, delete the record
                         repository.deleteAttendanceRecord(action.subjectId, action.date)
@@ -222,14 +231,34 @@ class AttendanceViewModel(application: Application) : AndroidViewModel(applicati
         viewModelScope.launch {
             val action = undoRedoManager.redo()
             if (action != null) {
-                // Reapply the new status
-                when (action.newStatus) {
-                    AttendanceStatus.PRESENT -> repository.markPresent(action.subjectId, action.date)
-                    AttendanceStatus.ABSENT -> repository.markAbsent(action.subjectId, action.date)
-                    AttendanceStatus.NO_CLASS -> repository.markNoClass(action.subjectId, action.date)
+                // Get current subject to calculate new counts
+                val subject = repository.getSubjectById(action.subjectId)
+                if (subject != null) {
+                    // Calculate what the counts should be after redo
+                    val presentDiff = when {
+                        action.newStatus == AttendanceStatus.PRESENT && action.oldStatus != AttendanceStatus.PRESENT -> action.newCount
+                        action.newStatus != AttendanceStatus.PRESENT && action.oldStatus == AttendanceStatus.PRESENT -> -action.oldCount
+                        else -> 0
+                    }
+                    val absentDiff = when {
+                        action.newStatus == AttendanceStatus.ABSENT && action.oldStatus != AttendanceStatus.ABSENT -> action.newCount
+                        action.newStatus != AttendanceStatus.ABSENT && action.oldStatus == AttendanceStatus.ABSENT -> -action.oldCount
+                        else -> 0
+                    }
+                    
+                    // Update subject counts
+                    repository.updateAttendanceCounts(
+                        action.subjectId,
+                        subject.presentLectures + presentDiff,
+                        subject.absentLectures + absentDiff
+                    )
+                    
+                    // Set the attendance record with the new status and count
+                    repository.setAttendanceStatus(action.subjectId, action.date, action.newStatus, action.newCount)
+                    
+                    loadAttendanceForDate(action.date)
+                    updateUndoRedoState()
                 }
-                loadAttendanceForDate(action.date)
-                updateUndoRedoState()
             }
         }
     }
