@@ -26,7 +26,8 @@ data class AttendanceRecord(
     val id: Long = 0,
     val subjectId: Long,
     val date: LocalDate,
-    val status: AttendanceStatus
+    val status: AttendanceStatus,
+    val count: Int = 1
 )
 
 enum class AttendanceStatus {

@@ -13,6 +13,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.attendance.tracker.data.model.AttendanceRecord
 import com.attendance.tracker.data.model.AttendanceStatus
 import com.attendance.tracker.data.model.Subject
 import com.attendance.tracker.ui.components.SubjectCard
@@ -25,7 +26,7 @@ import java.time.format.DateTimeFormatter
 fun HomeScreen(
     subjects: List<Subject>,
     allSubjects: List<Subject>,
-    todayAttendance: Map<Long, AttendanceStatus>,
+    todayAttendance: Map<Long, AttendanceRecord>,
     canUndo: Boolean,
     canRedo: Boolean,
     onMarkAttendance: (Long, AttendanceStatus) -> Unit,
@@ -184,7 +185,7 @@ fun HomeScreen(
                         SubjectCard(
                             subject = subject,
                             allSubjects = allSubjects,
-                            currentStatus = todayAttendance[subject.id],
+                            currentRecord = todayAttendance[subject.id],
                             onMarkPresent = { 
                                 onMarkAttendance(subject.id, AttendanceStatus.PRESENT)
                                 showAttendanceSnackbar(subject.name, AttendanceStatus.PRESENT)

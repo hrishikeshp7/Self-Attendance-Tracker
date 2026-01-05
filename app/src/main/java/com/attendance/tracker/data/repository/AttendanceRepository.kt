@@ -33,35 +33,183 @@ class AttendanceRepository(
     suspend fun deleteSubject(subject: Subject) = subjectDao.deleteSubject(subject)
 
     suspend fun markPresent(subjectId: Long, date: LocalDate) {
-        subjectDao.markPresent(subjectId)
-        attendanceDao.insertAttendance(
-            AttendanceRecord(
-                subjectId = subjectId,
-                date = date,
-                status = AttendanceStatus.PRESENT
+        // Check if there's already a record for this subject on this date
+        val existingRecord = attendanceDao.getAttendanceRecord(subjectId, date)
+        
+        if (existingRecord != null && existingRecord.status == AttendanceStatus.PRESENT) {
+            // If already marked present, increment the count
+            val updatedRecord = existingRecord.copy(count = existingRecord.count + 1)
+            attendanceDao.insertAttendance(updatedRecord)
+            // Also increment subject counts
+            subjectDao.markPresent(subjectId)
+        } else if (existingRecord != null) {
+            // Different status exists, replace it
+            // First, adjust subject counts based on previous status
+            when (existingRecord.status) {
+                AttendanceStatus.ABSENT -> {
+                    // Was absent, now present: decrease absent, increase present
+                    val subject = getSubjectById(subjectId)
+                    subject?.let {
+                        subjectDao.updateAttendanceCounts(
+                            subjectId,
+                            it.presentLectures + existingRecord.count,
+                            it.absentLectures - existingRecord.count
+                        )
+                    }
+                }
+                AttendanceStatus.NO_CLASS -> {
+                    // Was no class, now present: increase present and total
+                    val subject = getSubjectById(subjectId)
+                    subject?.let {
+                        subjectDao.updateAttendanceCounts(
+                            subjectId,
+                            it.presentLectures + 1,
+                            it.absentLectures
+                        )
+                    }
+                }
+                else -> {}
+            }
+            // Insert new present record
+            attendanceDao.insertAttendance(
+                AttendanceRecord(
+                    subjectId = subjectId,
+                    date = date,
+                    status = AttendanceStatus.PRESENT,
+                    count = 1
+                )
             )
-        )
+        } else {
+            // No existing record, create new one
+            subjectDao.markPresent(subjectId)
+            attendanceDao.insertAttendance(
+                AttendanceRecord(
+                    subjectId = subjectId,
+                    date = date,
+                    status = AttendanceStatus.PRESENT,
+                    count = 1
+                )
+            )
+        }
     }
 
     suspend fun markAbsent(subjectId: Long, date: LocalDate) {
-        subjectDao.markAbsent(subjectId)
-        attendanceDao.insertAttendance(
-            AttendanceRecord(
-                subjectId = subjectId,
-                date = date,
-                status = AttendanceStatus.ABSENT
+        // Check if there's already a record for this subject on this date
+        val existingRecord = attendanceDao.getAttendanceRecord(subjectId, date)
+        
+        if (existingRecord != null && existingRecord.status == AttendanceStatus.ABSENT) {
+            // If already marked absent, increment the count
+            val updatedRecord = existingRecord.copy(count = existingRecord.count + 1)
+            attendanceDao.insertAttendance(updatedRecord)
+            // Also increment subject counts
+            subjectDao.markAbsent(subjectId)
+        } else if (existingRecord != null) {
+            // Different status exists, replace it
+            // First, adjust subject counts based on previous status
+            when (existingRecord.status) {
+                AttendanceStatus.PRESENT -> {
+                    // Was present, now absent: decrease present, increase absent
+                    val subject = getSubjectById(subjectId)
+                    subject?.let {
+                        subjectDao.updateAttendanceCounts(
+                            subjectId,
+                            it.presentLectures - existingRecord.count,
+                            it.absentLectures + existingRecord.count
+                        )
+                    }
+                }
+                AttendanceStatus.NO_CLASS -> {
+                    // Was no class, now absent: increase absent and total
+                    val subject = getSubjectById(subjectId)
+                    subject?.let {
+                        subjectDao.updateAttendanceCounts(
+                            subjectId,
+                            it.presentLectures,
+                            it.absentLectures + 1
+                        )
+                    }
+                }
+                else -> {}
+            }
+            // Insert new absent record
+            attendanceDao.insertAttendance(
+                AttendanceRecord(
+                    subjectId = subjectId,
+                    date = date,
+                    status = AttendanceStatus.ABSENT,
+                    count = 1
+                )
             )
-        )
+        } else {
+            // No existing record, create new one
+            subjectDao.markAbsent(subjectId)
+            attendanceDao.insertAttendance(
+                AttendanceRecord(
+                    subjectId = subjectId,
+                    date = date,
+                    status = AttendanceStatus.ABSENT,
+                    count = 1
+                )
+            )
+        }
     }
 
     suspend fun markNoClass(subjectId: Long, date: LocalDate) {
-        attendanceDao.insertAttendance(
-            AttendanceRecord(
-                subjectId = subjectId,
-                date = date,
-                status = AttendanceStatus.NO_CLASS
+        // Check if there's already a record for this subject on this date
+        val existingRecord = attendanceDao.getAttendanceRecord(subjectId, date)
+        
+        if (existingRecord != null && existingRecord.status == AttendanceStatus.NO_CLASS) {
+            // If already marked no class, increment the count
+            val updatedRecord = existingRecord.copy(count = existingRecord.count + 1)
+            attendanceDao.insertAttendance(updatedRecord)
+        } else if (existingRecord != null) {
+            // Different status exists, replace it
+            // Adjust subject counts based on previous status
+            when (existingRecord.status) {
+                AttendanceStatus.PRESENT -> {
+                    // Was present, now no class: decrease present and total
+                    val subject = getSubjectById(subjectId)
+                    subject?.let {
+                        subjectDao.updateAttendanceCounts(
+                            subjectId,
+                            it.presentLectures - existingRecord.count,
+                            it.absentLectures
+                        )
+                    }
+                }
+                AttendanceStatus.ABSENT -> {
+                    // Was absent, now no class: decrease absent and total
+                    val subject = getSubjectById(subjectId)
+                    subject?.let {
+                        subjectDao.updateAttendanceCounts(
+                            subjectId,
+                            it.presentLectures,
+                            it.absentLectures - existingRecord.count
+                        )
+                    }
+                }
+                else -> {}
+            }
+            // Insert new no class record
+            attendanceDao.insertAttendance(
+                AttendanceRecord(
+                    subjectId = subjectId,
+                    date = date,
+                    status = AttendanceStatus.NO_CLASS,
+                    count = 1
+                )
             )
-        )
+        } else {
+            // No existing record, create new one
+            attendanceDao.insertAttendance(
+                AttendanceRecord(
+                    subjectId = subjectId,
+                    date = date,
+                    status = AttendanceStatus.NO_CLASS,
+                    count = 1
+                )
+            )
+        }
     }
     
     suspend fun setAttendanceStatus(subjectId: Long, date: LocalDate, status: AttendanceStatus) {

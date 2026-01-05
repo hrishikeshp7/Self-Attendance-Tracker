@@ -177,8 +177,10 @@ private fun MonthCalendarGrid(
             columns = GridCells.Fixed(7),
             modifier = Modifier
                 .fillMaxWidth()
+                .height(320.dp)
                 .padding(horizontal = 8.dp),
-            contentPadding = PaddingValues(4.dp)
+            contentPadding = PaddingValues(4.dp),
+            userScrollEnabled = false
         ) {
             items(calendarDays) { date ->
                 CalendarDay(

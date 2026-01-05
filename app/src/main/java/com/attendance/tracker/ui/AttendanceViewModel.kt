@@ -52,8 +52,8 @@ class AttendanceViewModel(application: Application) : AndroidViewModel(applicati
     private val _selectedMonth = MutableStateFlow(YearMonth.now())
     val selectedMonth: StateFlow<YearMonth> = _selectedMonth.asStateFlow()
 
-    private val _todayAttendance = MutableStateFlow<Map<Long, AttendanceStatus>>(emptyMap())
-    val todayAttendance: StateFlow<Map<Long, AttendanceStatus>> = _todayAttendance.asStateFlow()
+    private val _todayAttendance = MutableStateFlow<Map<Long, AttendanceRecord>>(emptyMap())
+    val todayAttendance: StateFlow<Map<Long, AttendanceRecord>> = _todayAttendance.asStateFlow()
 
     private val _attendanceRecords = MutableStateFlow<List<AttendanceRecord>>(emptyList())
     val attendanceRecords: StateFlow<List<AttendanceRecord>> = _attendanceRecords.asStateFlow()
@@ -74,7 +74,7 @@ class AttendanceViewModel(application: Application) : AndroidViewModel(applicati
     fun loadAttendanceForDate(date: LocalDate) {
         viewModelScope.launch {
             repository.getAttendanceForDate(date).collect { records ->
-                _todayAttendance.value = records.associate { it.subjectId to it.status }
+                _todayAttendance.value = records.associateBy { it.subjectId }
             }
         }
     }
