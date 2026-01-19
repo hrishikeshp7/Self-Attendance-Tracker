@@ -82,8 +82,13 @@ fun CalendarScreen(
 
             // Attendance Statistics Bar for selected date
             val selectedDateRecords = attendanceRecords.filter { it.date == selectedDate }
-            val presentCount = selectedDateRecords.count { it.status == AttendanceStatus.PRESENT }
-            val absentCount = selectedDateRecords.count { it.status == AttendanceStatus.ABSENT }
+            val (presentCount, absentCount) = selectedDateRecords.fold(Pair(0, 0)) { acc, record ->
+                when (record.status) {
+                    AttendanceStatus.PRESENT -> Pair(acc.first + 1, acc.second)
+                    AttendanceStatus.ABSENT -> Pair(acc.first, acc.second + 1)
+                    else -> acc
+                }
+            }
             val totalCount = selectedDateRecords.size
             
             Card(
