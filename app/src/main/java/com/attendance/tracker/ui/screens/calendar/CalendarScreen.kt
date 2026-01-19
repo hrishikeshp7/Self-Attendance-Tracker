@@ -80,6 +80,44 @@ fun CalendarScreen(
                 onMonthChanged = onMonthChanged
             )
 
+            // Attendance Statistics Bar for selected date
+            val selectedDateRecords = attendanceRecords.filter { it.date == selectedDate }
+            val presentCount = selectedDateRecords.count { it.status == AttendanceStatus.PRESENT }
+            val absentCount = selectedDateRecords.count { it.status == AttendanceStatus.ABSENT }
+            val totalCount = selectedDateRecords.size
+            
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer
+                )
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    horizontalArrangement = Arrangement.SpaceEvenly
+                ) {
+                    AttendanceStatItem(
+                        label = "Present",
+                        value = presentCount.toString(),
+                        color = PresentGreen
+                    )
+                    AttendanceStatItem(
+                        label = "Absent",
+                        value = absentCount.toString(),
+                        color = AbsentRed
+                    )
+                    AttendanceStatItem(
+                        label = "Total",
+                        value = totalCount.toString(),
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+
             Divider(modifier = Modifier.padding(vertical = 4.dp))
 
             // Selected Date Attendance Details
@@ -88,8 +126,6 @@ fun CalendarScreen(
                 style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
             )
-
-            val selectedDateRecords = attendanceRecords.filter { it.date == selectedDate }
             
             if (subjects.isEmpty()) {
                 Box(
@@ -207,6 +243,26 @@ private fun CalendarAttendanceButton(
         Text(
             text = text,
             style = MaterialTheme.typography.labelMedium
+        )
+    }
+}
+
+@Composable
+private fun AttendanceStatItem(
+    label: String,
+    value: String,
+    color: androidx.compose.ui.graphics.Color
+) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(
+            text = value,
+            style = MaterialTheme.typography.titleSmall,
+            color = color
+        )
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
 }
