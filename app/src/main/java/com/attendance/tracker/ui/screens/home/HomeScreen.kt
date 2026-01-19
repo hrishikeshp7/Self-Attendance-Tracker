@@ -60,7 +60,12 @@ fun HomeScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Attendance Tracker") },
+                title = { 
+                    Text(
+                        "Attendance Tracker",
+                        style = MaterialTheme.typography.titleMedium
+                    ) 
+                },
                 actions = {
                     // Undo button
                     IconButton(
@@ -71,9 +76,9 @@ fun HomeScreen(
                             Icons.Default.Undo,
                             contentDescription = "Undo",
                             tint = if (canUndo) 
-                                MaterialTheme.colorScheme.onPrimary 
+                                MaterialTheme.colorScheme.onSurfaceVariant 
                             else 
-                                MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.38f)
+                                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
                         )
                     }
                     // Redo button
@@ -85,15 +90,15 @@ fun HomeScreen(
                             Icons.Default.Redo,
                             contentDescription = "Redo",
                             tint = if (canRedo) 
-                                MaterialTheme.colorScheme.onPrimary 
+                                MaterialTheme.colorScheme.onSurfaceVariant 
                             else 
-                                MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.38f)
+                                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
                         )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimary
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    titleContentColor = MaterialTheme.colorScheme.onSurface
                 )
             )
         },
@@ -117,17 +122,17 @@ fun HomeScreen(
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                    .padding(horizontal = 16.dp, vertical = 4.dp),
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.primaryContainer
                 )
             ) {
                 Text(
                     text = today.format(dateFormatter),
-                    style = MaterialTheme.typography.titleMedium,
+                    style = MaterialTheme.typography.titleSmall,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(16.dp),
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
                     textAlign = TextAlign.Center,
                     color = MaterialTheme.colorScheme.onPrimaryContainer
                 )
