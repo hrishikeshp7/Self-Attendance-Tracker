@@ -90,7 +90,7 @@ fun CalendarView(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
+                .padding(horizontal = 12.dp, vertical = 8.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -99,7 +99,7 @@ fun CalendarView(
             }
             Text(
                 text = "${selectedMonth.month.getDisplayName(TextStyle.FULL, Locale.getDefault())} ${selectedMonth.year}",
-                style = MaterialTheme.typography.titleMedium
+                style = MaterialTheme.typography.titleSmall
             )
             IconButton(onClick = { onMonthChanged(selectedMonth.plusMonths(1)) }) {
                 Icon(Icons.Filled.KeyboardArrowRight, contentDescription = "Next Month")
@@ -136,7 +136,7 @@ private fun MonthCalendarGrid(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 8.dp),
+                .padding(horizontal = 6.dp),
             horizontalArrangement = Arrangement.SpaceEvenly
         ) {
             val daysOfWeek = listOf(
@@ -146,14 +146,14 @@ private fun MonthCalendarGrid(
             daysOfWeek.forEach { day ->
                 Text(
                     text = day.getDisplayName(TextStyle.SHORT, Locale.getDefault()),
-                    style = MaterialTheme.typography.labelMedium,
+                    style = MaterialTheme.typography.labelSmall,
                     textAlign = TextAlign.Center,
                     modifier = Modifier.weight(1f)
                 )
             }
         }
 
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(4.dp))
 
         // Calendar Grid
         val firstDayOfMonth = month.atDay(1)
@@ -177,9 +177,9 @@ private fun MonthCalendarGrid(
             columns = GridCells.Fixed(7),
             modifier = Modifier
                 .fillMaxWidth()
-                .height(320.dp)
-                .padding(horizontal = 8.dp),
-            contentPadding = PaddingValues(4.dp),
+                .height(200.dp)
+                .padding(horizontal = 6.dp),
+            contentPadding = PaddingValues(2.dp),
             userScrollEnabled = false
         ) {
             items(calendarDays) { date ->
@@ -206,7 +206,7 @@ private fun CalendarDay(
     onClick: () -> Unit
 ) {
     if (date == null) {
-        Box(modifier = Modifier.size(48.dp))
+        Box(modifier = Modifier.size(40.dp))
         return
     }
 
@@ -229,7 +229,7 @@ private fun CalendarDay(
 
     Column(
         modifier = Modifier
-            .size(48.dp)
+            .size(40.dp)
             .clip(CircleShape)
             .background(backgroundColor)
             .clickable(onClick = onClick),
@@ -238,13 +238,13 @@ private fun CalendarDay(
     ) {
         Text(
             text = date.dayOfMonth.toString(),
-            style = MaterialTheme.typography.bodyMedium,
+            style = MaterialTheme.typography.bodySmall,
             color = textColor
         )
         
         // Show attendance indicator dots
         if (hasPresent || hasAbsent || hasNoClass) {
-            Spacer(modifier = Modifier.height(2.dp))
+            Spacer(modifier = Modifier.height(1.dp))
             Row(
                 horizontalArrangement = Arrangement.Center,
                 modifier = Modifier.fillMaxWidth()
@@ -252,25 +252,25 @@ private fun CalendarDay(
                 if (hasPresent) {
                     Box(
                         modifier = Modifier
-                            .size(4.dp)
+                            .size(3.dp)
                             .clip(CircleShape)
                             .background(PresentGreen)
                     )
-                    if (hasAbsent || hasNoClass) Spacer(modifier = Modifier.width(2.dp))
+                    if (hasAbsent || hasNoClass) Spacer(modifier = Modifier.width(1.dp))
                 }
                 if (hasAbsent) {
                     Box(
                         modifier = Modifier
-                            .size(4.dp)
+                            .size(3.dp)
                             .clip(CircleShape)
                             .background(AbsentRed)
                     )
-                    if (hasNoClass) Spacer(modifier = Modifier.width(2.dp))
+                    if (hasNoClass) Spacer(modifier = Modifier.width(1.dp))
                 }
                 if (hasNoClass) {
                     Box(
                         modifier = Modifier
-                            .size(4.dp)
+                            .size(3.dp)
                             .clip(CircleShape)
                             .background(NoClassGray)
                     )
