@@ -80,13 +80,13 @@ fun CalendarScreen(
                 onMonthChanged = onMonthChanged
             )
 
-            Divider(modifier = Modifier.padding(vertical = 8.dp))
+            Divider(modifier = Modifier.padding(vertical = 4.dp))
 
             // Selected Date Attendance Details
             Text(
                 text = selectedDate.format(dateFormatter),
                 style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
             )
 
             val selectedDateRecords = attendanceRecords.filter { it.date == selectedDate }
