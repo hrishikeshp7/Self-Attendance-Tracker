@@ -31,8 +31,8 @@ fun SubjectCard(
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 6.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
+            .padding(horizontal = 16.dp, vertical = 4.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
         onClick = onCardClick,
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant
@@ -41,7 +41,7 @@ fun SubjectCard(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp)
+                .padding(12.dp)
         ) {
             // Subject Name, Edit Button, and Pie Chart Row
             Row(
@@ -52,19 +52,18 @@ fun SubjectCard(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = subject.getDisplayName(allSubjects),
-                        style = MaterialTheme.typography.titleLarge,
+                        style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Text(
-                        text = "Tap to view calendar",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     TextButton(
                         onClick = onEditClick,
-                        contentPadding = PaddingValues(0.dp)
+                        contentPadding = PaddingValues(0.dp),
+                        modifier = Modifier.height(28.dp)
                     ) {
-                        Text("Edit Subject")
+                        Text(
+                            "Edit",
+                            style = MaterialTheme.typography.labelSmall
+                        )
                     }
                 }
                 
@@ -72,13 +71,13 @@ fun SubjectCard(
                 AttendancePieChart(
                     percentage = subject.currentAttendancePercentage,
                     requiredPercentage = subject.requiredAttendance,
-                    size = 80.dp,
-                    strokeWidth = 9.dp
+                    size = 60.dp,
+                    strokeWidth = 7.dp
                 )
             }
 
             Divider(
-                modifier = Modifier.padding(vertical = 12.dp),
+                modifier = Modifier.padding(vertical = 6.dp),
                 color = MaterialTheme.colorScheme.outlineVariant
             )
 
@@ -104,26 +103,15 @@ fun SubjectCard(
                 )
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(4.dp))
 
-            // Attendance Percentage Text
-            Text(
-                text = "Target: ${subject.requiredAttendance}%",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.fillMaxWidth(),
-                textAlign = TextAlign.Center
-            )
-
-            // Bunk Help Information
+            // Attendance Percentage and Bunk Help in one line
             if (subject.totalLectures > 0) {
-                Spacer(modifier = Modifier.height(4.dp))
-                
                 if (subject.isAboveRequired) {
                     val canBunk = subject.classesCanBunk
                     if (canBunk > 0) {
                         Text(
-                            text = "✓ You can bunk $canBunk ${if (canBunk == 1) "class" else "classes"}",
+                            text = "Target: ${subject.requiredAttendance}% • Can bunk $canBunk ${if (canBunk == 1) "class" else "classes"}",
                             style = MaterialTheme.typography.bodySmall,
                             color = PresentGreen,
                             modifier = Modifier.fillMaxWidth(),
@@ -131,7 +119,7 @@ fun SubjectCard(
                         )
                     } else {
                         Text(
-                            text = "✓ At threshold - attend next class",
+                            text = "Target: ${subject.requiredAttendance}% • At threshold",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.fillMaxWidth(),
@@ -142,17 +130,33 @@ fun SubjectCard(
                     val needToAttend = subject.classesToAttend
                     if (needToAttend > 0) {
                         Text(
-                            text = "⚠ Attend next $needToAttend ${if (needToAttend == 1) "class" else "classes"}",
+                            text = "Target: ${subject.requiredAttendance}% • Attend next $needToAttend ${if (needToAttend == 1) "class" else "classes"}",
                             style = MaterialTheme.typography.bodySmall,
                             color = AbsentRed,
                             modifier = Modifier.fillMaxWidth(),
                             textAlign = TextAlign.Center
                         )
+                    } else {
+                        Text(
+                            text = "Target: ${subject.requiredAttendance}%",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.fillMaxWidth(),
+                            textAlign = TextAlign.Center
+                        )
                     }
                 }
+            } else {
+                Text(
+                    text = "Target: ${subject.requiredAttendance}%",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = TextAlign.Center
+                )
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
             // Attendance Action Buttons
             Row(
@@ -194,12 +198,12 @@ private fun AttendanceStatItem(
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text(
             text = value,
-            style = MaterialTheme.typography.titleMedium,
+            style = MaterialTheme.typography.titleSmall,
             color = color
         )
         Text(
             text = label,
-            style = MaterialTheme.typography.bodySmall,
+            style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
@@ -219,11 +223,14 @@ private fun AttendanceButton(
             containerColor = if (isSelected) color else color.copy(alpha = 0.3f),
             contentColor = if (isSelected) MaterialTheme.colorScheme.onPrimary else color
         ),
-        modifier = Modifier.width(100.dp)
+        modifier = Modifier
+            .width(90.dp)
+            .height(36.dp),
+        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
     ) {
         Text(
             text = if (count != null && count > 1) "$text ($count)" else text,
-            style = MaterialTheme.typography.labelMedium
+            style = MaterialTheme.typography.labelSmall
         )
     }
 }
