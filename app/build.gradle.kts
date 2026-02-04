@@ -5,6 +5,30 @@ plugins {
     id("com.google.devtools.ksp")
 }
 
+// Function to get Git commit count for version code
+fun getGitCommitCount(): Int {
+    return try {
+        val process = ProcessBuilder("git", "rev-list", "--count", "HEAD")
+            .redirectErrorStream(true)
+            .start()
+        process.waitFor()
+        val output = process.inputStream.bufferedReader().readText().trim()
+        output.toIntOrNull() ?: 1
+    } catch (e: Exception) {
+        println("Warning: Could not get Git commit count: ${e.message}")
+        1
+    }
+}
+
+// Function to get version name from Git
+fun getVersionName(): String {
+    val commitCount = getGitCommitCount()
+    val majorVersion = 1
+    val minorVersion = commitCount / 100  // Increment minor version every 100 commits
+    val patchVersion = commitCount % 100  // Patch version is the remainder
+    return "$majorVersion.$minorVersion.$patchVersion"
+}
+
 android {
     namespace = "com.attendance.tracker"
     compileSdk = 36
@@ -13,8 +37,8 @@ android {
         applicationId = "com.attendance.tracker"
         minSdk = 26
         targetSdk = 36
-        versionCode = 2
-        versionName = "1.1"
+        versionCode = getGitCommitCount()
+        versionName = getVersionName()
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {

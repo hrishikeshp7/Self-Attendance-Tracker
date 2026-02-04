@@ -9,6 +9,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.attendance.tracker.data.model.AttendanceRecord
 import com.attendance.tracker.data.model.AttendanceStatus
@@ -94,6 +95,49 @@ fun SubjectCalendarScreen(
                 onMonthChanged = onMonthChanged
             )
 
+            // Attendance Statistics Bar for selected date
+            val selectedDateRecord = subjectRecords.find { it.date == selectedDate }
+            // Calculate statistics in a single pass
+            val (presentCount, absentCount, totalCount) = subjectRecords.fold(Triple(0, 0, 0)) { acc, record ->
+                when (record.status) {
+                    AttendanceStatus.PRESENT -> Triple(acc.first + 1, acc.second, acc.third + 1)
+                    AttendanceStatus.ABSENT -> Triple(acc.first, acc.second + 1, acc.third + 1)
+                    else -> acc
+                }
+            }
+            
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer
+                )
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    horizontalArrangement = Arrangement.SpaceEvenly
+                ) {
+                    AttendanceStatItem(
+                        label = "Present",
+                        value = presentCount.toString(),
+                        color = PresentGreen
+                    )
+                    AttendanceStatItem(
+                        label = "Absent",
+                        value = absentCount.toString(),
+                        color = AbsentRed
+                    )
+                    AttendanceStatItem(
+                        label = "Total",
+                        value = totalCount.toString(),
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+
             Divider(modifier = Modifier.padding(vertical = 4.dp))
 
             // Selected Date Attendance Details
@@ -102,8 +146,6 @@ fun SubjectCalendarScreen(
                 style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
             )
-
-            val selectedDateRecord = subjectRecords.find { it.date == selectedDate }
             
             Card(
                 modifier = Modifier
@@ -165,7 +207,7 @@ fun SubjectCalendarScreen(
 private fun SubjectCalendarAttendanceButton(
     text: String,
     isSelected: Boolean,
-    color: androidx.compose.ui.graphics.Color,
+    color: Color,
     onClick: () -> Unit
 ) {
     Button(
@@ -179,6 +221,26 @@ private fun SubjectCalendarAttendanceButton(
         Text(
             text = text,
             style = MaterialTheme.typography.labelMedium
+        )
+    }
+}
+
+@Composable
+private fun AttendanceStatItem(
+    label: String,
+    value: String,
+    color: Color
+) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(
+            text = value,
+            style = MaterialTheme.typography.titleSmall,
+            color = color
+        )
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
 }

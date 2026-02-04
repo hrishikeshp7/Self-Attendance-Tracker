@@ -74,9 +74,12 @@ fun AttendanceApp(
                         label = { Text(item.label) },
                         selected = currentDestination?.hierarchy?.any { it.route == item.screen.route } == true,
                         onClick = {
+                            // Navigate to the selected screen
                             navController.navigate(item.screen.route) {
+                                // Pop up to the start destination to clear intermediate screens
                                 popUpTo(navController.graph.findStartDestination().id) {
                                     saveState = true
+                                    inclusive = false
                                 }
                                 launchSingleTop = true
                                 restoreState = true
