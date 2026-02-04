@@ -9,6 +9,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.attendance.tracker.data.model.AttendanceRecord
 import com.attendance.tracker.data.model.AttendanceStatus
@@ -96,16 +97,14 @@ fun SubjectCalendarScreen(
 
             // Attendance Statistics Bar for selected date
             val selectedDateRecord = subjectRecords.find { it.date == selectedDate }
-            val (presentCount, absentCount) = subjectRecords.fold(Pair(0, 0)) { acc, record ->
+            // Calculate statistics in a single pass
+            val (presentCount, absentCount, totalCount) = subjectRecords.fold(Triple(0, 0, 0)) { acc, record ->
                 when (record.status) {
-                    AttendanceStatus.PRESENT -> Pair(acc.first + 1, acc.second)
-                    AttendanceStatus.ABSENT -> Pair(acc.first, acc.second + 1)
+                    AttendanceStatus.PRESENT -> Triple(acc.first + 1, acc.second, acc.third + 1)
+                    AttendanceStatus.ABSENT -> Triple(acc.first, acc.second + 1, acc.third + 1)
                     else -> acc
                 }
             }
-            val totalCount = subjectRecords.filter { 
-                it.status == AttendanceStatus.PRESENT || it.status == AttendanceStatus.ABSENT 
-            }.size
             
             Card(
                 modifier = Modifier
@@ -208,7 +207,7 @@ fun SubjectCalendarScreen(
 private fun SubjectCalendarAttendanceButton(
     text: String,
     isSelected: Boolean,
-    color: androidx.compose.ui.graphics.Color,
+    color: Color,
     onClick: () -> Unit
 ) {
     Button(
@@ -230,7 +229,7 @@ private fun SubjectCalendarAttendanceButton(
 private fun AttendanceStatItem(
     label: String,
     value: String,
-    color: androidx.compose.ui.graphics.Color
+    color: Color
 ) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text(

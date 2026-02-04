@@ -8,7 +8,9 @@ plugins {
 // Function to get Git commit count for version code
 fun getGitCommitCount(): Int {
     return try {
-        val process = Runtime.getRuntime().exec("git rev-list --count HEAD")
+        val process = ProcessBuilder("git", "rev-list", "--count", "HEAD")
+            .redirectErrorStream(true)
+            .start()
         process.waitFor()
         val output = process.inputStream.bufferedReader().readText().trim()
         output.toIntOrNull() ?: 1
