@@ -94,6 +94,51 @@ fun SubjectCalendarScreen(
                 onMonthChanged = onMonthChanged
             )
 
+            // Attendance Statistics Bar for selected date
+            val selectedDateRecord = subjectRecords.find { it.date == selectedDate }
+            val (presentCount, absentCount) = subjectRecords.fold(Pair(0, 0)) { acc, record ->
+                when (record.status) {
+                    AttendanceStatus.PRESENT -> Pair(acc.first + 1, acc.second)
+                    AttendanceStatus.ABSENT -> Pair(acc.first, acc.second + 1)
+                    else -> acc
+                }
+            }
+            val totalCount = subjectRecords.filter { 
+                it.status == AttendanceStatus.PRESENT || it.status == AttendanceStatus.ABSENT 
+            }.size
+            
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer
+                )
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    horizontalArrangement = Arrangement.SpaceEvenly
+                ) {
+                    AttendanceStatItem(
+                        label = "Present",
+                        value = presentCount.toString(),
+                        color = PresentGreen
+                    )
+                    AttendanceStatItem(
+                        label = "Absent",
+                        value = absentCount.toString(),
+                        color = AbsentRed
+                    )
+                    AttendanceStatItem(
+                        label = "Total",
+                        value = totalCount.toString(),
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+
             Divider(modifier = Modifier.padding(vertical = 4.dp))
 
             // Selected Date Attendance Details
@@ -102,8 +147,6 @@ fun SubjectCalendarScreen(
                 style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
             )
-
-            val selectedDateRecord = subjectRecords.find { it.date == selectedDate }
             
             Card(
                 modifier = Modifier
@@ -179,6 +222,26 @@ private fun SubjectCalendarAttendanceButton(
         Text(
             text = text,
             style = MaterialTheme.typography.labelMedium
+        )
+    }
+}
+
+@Composable
+private fun AttendanceStatItem(
+    label: String,
+    value: String,
+    color: androidx.compose.ui.graphics.Color
+) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(
+            text = value,
+            style = MaterialTheme.typography.titleSmall,
+            color = color
+        )
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
 }
