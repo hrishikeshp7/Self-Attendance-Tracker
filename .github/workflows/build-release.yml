@@ -72,8 +72,10 @@ jobs:
       - name: Get version info
         id: version
         run: |
-          VERSION_NAME=$(grep -oP 'versionName = "\K[^"]+' app/build.gradle.kts)
-          VERSION_CODE=$(grep -oP 'versionCode = \K\d+' app/build.gradle.kts)
+          # Extract version info from Gradle task output
+          VERSION_INFO=$(./gradlew -q printVersionInfo)
+          VERSION_NAME=$(echo "$VERSION_INFO" | grep "VERSION_NAME=" | cut -d'=' -f2)
+          VERSION_CODE=$(echo "$VERSION_INFO" | grep "VERSION_CODE=" | cut -d'=' -f2)
           echo "version_name=$VERSION_NAME" >> $GITHUB_OUTPUT
           echo "version_code=$VERSION_CODE" >> $GITHUB_OUTPUT
           echo "date=$(date +'%Y%m%d_%H%M%S')" >> $GITHUB_OUTPUT
