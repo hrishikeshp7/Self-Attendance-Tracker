@@ -76,9 +76,9 @@ fun HomeScreen(
                             Icons.Default.Undo,
                             contentDescription = "Undo",
                             tint = if (canUndo) 
-                                MaterialTheme.colorScheme.onSurfaceVariant 
+                                MaterialTheme.colorScheme.onPrimary 
                             else 
-                                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
+                                MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.38f)
                         )
                     }
                     // Redo button
@@ -90,15 +90,15 @@ fun HomeScreen(
                             Icons.Default.Redo,
                             contentDescription = "Redo",
                             tint = if (canRedo) 
-                                MaterialTheme.colorScheme.onSurfaceVariant 
+                                MaterialTheme.colorScheme.onPrimary 
                             else 
-                                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
+                                MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.38f)
                         )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface,
-                    titleContentColor = MaterialTheme.colorScheme.onSurface
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    titleContentColor = MaterialTheme.colorScheme.onPrimary
                 )
             )
         },
