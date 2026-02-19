@@ -1,6 +1,6 @@
 # Attendance Tracker
 
-An Android application for tracking and managing class attendance. Built with Kotlin, Jetpack Compose, and Room Database.
+An Android application for tracking and managing class attendance. Built with Kotlin, Jetpack Compose, and Room Database. Entirely vibe coded with AI as a test project .
 
 [![Build and Release APK](https://github.com/hrishikeshp7/Self-Attendance-Tracker/actions/workflows/build-release.yml/badge.svg)](https://github.com/hrishikeshp7/Self-Attendance-Tracker/actions/workflows/build-release.yml)
 
