@@ -20,6 +20,7 @@ fun SettingsScreen(
     onUpdateRequiredAttendance: (Long, Int) -> Unit,
     onNavigateToAbout: () -> Unit,
     onNavigateToCustomizations: () -> Unit,
+    onNavigateToBackupRestore: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -87,6 +88,37 @@ fun SettingsScreen(
                         )
                         Text(
                             text = "Themes and color settings",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Text(
+                        text = "→",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+
+            // Backup & Restore Option
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                onClick = onNavigateToBackupRestore
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text(
+                            text = "Backup & Restore",
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                        Text(
+                            text = "Export / import data, Google Drive backup",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )

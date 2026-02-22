@@ -21,6 +21,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.attendance.tracker.data.model.AttendanceStatus
 import com.attendance.tracker.ui.screens.about.AboutScreen
+import com.attendance.tracker.ui.screens.backup.BackupRestoreScreen
 import com.attendance.tracker.ui.screens.calendar.SubjectCalendarScreen
 import com.attendance.tracker.ui.screens.home.HomeScreen
 import com.attendance.tracker.ui.screens.schedule.ScheduleScreen
@@ -216,6 +217,9 @@ fun AttendanceApp(
                     },
                     onNavigateToCustomizations = {
                         navController.navigate(Screen.Customizations.route)
+                    },
+                    onNavigateToBackupRestore = {
+                        navController.navigate(Screen.BackupRestore.route)
                     }
                 )
             }
@@ -246,6 +250,15 @@ fun AttendanceApp(
 
             composable(Screen.About.route) {
                 AboutScreen(
+                    onNavigateBack = {
+                        navController.popBackStack()
+                    }
+                )
+            }
+
+            composable(Screen.BackupRestore.route) {
+                BackupRestoreScreen(
+                    viewModel = viewModel,
                     onNavigateBack = {
                         navController.popBackStack()
                     }

@@ -282,4 +282,29 @@ class AttendanceRepository(
             )
         }
     }
+
+    // Backup / Restore helpers
+
+    suspend fun getAllSubjectsOnce(): List<Subject> = subjectDao.getAllSubjectsOnce()
+
+    suspend fun getAllAttendanceRecordsOnce(): List<AttendanceRecord> =
+        attendanceDao.getAllAttendanceRecordsOnce()
+
+    suspend fun getAllScheduleEntriesOnce(): List<ScheduleEntry> =
+        scheduleDao.getAllScheduleEntriesOnce()
+
+    suspend fun restoreData(
+        subjects: List<Subject>,
+        attendanceRecords: List<AttendanceRecord>,
+        scheduleEntries: List<ScheduleEntry>
+    ) {
+        // Clear in dependency order (child tables first)
+        scheduleDao.deleteAllScheduleEntries()
+        attendanceDao.deleteAllAttendance()
+        subjectDao.deleteAllSubjects()
+        // Insert restored data
+        subjectDao.insertSubjects(subjects)
+        attendanceDao.insertAttendanceRecords(attendanceRecords)
+        scheduleDao.insertScheduleEntries(scheduleEntries)
+    }
 }

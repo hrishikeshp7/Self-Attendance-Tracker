@@ -3,6 +3,7 @@ package com.attendance.tracker.ui
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.attendance.tracker.backup.BackupManager
 import com.attendance.tracker.data.database.AttendanceDatabase
 import com.attendance.tracker.data.model.AttendanceRecord
 import com.attendance.tracker.data.model.AttendanceStatus
@@ -302,5 +303,62 @@ class AttendanceViewModel(application: Application) : AndroidViewModel(applicati
         viewModelScope.launch {
             themeRepository.updateCustomColors(primaryColor, secondaryColor)
         }
+    }
+
+    // -----------------------------------------------------------------------
+    // Backup / Restore
+    // -----------------------------------------------------------------------
+
+    enum class BackupRestoreStatus { IDLE, IN_PROGRESS, SUCCESS, ERROR }
+
+    private val _backupRestoreStatus = MutableStateFlow(BackupRestoreStatus.IDLE)
+    val backupRestoreStatus: StateFlow<BackupRestoreStatus> = _backupRestoreStatus.asStateFlow()
+
+    private val _backupRestoreMessage = MutableStateFlow("")
+    val backupRestoreMessage: StateFlow<String> = _backupRestoreMessage.asStateFlow()
+
+    /** Collect all data and return a JSON string ready to be written to a file. */
+    suspend fun createJsonBackup(): String {
+        val subjects = repository.getAllSubjectsOnce()
+        val records = repository.getAllAttendanceRecordsOnce()
+        val schedule = repository.getAllScheduleEntriesOnce()
+        return BackupManager.exportToJson(subjects, records, schedule)
+    }
+
+    /** Collect attendance data and return a CSV string ready to be written to a file. */
+    suspend fun createCsvBackup(): String {
+        val subjects = repository.getAllSubjectsOnce()
+        val records = repository.getAllAttendanceRecordsOnce()
+        return BackupManager.exportToCsv(subjects, records)
+    }
+
+    /** Restore from a JSON backup string. Clears existing data first. */
+    fun restoreFromJson(json: String) {
+        viewModelScope.launch {
+            _backupRestoreStatus.value = BackupRestoreStatus.IN_PROGRESS
+            val data = BackupManager.parseJson(json)
+            if (data == null) {
+                _backupRestoreStatus.value = BackupRestoreStatus.ERROR
+                _backupRestoreMessage.value = "Invalid backup file. Please select a valid JSON backup."
+                return@launch
+            }
+            try {
+                repository.restoreData(data.subjects, data.attendanceRecords, data.scheduleEntries)
+                loadAttendanceForDate(LocalDate.now())
+                _backupRestoreStatus.value = BackupRestoreStatus.SUCCESS
+                _backupRestoreMessage.value =
+                    "Restore complete: ${data.subjects.size} subjects, " +
+                    "${data.attendanceRecords.size} attendance records, " +
+                    "${data.scheduleEntries.size} schedule entries."
+            } catch (e: Exception) {
+                _backupRestoreStatus.value = BackupRestoreStatus.ERROR
+                _backupRestoreMessage.value = "Restore failed: ${e.message}"
+            }
+        }
+    }
+
+    fun resetBackupRestoreStatus() {
+        _backupRestoreStatus.value = BackupRestoreStatus.IDLE
+        _backupRestoreMessage.value = ""
     }
 }

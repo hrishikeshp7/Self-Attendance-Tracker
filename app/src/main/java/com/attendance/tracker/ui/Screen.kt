@@ -11,4 +11,5 @@ sealed class Screen(val route: String) {
     data object Settings : Screen("settings")
     data object Customizations : Screen("customizations")
     data object About : Screen("about")
+    data object BackupRestore : Screen("backup_restore")
 }
