@@ -13,6 +13,9 @@ interface ScheduleDao {
     @Query("SELECT * FROM schedule_entries WHERE dayOfWeek = :dayOfWeek")
     fun getScheduleForDay(dayOfWeek: DayOfWeek): Flow<List<ScheduleEntry>>
 
+    @Query("SELECT * FROM schedule_entries WHERE dayOfWeek = :dayOfWeek")
+    suspend fun getScheduleForDayOnce(dayOfWeek: DayOfWeek): List<ScheduleEntry>
+
     @Query("SELECT * FROM schedule_entries WHERE subjectId = :subjectId")
     fun getScheduleForSubject(subjectId: Long): Flow<List<ScheduleEntry>>
 
