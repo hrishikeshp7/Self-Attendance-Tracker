@@ -100,6 +100,7 @@ fun AttendanceApp(
                     subjects = subjects,
                     allSubjects = allSubjectsIncludingFolders,
                     todayAttendance = todayAttendance,
+                    scheduleEntries = scheduleEntries,
                     canUndo = canUndo,
                     canRedo = canRedo,
                     onMarkAttendance = { subjectId, status ->
