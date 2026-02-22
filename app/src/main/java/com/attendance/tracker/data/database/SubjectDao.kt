@@ -41,4 +41,13 @@ interface SubjectDao {
 
     @Query("UPDATE subjects SET requiredAttendance = :required WHERE id = :subjectId")
     suspend fun updateRequiredAttendance(subjectId: Long, required: Int)
+
+    @Query("SELECT * FROM subjects ORDER BY id ASC")
+    suspend fun getAllSubjectsOnce(): List<Subject>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertSubjects(subjects: List<Subject>)
+
+    @Query("DELETE FROM subjects")
+    suspend fun deleteAllSubjects()
 }

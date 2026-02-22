@@ -33,4 +33,13 @@ interface ScheduleDao {
 
     @Query("DELETE FROM schedule_entries WHERE subjectId = :subjectId AND dayOfWeek = :dayOfWeek")
     suspend fun deleteScheduleEntry(subjectId: Long, dayOfWeek: DayOfWeek)
+
+    @Query("SELECT * FROM schedule_entries ORDER BY subjectId ASC")
+    suspend fun getAllScheduleEntriesOnce(): List<ScheduleEntry>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertScheduleEntries(entries: List<ScheduleEntry>)
+
+    @Query("DELETE FROM schedule_entries")
+    suspend fun deleteAllScheduleEntries()
 }
