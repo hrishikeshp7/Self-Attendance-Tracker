@@ -10,6 +10,7 @@ import com.attendance.tracker.data.model.AttendanceStatus
 import com.attendance.tracker.data.model.ScheduleEntry
 import com.attendance.tracker.data.model.Subject
 import com.attendance.tracker.data.repository.AttendanceRepository
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import java.time.DayOfWeek
@@ -59,6 +60,10 @@ class AttendanceViewModel(application: Application) : AndroidViewModel(applicati
     private val _attendanceRecords = MutableStateFlow<List<AttendanceRecord>>(emptyList())
     val attendanceRecords: StateFlow<List<AttendanceRecord>> = _attendanceRecords.asStateFlow()
 
+    // Job handles for cancelling stale collectors before starting new ones
+    private var todayAttendanceJob: Job? = null
+    private var monthAttendanceJob: Job? = null
+
     // Theme preferences
     val themePreference = themeRepository.themePreference
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
@@ -73,7 +78,8 @@ class AttendanceViewModel(application: Application) : AndroidViewModel(applicati
     }
 
     fun loadAttendanceForDate(date: LocalDate) {
-        viewModelScope.launch {
+        todayAttendanceJob?.cancel()
+        todayAttendanceJob = viewModelScope.launch {
             repository.getAttendanceForDate(date).collect { records ->
                 _todayAttendance.value = records.associateBy { it.subjectId }
             }
@@ -81,7 +87,8 @@ class AttendanceViewModel(application: Application) : AndroidViewModel(applicati
     }
 
     fun loadAttendanceForMonth(yearMonth: YearMonth) {
-        viewModelScope.launch {
+        monthAttendanceJob?.cancel()
+        monthAttendanceJob = viewModelScope.launch {
             val startDate = yearMonth.atDay(1)
             val endDate = yearMonth.atEndOfMonth()
             repository.getAttendanceInRange(startDate, endDate).collect { records ->
