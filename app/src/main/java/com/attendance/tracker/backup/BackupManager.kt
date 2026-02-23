@@ -16,9 +16,11 @@ import java.time.LocalDate
  *  - JSON  – full backup/restore (subjects + attendance records + schedule entries)
  *  - CSV   – attendance records only (human-readable export)
  *
- * Google Drive is supported transparently: Android's Storage Access Framework (SAF)
- * file-picker surfaces Google Drive as a storage provider, so the user can save / open
- * backup files directly to/from Drive without any additional OAuth setup.
+ * Google Drive is supported transparently: a dedicated SAF launcher in the UI sets
+ * `DocumentsContract.EXTRA_INITIAL_URI` to the Google Drive root
+ * (`com.google.android.apps.docs.storage / mydrive`), so the system file-picker
+ * opens directly inside Google Drive.  No OAuth or Google Drive SDK is needed – the
+ * file is written via the standard `ContentResolver`.
  */
 object BackupManager {
 

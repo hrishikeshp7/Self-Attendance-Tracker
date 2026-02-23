@@ -1,8 +1,12 @@
 package com.attendance.tracker.ui.screens.backup
 
+import android.app.Activity
 import android.content.Context
+import android.content.Intent
 import android.net.Uri
+import android.provider.DocumentsContract
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContract
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -61,6 +65,41 @@ fun BackupRestoreScreen(
             scope.launch {
                 val csv = viewModel.createCsvBackup()
                 writeToUri(context, uri, csv)
+            }
+        }
+    }
+
+    // Google Drive Backup – opens the SAF file-picker pre-navigated to Google Drive.
+    // Uses a custom contract so we can embed EXTRA_INITIAL_URI pointing to the Drive root,
+    // which causes Android to open the picker directly inside Google Drive instead of local
+    // storage.  The file is still written via the standard ContentResolver, so no OAuth or
+    // Google Drive SDK is required.
+    val googleDriveExportLauncher = rememberLauncherForActivityResult(
+        contract = object : ActivityResultContract<String, Uri?>() {
+            override fun createIntent(context: Context, input: String): Intent =
+                Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
+                    addCategory(Intent.CATEGORY_OPENABLE)
+                    type = "application/json"
+                    putExtra(Intent.EXTRA_TITLE, input)
+                    // Pre-navigate the picker to Google Drive "My Drive" root.
+                    // Authority: com.google.android.apps.docs.storage (Google Drive SAF provider)
+                    putExtra(
+                        DocumentsContract.EXTRA_INITIAL_URI,
+                        DocumentsContract.buildRootUri(
+                            "com.google.android.apps.docs.storage",
+                            "mydrive"
+                        )
+                    )
+                }
+
+            override fun parseResult(resultCode: Int, intent: Intent?): Uri? =
+                if (resultCode == Activity.RESULT_OK) intent?.data else null
+        }
+    ) { uri ->
+        if (uri != null) {
+            scope.launch {
+                val json = viewModel.createJsonBackup()
+                writeToUri(context, uri, json)
             }
         }
     }
@@ -217,12 +256,13 @@ fun BackupRestoreScreen(
             BackupActionCard(
                 title = "Google Drive Backup",
                 description = "Save your JSON backup directly to Google Drive. " +
-                              "When the file picker opens, navigate to Google Drive and save there.",
+                              "The file picker will open inside Google Drive so you can " +
+                              "choose a folder and save without leaving the app.",
                 icon = { Icon(Icons.Default.CloudUpload, contentDescription = null) },
                 buttonLabel = "Backup to Drive"
             ) {
                 val today = LocalDate.now().toString()
-                exportJsonLauncher.launch("attendance_backup_$today.json")
+                googleDriveExportLauncher.launch("attendance_backup_$today.json")
             }
 
             // ---- Restore section ----
