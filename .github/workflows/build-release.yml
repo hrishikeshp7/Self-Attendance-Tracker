@@ -2,10 +2,15 @@ name: Build and Release APK
 
 on:
   workflow_dispatch:
+  pull_request:
+    types: [closed]
+    branches: [main]
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    # Only run if PR was merged or workflow was manually triggered
+    if: github.event.pull_request.merged == true || github.event_name == 'workflow_dispatch'
     
     # Step 1: Map the secret presence to an environment variable
     # This allows us to use it in 'if' conditions below.
