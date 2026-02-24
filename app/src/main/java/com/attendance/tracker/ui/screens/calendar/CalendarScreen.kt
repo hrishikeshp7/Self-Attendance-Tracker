@@ -132,6 +132,8 @@ fun CalendarScreen(
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
             )
             
+            val isFutureDate = selectedDate.isAfter(LocalDate.now())
+
             if (subjects.isEmpty()) {
                 Box(
                     modifier = Modifier
@@ -141,6 +143,19 @@ fun CalendarScreen(
                 ) {
                     Text(
                         text = "No subjects added yet",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            } else if (isFutureDate) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(32.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "Cannot mark attendance for future dates",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
