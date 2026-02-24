@@ -1,5 +1,10 @@
 package com.attendance.tracker.ui
 
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
@@ -94,7 +99,12 @@ fun AttendanceApp(
         NavHost(
             navController = navController,
             startDestination = Screen.Home.route,
-            modifier = Modifier.padding(innerPadding)
+            modifier = Modifier.padding(innerPadding),
+            // No animation for bottom-tab switches — instant response
+            enterTransition = { EnterTransition.None },
+            exitTransition = { ExitTransition.None },
+            popEnterTransition = { EnterTransition.None },
+            popExitTransition = { ExitTransition.None }
         ) {
             composable(Screen.Home.route) {
                 HomeScreen(
@@ -135,7 +145,9 @@ fun AttendanceApp(
 
             composable(
                 route = Screen.SubjectCalendar.route,
-                arguments = listOf(navArgument("subjectId") { type = NavType.LongType })
+                arguments = listOf(navArgument("subjectId") { type = NavType.LongType }),
+                enterTransition = { slideInHorizontally(initialOffsetX = { it }, animationSpec = tween(200)) },
+                popExitTransition = { slideOutHorizontally(targetOffsetX = { it }, animationSpec = tween(200)) }
             ) { backStackEntry ->
                 val subjectId = backStackEntry.arguments?.getLong("subjectId") ?: return@composable
                 val subject = allSubjectsIncludingFolders.find { it.id == subjectId } ?: return@composable
@@ -224,12 +236,16 @@ fun AttendanceApp(
                 )
             }
 
-            composable(Screen.Customizations.route) {
+            composable(
+                Screen.Customizations.route,
+                enterTransition = { slideInHorizontally(initialOffsetX = { it }, animationSpec = tween(200)) },
+                popExitTransition = { slideOutHorizontally(targetOffsetX = { it }, animationSpec = tween(200)) }
+            ) {
                 val currentPrimary = themePreference?.customPrimaryColor?.let { 
-                    androidx.compose.ui.graphics.Color(it.toULong()) 
+                    androidx.compose.ui.graphics.Color(it.toInt()) 
                 }
                 val currentSecondary = themePreference?.customSecondaryColor?.let { 
-                    androidx.compose.ui.graphics.Color(it.toULong()) 
+                    androidx.compose.ui.graphics.Color(it.toInt()) 
                 }
                 
                 com.attendance.tracker.ui.screens.customizations.CustomizationsScreen(
@@ -248,7 +264,11 @@ fun AttendanceApp(
                 )
             }
 
-            composable(Screen.About.route) {
+            composable(
+                Screen.About.route,
+                enterTransition = { slideInHorizontally(initialOffsetX = { it }, animationSpec = tween(200)) },
+                popExitTransition = { slideOutHorizontally(targetOffsetX = { it }, animationSpec = tween(200)) }
+            ) {
                 AboutScreen(
                     onNavigateBack = {
                         navController.popBackStack()
@@ -256,7 +276,11 @@ fun AttendanceApp(
                 )
             }
 
-            composable(Screen.BackupRestore.route) {
+            composable(
+                Screen.BackupRestore.route,
+                enterTransition = { slideInHorizontally(initialOffsetX = { it }, animationSpec = tween(200)) },
+                popExitTransition = { slideOutHorizontally(targetOffsetX = { it }, animationSpec = tween(200)) }
+            ) {
                 BackupRestoreScreen(
                     viewModel = viewModel,
                     onNavigateBack = {

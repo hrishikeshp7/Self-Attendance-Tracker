@@ -43,8 +43,8 @@ class MainActivity : ComponentActivity() {
             val themePreference by viewModel.themePreference.collectAsState(initial = null)
             
             val themeMode = themePreference?.themeMode ?: com.attendance.tracker.data.model.ThemeMode.SYSTEM
-            val customPrimary = themePreference?.customPrimaryColor?.let { Color(it.toULong()) }
-            val customSecondary = themePreference?.customSecondaryColor?.let { Color(it.toULong()) }
+            val customPrimary = themePreference?.customPrimaryColor?.let { Color(it.toInt()) }
+            val customSecondary = themePreference?.customSecondaryColor?.let { Color(it.toInt()) }
             
             AttendanceTrackerTheme(
                 themeMode = themeMode,

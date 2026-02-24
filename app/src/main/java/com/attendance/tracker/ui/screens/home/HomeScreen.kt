@@ -3,6 +3,7 @@ package com.attendance.tracker.ui.screens.home
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Redo
@@ -12,15 +13,16 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.attendance.tracker.data.model.AttendanceRecord
 import com.attendance.tracker.data.model.AttendanceStatus
 import com.attendance.tracker.data.model.ScheduleEntry
 import com.attendance.tracker.data.model.Subject
 import com.attendance.tracker.ui.components.SubjectCard
 import kotlinx.coroutines.launch
-import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import kotlin.math.roundToInt
@@ -43,11 +45,11 @@ fun HomeScreen(
     modifier: Modifier = Modifier
 ) {
     val today = LocalDate.now()
-    val dateFormatter = DateTimeFormatter.ofPattern("EEEE, MMMM d, yyyy")
+    val dayFormatter = DateTimeFormatter.ofPattern("EEEE")
+    val dateFormatter = DateTimeFormatter.ofPattern("MMMM d, yyyy")
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
-    
-    // Helper function to show snackbar with attendance status
+
     val showAttendanceSnackbar: (String, AttendanceStatus) -> Unit = { subjectName, status ->
         scope.launch {
             val statusText = when (status) {
@@ -62,12 +64,10 @@ fun HomeScreen(
         }
     }
 
-    // Compute per-subject weekly class count from schedule entries
     val weeklyClassCount: Map<Long, Int> = remember(scheduleEntries) {
         scheduleEntries.groupBy { it.subjectId }.mapValues { it.value.size }
     }
 
-    // Subjects at risk: above threshold but might fall below soon
     val atRiskSubjects: List<Pair<Subject, String>> = remember(subjects, scheduleEntries) {
         subjects.mapNotNull { subject ->
             val alert = computeAttendanceAlert(subject, weeklyClassCount[subject.id] ?: 0)
@@ -78,14 +78,23 @@ fun HomeScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { 
-                    Text(
-                        "Attendance Tracker",
-                        style = MaterialTheme.typography.titleMedium
-                    ) 
+                title = {
+                    Column {
+                        Text(
+                            text = today.format(dayFormatter),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            text = today.format(dateFormatter),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
                 },
                 actions = {
-                    // Undo button
                     IconButton(
                         onClick = onUndo,
                         enabled = canUndo
@@ -93,13 +102,12 @@ fun HomeScreen(
                         Icon(
                             Icons.Default.Undo,
                             contentDescription = "Undo",
-                            tint = if (canUndo) 
-                                MaterialTheme.colorScheme.onPrimary 
-                            else 
-                                MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.38f)
+                            tint = if (canUndo)
+                                MaterialTheme.colorScheme.onSurface
+                            else
+                                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.32f)
                         )
                     }
-                    // Redo button
                     IconButton(
                         onClick = onRedo,
                         enabled = canRedo
@@ -107,139 +115,115 @@ fun HomeScreen(
                         Icon(
                             Icons.Default.Redo,
                             contentDescription = "Redo",
-                            tint = if (canRedo) 
-                                MaterialTheme.colorScheme.onPrimary 
-                            else 
-                                MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.38f)
+                            tint = if (canRedo)
+                                MaterialTheme.colorScheme.onSurface
+                            else
+                                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.32f)
                         )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimary
+                    containerColor = MaterialTheme.colorScheme.background,
+                    titleContentColor = MaterialTheme.colorScheme.onBackground
                 )
             )
         },
         floatingActionButton = {
             FloatingActionButton(
                 onClick = onAddSubject,
-                containerColor = MaterialTheme.colorScheme.primary
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
+                shape = RoundedCornerShape(16.dp)
             ) {
                 Icon(Icons.Default.Add, contentDescription = "Add Subject")
             }
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
+        containerColor = MaterialTheme.colorScheme.background,
         modifier = modifier
     ) { paddingValues ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-        ) {
-            // Today's Date Header with improved styling
-            Card(
+        if (subjects.isEmpty()) {
+            EmptySubjectsState(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 4.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer
-                )
+                    .fillMaxSize()
+                    .padding(paddingValues)
+            )
+        } else {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues),
+                contentPadding = PaddingValues(bottom = 88.dp)
             ) {
-                Text(
-                    text = today.format(dateFormatter),
-                    style = MaterialTheme.typography.titleSmall,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
-                    textAlign = TextAlign.Center,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer
-                )
-            }
-
-            if (subjects.isEmpty()) {
-                // Empty State with improved styling
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Card(
-                        modifier = Modifier.padding(32.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.secondaryContainer
-                        )
-                    ) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            modifier = Modifier.padding(32.dp)
-                        ) {
-                            Text(
-                                text = "📚",
-                                style = MaterialTheme.typography.displayLarge
-                            )
-                            Spacer(modifier = Modifier.height(16.dp))
-                            Text(
-                                text = "No subjects yet",
-                                style = MaterialTheme.typography.titleLarge,
-                                textAlign = TextAlign.Center,
-                                color = MaterialTheme.colorScheme.onSecondaryContainer
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                text = "Tap the + button to add your first subject and start tracking attendance",
-                                style = MaterialTheme.typography.bodyMedium,
-                                textAlign = TextAlign.Center,
-                                color = MaterialTheme.colorScheme.onSecondaryContainer
+                // Alert banners
+                if (atRiskSubjects.isNotEmpty()) {
+                    item {
+                        atRiskSubjects.forEach { (subject, message) ->
+                            AttendanceAlertBanner(
+                                subjectName = subject.name,
+                                message = message,
+                                isBelow = !subject.isAboveRequired
                             )
                         }
                     }
                 }
-            } else {
-                // Subject List
-                LazyColumn(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth(),
-                    contentPadding = PaddingValues(bottom = 88.dp)
-                ) {
-                    // Smart Alert Banners
-                    if (atRiskSubjects.isNotEmpty()) {
-                        item {
-                            atRiskSubjects.forEach { (subject, message) ->
-                                AttendanceAlertBanner(
-                                    subjectName = subject.name,
-                                    message = message,
-                                    isBelow = !subject.isAboveRequired
-                                )
-                            }
-                        }
-                    }
 
-                    // Subject Cards
-                    items(subjects, key = { it.id }) { subject ->
-                        SubjectCard(
-                            subject = subject,
-                            allSubjects = allSubjects,
-                            currentRecord = todayAttendance[subject.id],
-                            onMarkPresent = { 
-                                onMarkAttendance(subject.id, AttendanceStatus.PRESENT)
-                                showAttendanceSnackbar(subject.name, AttendanceStatus.PRESENT)
-                            },
-                            onMarkAbsent = { 
-                                onMarkAttendance(subject.id, AttendanceStatus.ABSENT)
-                                showAttendanceSnackbar(subject.name, AttendanceStatus.ABSENT)
-                            },
-                            onMarkNoClass = { 
-                                onMarkAttendance(subject.id, AttendanceStatus.NO_CLASS)
-                                showAttendanceSnackbar(subject.name, AttendanceStatus.NO_CLASS)
-                            },
-                            onEditClick = { onEditSubject(subject) },
-                            onCardClick = { onSubjectClick(subject) }
-                        )
-                    }
+                // Subject Cards
+                items(subjects, key = { it.id }) { subject ->
+                    SubjectCard(
+                        subject = subject,
+                        allSubjects = allSubjects,
+                        currentRecord = todayAttendance[subject.id],
+                        onMarkPresent = {
+                            onMarkAttendance(subject.id, AttendanceStatus.PRESENT)
+                            showAttendanceSnackbar(subject.name, AttendanceStatus.PRESENT)
+                        },
+                        onMarkAbsent = {
+                            onMarkAttendance(subject.id, AttendanceStatus.ABSENT)
+                            showAttendanceSnackbar(subject.name, AttendanceStatus.ABSENT)
+                        },
+                        onMarkNoClass = {
+                            onMarkAttendance(subject.id, AttendanceStatus.NO_CLASS)
+                            showAttendanceSnackbar(subject.name, AttendanceStatus.NO_CLASS)
+                        },
+                        onEditClick = { onEditSubject(subject) },
+                        onCardClick = { onSubjectClick(subject) }
+                    )
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun EmptySubjectsState(modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier,
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.padding(40.dp)
+        ) {
+            Text(
+                text = "📚",
+                fontSize = 64.sp
+            )
+            Spacer(modifier = Modifier.height(20.dp))
+            Text(
+                text = "No subjects yet",
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center,
+                color = MaterialTheme.colorScheme.onBackground
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "Tap the + button to add your first subject and start tracking attendance",
+                style = MaterialTheme.typography.bodyMedium,
+                textAlign = TextAlign.Center,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }
@@ -252,7 +236,6 @@ private fun computeAttendanceAlert(subject: Subject, classesPerWeek: Int): Strin
     if (subject.totalLectures == 0) return null
 
     return if (!subject.isAboveRequired) {
-        // Already below threshold
         val needed = subject.classesToAttend
         if (needed >= 999) {
             "Cannot recover attendance for ${subject.name} (100% required with absences)"
@@ -260,7 +243,6 @@ private fun computeAttendanceAlert(subject: Subject, classesPerWeek: Int): Strin
             "⚠\uFE0F ${subject.name}: Attend $needed more class${if (needed != 1) "es" else ""} to reach ${subject.requiredAttendance}%"
         }
     } else if (subject.classesCanBunk in 0..2) {
-        // Above threshold but very close to falling below
         if (classesPerWeek > 0) {
             val daysUntilBelow = ((subject.classesCanBunk.toFloat() / classesPerWeek) * 7).roundToInt()
             if (daysUntilBelow <= 14) {
@@ -269,7 +251,6 @@ private fun computeAttendanceAlert(subject: Subject, classesPerWeek: Int): Strin
                 null
             }
         } else {
-            // No schedule info, show classes-based warning
             "⚠\uFE0F ${subject.name}: Can only miss ${subject.classesCanBunk} more class${if (subject.classesCanBunk != 1) "es" else ""}"
         }
     } else {
@@ -298,7 +279,8 @@ private fun AttendanceAlertBanner(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 4.dp),
-        colors = CardDefaults.cardColors(containerColor = containerColor)
+        colors = CardDefaults.cardColors(containerColor = containerColor),
+        shape = RoundedCornerShape(12.dp)
     ) {
         Row(
             modifier = Modifier
@@ -311,7 +293,7 @@ private fun AttendanceAlertBanner(
                 imageVector = Icons.Default.Warning,
                 contentDescription = "Alert",
                 tint = contentColor,
-                modifier = Modifier.size(20.dp)
+                modifier = Modifier.size(18.dp)
             )
             Text(
                 text = message,
@@ -322,3 +304,4 @@ private fun AttendanceAlertBanner(
         }
     }
 }
+
