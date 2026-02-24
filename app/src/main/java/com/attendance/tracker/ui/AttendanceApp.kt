@@ -242,10 +242,10 @@ fun AttendanceApp(
                 popExitTransition = { slideOutHorizontally(targetOffsetX = { it }, animationSpec = tween(200)) }
             ) {
                 val currentPrimary = themePreference?.customPrimaryColor?.let { 
-                    androidx.compose.ui.graphics.Color(it.toULong()) 
+                    androidx.compose.ui.graphics.Color(it.toInt()) 
                 }
                 val currentSecondary = themePreference?.customSecondaryColor?.let { 
-                    androidx.compose.ui.graphics.Color(it.toULong()) 
+                    androidx.compose.ui.graphics.Color(it.toInt()) 
                 }
                 
                 com.attendance.tracker.ui.screens.customizations.CustomizationsScreen(
