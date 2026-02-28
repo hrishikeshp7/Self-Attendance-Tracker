@@ -21,6 +21,7 @@ import com.attendance.tracker.data.model.AttendanceRecord
 import com.attendance.tracker.data.model.AttendanceStatus
 import com.attendance.tracker.data.model.ScheduleEntry
 import com.attendance.tracker.data.model.Subject
+import com.attendance.tracker.data.model.getDisplayName
 import com.attendance.tracker.ui.components.SubjectCard
 import kotlinx.coroutines.launch
 import java.time.LocalDate
@@ -74,6 +75,20 @@ fun HomeScreen(
             if (alert != null) Pair(subject, alert) else null
         }
     }
+
+    // Determine today's scheduled subjects
+    val todayDayOfWeek = today.dayOfWeek
+    val todaysScheduledIds: Set<Long> = remember(scheduleEntries, todayDayOfWeek) {
+        scheduleEntries.filter { it.dayOfWeek == todayDayOfWeek }.map { it.subjectId }.toSet()
+    }
+    // If the user has not set up any schedule at all, fall back to showing all subjects
+    val hasAnySchedule = scheduleEntries.isNotEmpty()
+    val todaysSubjects: List<Subject> = remember(subjects, todaysScheduledIds, hasAnySchedule) {
+        if (!hasAnySchedule) subjects else subjects.filter { it.id in todaysScheduledIds }
+    }
+
+    // Extra-class dialog state
+    var showExtraClassDialog by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -148,6 +163,13 @@ fun HomeScreen(
                     .fillMaxSize()
                     .padding(paddingValues)
             )
+        } else if (hasAnySchedule && todaysSubjects.isEmpty()) {
+            NoClassesTodayState(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues),
+                onAddExtraClass = { showExtraClassDialog = true }
+            )
         } else {
             LazyColumn(
                 modifier = Modifier
@@ -168,8 +190,8 @@ fun HomeScreen(
                     }
                 }
 
-                // Subject Cards
-                items(subjects, key = { it.id }) { subject ->
+                // Subject Cards – only today's scheduled subjects, single-mark mode
+                items(todaysSubjects, key = { it.id }) { subject ->
                     SubjectCard(
                         subject = subject,
                         allSubjects = allSubjects,
@@ -187,9 +209,152 @@ fun HomeScreen(
                             showAttendanceSnackbar(subject.name, AttendanceStatus.NO_CLASS)
                         },
                         onEditClick = { onEditSubject(subject) },
-                        onCardClick = { onSubjectClick(subject) }
+                        onCardClick = { onSubjectClick(subject) },
+                        allowMultipleMark = false
                     )
                 }
+
+                // "Add Extra Class" button at the bottom of the list
+                item {
+                    OutlinedButton(
+                        onClick = { showExtraClassDialog = true },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.Add,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Add Extra Class")
+                    }
+                }
+            }
+        }
+    }
+
+    // Extra Class Dialog
+    if (showExtraClassDialog) {
+        ExtraClassDialog(
+            subjects = subjects,
+            allSubjects = allSubjects,
+            onDismiss = { showExtraClassDialog = false },
+            onConfirm = { subjectId ->
+                val subject = subjects.find { it.id == subjectId }
+                if (subject != null) {
+                    onMarkAttendance(subject.id, AttendanceStatus.PRESENT)
+                    showAttendanceSnackbar(subject.name, AttendanceStatus.PRESENT)
+                }
+                showExtraClassDialog = false
+            }
+        )
+    }
+}
+
+@Composable
+private fun ExtraClassDialog(
+    subjects: List<Subject>,
+    allSubjects: List<Subject>,
+    onDismiss: () -> Unit,
+    onConfirm: (Long) -> Unit
+) {
+    var selectedSubjectId by remember { mutableStateOf<Long?>(null) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Add Extra Class") },
+        text = {
+            Column {
+                Text(
+                    text = "Select the subject that had an extra class today:",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                subjects.forEach { subject ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        RadioButton(
+                            selected = selectedSubjectId == subject.id,
+                            onClick = { selectedSubjectId = subject.id }
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = subject.getDisplayName(allSubjects),
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { selectedSubjectId?.let { onConfirm(it) } },
+                enabled = selectedSubjectId != null
+            ) {
+                Text("Mark Present")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
+}
+
+@Composable
+private fun NoClassesTodayState(
+    modifier: Modifier = Modifier,
+    onAddExtraClass: () -> Unit
+) {
+    Box(
+        modifier = modifier,
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.padding(40.dp)
+        ) {
+            Text(
+                text = "🎉",
+                fontSize = 64.sp
+            )
+            Spacer(modifier = Modifier.height(20.dp))
+            Text(
+                text = "No classes today",
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center,
+                color = MaterialTheme.colorScheme.onBackground
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "No subjects are scheduled for today. You can still record an extra class if one was held.",
+                style = MaterialTheme.typography.bodyMedium,
+                textAlign = TextAlign.Center,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(modifier = Modifier.height(24.dp))
+            OutlinedButton(
+                onClick = onAddExtraClass,
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Icon(
+                    Icons.Default.Add,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Add Extra Class")
             }
         }
     }

@@ -25,6 +25,14 @@ import com.attendance.tracker.ui.theme.PresentGreen
 
 private const val STATS_BACKGROUND_ALPHA = 0.5f
 
+/** Returns whether an attendance button should be enabled. When [allowMultipleMark] is false,
+ *  the button for the already-selected status is disabled to prevent double-counting. */
+private fun shouldEnableButton(
+    allowMultipleMark: Boolean,
+    currentStatus: AttendanceStatus?,
+    targetStatus: AttendanceStatus
+): Boolean = allowMultipleMark || currentStatus != targetStatus
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SubjectCard(
@@ -36,6 +44,7 @@ fun SubjectCard(
     onMarkNoClass: () -> Unit,
     onEditClick: () -> Unit,
     onCardClick: () -> Unit,
+    allowMultipleMark: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     val attendanceColor = when {
@@ -177,6 +186,7 @@ fun SubjectCard(
                     isSelected = currentRecord?.status == AttendanceStatus.PRESENT,
                     color = PresentGreen,
                     onClick = onMarkPresent,
+                    enabled = shouldEnableButton(allowMultipleMark, currentRecord?.status, AttendanceStatus.PRESENT),
                     modifier = Modifier.weight(1f)
                 )
                 AttendanceButton(
@@ -185,6 +195,7 @@ fun SubjectCard(
                     isSelected = currentRecord?.status == AttendanceStatus.ABSENT,
                     color = AbsentRed,
                     onClick = onMarkAbsent,
+                    enabled = shouldEnableButton(allowMultipleMark, currentRecord?.status, AttendanceStatus.ABSENT),
                     modifier = Modifier.weight(1f)
                 )
                 AttendanceButton(
@@ -193,6 +204,7 @@ fun SubjectCard(
                     isSelected = currentRecord?.status == AttendanceStatus.NO_CLASS,
                     color = NoClassGray,
                     onClick = onMarkNoClass,
+                    enabled = shouldEnableButton(allowMultipleMark, currentRecord?.status, AttendanceStatus.NO_CLASS),
                     modifier = Modifier.weight(1f)
                 )
             }
@@ -231,14 +243,18 @@ private fun AttendanceButton(
     isSelected: Boolean,
     color: Color,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true
 ) {
     val buttonText = if (count != null && count > 1) "$text ($count)" else text
     Button(
         onClick = onClick,
+        enabled = enabled,
         colors = ButtonDefaults.buttonColors(
             containerColor = if (isSelected) color else color.copy(alpha = 0.12f),
-            contentColor = if (isSelected) Color.White else color
+            contentColor = if (isSelected) Color.White else color,
+            disabledContainerColor = if (isSelected) color.copy(alpha = 0.6f) else color.copy(alpha = 0.08f),
+            disabledContentColor = if (isSelected) Color.White.copy(alpha = 0.7f) else color.copy(alpha = 0.4f)
         ),
         modifier = modifier.height(36.dp),
         contentPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp),
