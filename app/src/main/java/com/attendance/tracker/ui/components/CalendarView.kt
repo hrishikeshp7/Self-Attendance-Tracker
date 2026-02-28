@@ -43,6 +43,8 @@ fun CalendarView(
     selectedMonth: YearMonth,
     selectedDate: LocalDate,
     attendanceRecords: List<AttendanceRecord>,
+    rangeStart: LocalDate? = null,
+    rangeEnd: LocalDate? = null,
     onDateSelected: (LocalDate) -> Unit,
     onMonthChanged: (YearMonth) -> Unit,
     modifier: Modifier = Modifier
@@ -118,6 +120,8 @@ fun CalendarView(
                 month = monthToDisplay,
                 selectedDate = selectedDate,
                 attendanceRecords = attendanceRecords,
+                rangeStart = rangeStart,
+                rangeEnd = rangeEnd,
                 onDateSelected = onDateSelected
             )
         }
@@ -129,6 +133,8 @@ private fun MonthCalendarGrid(
     month: YearMonth,
     selectedDate: LocalDate,
     attendanceRecords: List<AttendanceRecord>,
+    rangeStart: LocalDate? = null,
+    rangeEnd: LocalDate? = null,
     onDateSelected: (LocalDate) -> Unit
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
@@ -182,11 +188,25 @@ private fun MonthCalendarGrid(
             contentPadding = PaddingValues(2.dp),
             userScrollEnabled = false
         ) {
+            // Normalize so start ≤ end regardless of tap order
+            val normalizedStart = if (rangeStart != null && rangeEnd != null) minOf(rangeStart, rangeEnd) else rangeStart
+            val normalizedEnd   = if (rangeStart != null && rangeEnd != null) maxOf(rangeStart, rangeEnd) else rangeEnd
             items(calendarDays) { date ->
+                val isInRange = date != null && normalizedStart != null && normalizedEnd != null &&
+                        !date.isBefore(normalizedStart) && !date.isAfter(normalizedEnd)
+                // Both guards include normalizedStart != normalizedEnd so a degenerate
+                // single-day range falls back to the regular isSelected highlight instead.
+                val isRangeStart = date != null && date == normalizedStart &&
+                        normalizedEnd != null && normalizedStart != normalizedEnd
+                val isRangeEnd   = date != null && date == normalizedEnd   &&
+                        normalizedStart != normalizedEnd
                 CalendarDay(
                     date = date,
                     isSelected = date == selectedDate,
                     isToday = date == LocalDate.now(),
+                    isRangeStart = isRangeStart,
+                    isRangeEnd = isRangeEnd,
+                    isInRange = isInRange,
                     attendanceRecords = date?.let { d ->
                         attendanceRecords.filter { it.date == d }
                     } ?: emptyList(),
@@ -202,6 +222,9 @@ private fun CalendarDay(
     date: LocalDate?,
     isSelected: Boolean,
     isToday: Boolean,
+    isRangeStart: Boolean = false,
+    isRangeEnd: Boolean = false,
+    isInRange: Boolean = false,
     attendanceRecords: List<AttendanceRecord>,
     onClick: () -> Unit
 ) {
@@ -211,12 +234,16 @@ private fun CalendarDay(
     }
 
     val backgroundColor = when {
+        isRangeStart || isRangeEnd -> MaterialTheme.colorScheme.primary
+        isInRange -> MaterialTheme.colorScheme.primaryContainer
         isSelected -> MaterialTheme.colorScheme.primary
         isToday -> MaterialTheme.colorScheme.primaryContainer
         else -> Color.Transparent
     }
 
     val textColor = when {
+        isRangeStart || isRangeEnd -> MaterialTheme.colorScheme.onPrimary
+        isInRange -> MaterialTheme.colorScheme.onPrimaryContainer
         isSelected -> MaterialTheme.colorScheme.onPrimary
         isToday -> MaterialTheme.colorScheme.onPrimaryContainer
         else -> MaterialTheme.colorScheme.onSurface
