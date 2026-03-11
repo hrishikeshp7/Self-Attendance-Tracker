@@ -51,10 +51,30 @@ android {
     // For production apps, use secure credential management (e.g., GitHub Secrets)
     signingConfigs {
         create("release") {
-            storeFile = file(System.getenv("KEYSTORE_FILE") ?: "release.keystore")
-            storePassword = System.getenv("KEYSTORE_PASSWORD") ?: "android"
-            keyAlias = System.getenv("KEY_ALIAS") ?: "release"
-            keyPassword = System.getenv("KEY_PASSWORD") ?: "android"
+            val storeFilePath = System.getenv("KEYSTORE_FILE") ?: "release.keystore"
+            val storePass = System.getenv("KEYSTORE_PASSWORD")
+            val keyAl = System.getenv("KEY_ALIAS") ?: "release"
+            val keyPass = System.getenv("KEY_PASSWORD")
+
+            // For release builds, we require environment variables to be set.
+            // We check this during the configuration phase only if a release task is requested.
+            val isReleaseTask = gradle.startParameter.taskNames.any {
+                it.contains("release", ignoreCase = true)
+            }
+
+            if (isReleaseTask) {
+                if (storePass == null) {
+                    throw GradleException("KEYSTORE_PASSWORD environment variable is not set for release build.")
+                }
+                if (keyPass == null) {
+                    throw GradleException("KEY_PASSWORD environment variable is not set for release build.")
+                }
+            }
+
+            storeFile = file(storeFilePath)
+            storePassword = storePass
+            keyAlias = keyAl
+            keyPassword = keyPass
         }
     }
 

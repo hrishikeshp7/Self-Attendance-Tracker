@@ -46,29 +46,19 @@ jobs:
           echo "Using persistent keystore from secrets..."
           echo "${{ secrets.RELEASE_KEYSTORE_BASE64 }}" | base64 -d > app/release.keystore
 
-      - name: Generate Temporary Keystore (Fallback)
-        # Use env.HAS_KEYSTORE instead of secrets.RELEASE_KEYSTORE_BASE64
+      - name: Check for Release Keystore
         if: env.HAS_KEYSTORE != 'true'
         run: |
-          # Fallback: Generate a temporary keystore for forks/testing
-          echo "WARNING: RELEASE_KEYSTORE_BASE64 secret not found."
-          echo "Generating temporary keystore. This will cause signature conflicts between releases!"
-          keytool -genkeypair -v \
-            -keystore app/release.keystore \
-            -alias release \
-            -keyalg RSA \
-            -keysize 2048 \
-            -validity 10000 \
-            -storepass android \
-            -keypass android \
-            -dname "CN=AttendanceTracker, OU=Development, O=AttendanceTracker, L=Unknown, ST=Unknown, C=US"
+          echo "ERROR: RELEASE_KEYSTORE_BASE64 secret not found."
+          echo "Release builds require a valid keystore and credentials."
+          exit 1
 
       - name: Build Release APK
         env:
           KEYSTORE_FILE: release.keystore
-          KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD || 'android' }}
+          KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS || 'release' }}
-          KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD || 'android' }}
+          KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
         run: ./gradlew assembleRelease
 
       - name: Generate random release name
