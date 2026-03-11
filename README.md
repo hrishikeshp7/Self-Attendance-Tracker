@@ -150,8 +150,8 @@ base64 release.keystore > release.keystore.base64
 
 #### For Local Release Builds
 
-If building locally, you can:
-1. Use the same keystore file and set environment variables:
+For release builds, you must use a valid keystore file and set the required environment variables. The build will fail if these are not provided.
+
 ```bash
 export KEYSTORE_FILE=path/to/release.keystore
 export KEYSTORE_PASSWORD=your_password
@@ -159,8 +159,6 @@ export KEY_ALIAS=release
 export KEY_PASSWORD=your_key_password
 ./gradlew assembleRelease
 ```
-
-2. Or let the build script use the default temporary keystore (not recommended for production).
 
 ## Usage Guide
 
