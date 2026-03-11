@@ -17,6 +17,9 @@ interface AttendanceDao {
     @Query("SELECT * FROM attendance_records WHERE subjectId = :subjectId AND date = :date")
     suspend fun getAttendanceRecord(subjectId: Long, date: LocalDate): AttendanceRecord?
 
+    @Query("SELECT * FROM attendance_records WHERE subjectId IN (:subjectIds) AND date = :date")
+    suspend fun getAttendanceRecordsForSubjectsOnDateOnce(subjectIds: List<Long>, date: LocalDate): List<AttendanceRecord>
+
     @Query("SELECT * FROM attendance_records WHERE date BETWEEN :startDate AND :endDate ORDER BY date ASC")
     fun getAttendanceInRange(startDate: LocalDate, endDate: LocalDate): Flow<List<AttendanceRecord>>
 
