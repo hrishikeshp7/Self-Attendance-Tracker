@@ -11,6 +11,9 @@ interface SubjectDao {
 
     @Query("SELECT * FROM subjects WHERE id = :id")
     suspend fun getSubjectById(id: Long): Subject?
+
+    @Query("SELECT * FROM subjects WHERE id IN (:ids)")
+    suspend fun getSubjectsByIdsOnce(ids: List<Long>): List<Subject>
     
     @Query("SELECT * FROM subjects WHERE parentSubjectId IS NULL ORDER BY name ASC")
     fun getTopLevelSubjects(): Flow<List<Subject>>

@@ -35,11 +35,15 @@ class AttendanceReminderWorker(
         }
 
         // Check which scheduled subjects have no attendance marked for today
+        val subjectIds = todayScheduledEntries.map { it.subjectId }.distinct()
+        val todayAttendanceRecords = attendanceDao.getAttendanceRecordsForSubjectsOnDateOnce(subjectIds, today)
+        val markedSubjectIds = todayAttendanceRecords.map { it.subjectId }.toSet()
+        val subjectsMap = subjectDao.getSubjectsByIdsOnce(subjectIds).associateBy { it.id }
+
         val unmarkedSubjectNames = mutableListOf<String>()
         for (entry in todayScheduledEntries) {
-            val record = attendanceDao.getAttendanceRecord(entry.subjectId, today)
-            if (record == null) {
-                val subject = subjectDao.getSubjectById(entry.subjectId)
+            if (entry.subjectId !in markedSubjectIds) {
+                val subject = subjectsMap[entry.subjectId]
                 if (subject != null && !subject.isFolder) {
                     unmarkedSubjectNames.add(subject.name)
                 }
