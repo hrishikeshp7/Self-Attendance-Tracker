@@ -60,8 +60,6 @@ fun AttendanceApp(
     val selectedMonth by viewModel.selectedMonth.collectAsState()
     val todayAttendance by viewModel.todayAttendance.collectAsState()
     val attendanceRecords by viewModel.attendanceRecords.collectAsState()
-    val canUndo by viewModel.canUndo.collectAsState()
-    val canRedo by viewModel.canRedo.collectAsState()
     val themePreference by viewModel.themePreference.collectAsState()
 
     // Variables for navigation to subjects screen
@@ -112,13 +110,12 @@ fun AttendanceApp(
                     allSubjects = allSubjectsIncludingFolders,
                     todayAttendance = todayAttendance,
                     scheduleEntries = scheduleEntries,
-                    canUndo = canUndo,
-                    canRedo = canRedo,
                     onMarkAttendance = { subjectId, status ->
                         viewModel.markAttendance(subjectId, status)
                     },
-                    onUndo = { viewModel.undo() },
-                    onRedo = { viewModel.redo() },
+                    onClearAttendance = { subjectId ->
+                        viewModel.clearAttendance(subjectId)
+                    },
                     onAddSubject = {
                         showAddSubjectOnSubjectsScreen = true
                         navController.navigate(Screen.Subjects.route) {
