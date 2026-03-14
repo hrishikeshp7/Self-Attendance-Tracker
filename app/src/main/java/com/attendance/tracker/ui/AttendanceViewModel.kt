@@ -204,6 +204,55 @@ class AttendanceViewModel(application: Application) : AndroidViewModel(applicati
             }
         }
     }
+
+    fun clearAttendance(subjectId: Long, date: LocalDate = LocalDate.now()) {
+        viewModelScope.launch {
+            val record = repository.getAttendanceRecord(subjectId, date)
+            val subject = repository.getSubjectById(subjectId)
+
+            if (record != null && subject != null) {
+                // Adjust counts based on the status we're removing
+                when (record.status) {
+                    AttendanceStatus.PRESENT -> {
+                        repository.updateAttendanceCounts(
+                            subjectId,
+                            subject.presentLectures - record.count,
+                            subject.absentLectures
+                        )
+                    }
+                    AttendanceStatus.ABSENT -> {
+                        repository.updateAttendanceCounts(
+                            subjectId,
+                            subject.presentLectures,
+                            subject.absentLectures - record.count
+                        )
+                    }
+                    AttendanceStatus.NO_CLASS -> {
+                        // NO_CLASS does not affect present/absent counts
+                    }
+                }
+
+                // Record the clear action for undo
+                val action = AttendanceAction(
+                    subjectId = subjectId,
+                    date = date,
+                    oldStatus = record.status,
+                    oldCount = record.count,
+                    newStatus = AttendanceStatus.PRESENT, // arbitrary, won't be used since newCount is 0 conceptually
+                    newCount = 0,
+                    oldPresentCount = subject.presentLectures,
+                    oldAbsentCount = subject.absentLectures
+                )
+                undoRedoManager.recordAction(action)
+                updateUndoRedoState()
+
+                // Delete the record
+                repository.deleteAttendanceRecord(subjectId, date)
+
+                loadAttendanceForDate(date)
+            }
+        }
+    }
     
     fun undo() {
         viewModelScope.launch {

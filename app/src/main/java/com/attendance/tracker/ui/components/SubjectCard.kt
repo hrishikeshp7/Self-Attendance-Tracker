@@ -13,6 +13,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.attendance.tracker.data.model.AttendanceRecord
@@ -25,14 +27,6 @@ import com.attendance.tracker.ui.theme.PresentGreen
 
 private const val STATS_BACKGROUND_ALPHA = 0.5f
 
-/** Returns whether an attendance button should be enabled. When [allowMultipleMark] is false,
- *  the button for the already-selected status is disabled to prevent double-counting. */
-private fun shouldEnableButton(
-    allowMultipleMark: Boolean,
-    currentStatus: AttendanceStatus?,
-    targetStatus: AttendanceStatus
-): Boolean = allowMultipleMark || currentStatus != targetStatus
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SubjectCard(
@@ -42,11 +36,13 @@ fun SubjectCard(
     onMarkPresent: () -> Unit,
     onMarkAbsent: () -> Unit,
     onMarkNoClass: () -> Unit,
+    onClearAttendance: () -> Unit,
     onEditClick: () -> Unit,
     onCardClick: () -> Unit,
     allowMultipleMark: Boolean = true,
     modifier: Modifier = Modifier
 ) {
+    val haptic = LocalHapticFeedback.current
     val attendanceColor = when {
         subject.totalLectures == 0 -> NoClassGray
         subject.isAboveRequired -> PresentGreen
@@ -185,8 +181,15 @@ fun SubjectCard(
                     count = if (currentRecord?.status == AttendanceStatus.PRESENT) currentRecord.count else null,
                     isSelected = currentRecord?.status == AttendanceStatus.PRESENT,
                     color = PresentGreen,
-                    onClick = onMarkPresent,
-                    enabled = shouldEnableButton(allowMultipleMark, currentRecord?.status, AttendanceStatus.PRESENT),
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        if (currentRecord?.status == AttendanceStatus.PRESENT) {
+                            onClearAttendance()
+                        } else {
+                            onMarkPresent()
+                        }
+                    },
+                    enabled = true,
                     modifier = Modifier.weight(1f)
                 )
                 AttendanceButton(
@@ -194,8 +197,15 @@ fun SubjectCard(
                     count = if (currentRecord?.status == AttendanceStatus.ABSENT) currentRecord.count else null,
                     isSelected = currentRecord?.status == AttendanceStatus.ABSENT,
                     color = AbsentRed,
-                    onClick = onMarkAbsent,
-                    enabled = shouldEnableButton(allowMultipleMark, currentRecord?.status, AttendanceStatus.ABSENT),
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        if (currentRecord?.status == AttendanceStatus.ABSENT) {
+                            onClearAttendance()
+                        } else {
+                            onMarkAbsent()
+                        }
+                    },
+                    enabled = true,
                     modifier = Modifier.weight(1f)
                 )
                 AttendanceButton(
@@ -203,8 +213,15 @@ fun SubjectCard(
                     count = if (currentRecord?.status == AttendanceStatus.NO_CLASS) currentRecord.count else null,
                     isSelected = currentRecord?.status == AttendanceStatus.NO_CLASS,
                     color = NoClassGray,
-                    onClick = onMarkNoClass,
-                    enabled = shouldEnableButton(allowMultipleMark, currentRecord?.status, AttendanceStatus.NO_CLASS),
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        if (currentRecord?.status == AttendanceStatus.NO_CLASS) {
+                            onClearAttendance()
+                        } else {
+                            onMarkNoClass()
+                        }
+                    },
+                    enabled = true,
                     modifier = Modifier.weight(1f)
                 )
             }
