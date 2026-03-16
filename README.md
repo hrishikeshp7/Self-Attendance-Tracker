@@ -1,209 +1,148 @@
-# Attendance Tracker
+<div align="center">
 
-An Android application for tracking and managing class attendance. Built with Kotlin, Jetpack Compose, and Room Database. Entirely vibe coded with AI as a test project .
+# 🎓 Attendance Tracker
+
+**A beautiful, modern Android application for effortlessly tracking and managing your class attendance.**
 
 [![Build and Release APK](https://github.com/hrishikeshp7/Self-Attendance-Tracker/actions/workflows/build-release.yml/badge.svg)](https://github.com/hrishikeshp7/Self-Attendance-Tracker/actions/workflows/build-release.yml)
+[![Kotlin](https://img.shields.io/badge/kotlin-%237F52FF.svg?style=flat&logo=kotlin&logoColor=white)](https://kotlinlang.org/)
+[![Jetpack Compose](https://img.shields.io/badge/Jetpack%20Compose-4285F4?style=flat&logo=android&logoColor=white)](https://developer.android.com/jetpack/compose)
+[![Material Design 3](https://img.shields.io/badge/Material%203-EADDFF?style=flat&logo=materialdesign&logoColor=black)](https://m3.material.io/)
+[![License](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
-## Features
+*Built with Kotlin, Jetpack Compose, and Room Database. Entirely vibe-coded with AI as a test project.*
 
-### 📱 Home Screen
-- View all subjects with their attendance statistics
-- **Visual pie chart** showing attendance percentage at a glance
-- Mark attendance for each subject with three options:
-  - **Present** - Mark as attended
-  - **Absent** - Mark as missed
-  - **No Class** - Mark as no class scheduled
-- Real-time attendance percentage calculation
-- Visual indicators for attendance status (green for above required, red for below)
+</div>
 
-### 🌙 Dark Mode Support
-- Automatic dark mode based on system settings
-- Beautiful Material 3 theming in both light and dark modes
-- Dynamic colors on Android 12+ devices
+<br />
 
-### 📅 Calendar View
-- Monthly calendar with attendance history
-- Color-coded days showing attendance status
-- View detailed attendance records for any selected day
-- Easy month navigation
+## 🌟 Overview
 
-### 📚 Subject Management
-- Add new subjects with custom names
-- Set required attendance percentage for each subject (default: 75%)
-- Edit subject details including:
-  - Subject name
-  - Required attendance percentage
-  - Present/Absent lecture counts
-- Delete subjects with confirmation
+Attendance Tracker helps students keep track of their daily attendance, ensuring they meet their required attendance criteria without any stress. With an intuitive interface, it provides deep insights, monthly calendar views, and smart scheduling.
 
-### 📆 Weekly Schedule
-- Set which subjects occur on which days of the week
-- Toggle subjects on/off for each day
-- Visual schedule overview
+---
 
-### ⚙️ Settings
-- View and modify required attendance baseline for each subject
-- Individual settings per subject
-- Preview how current attendance compares to requirements
+## 🚀 How It Works
 
-## Tech Stack
+```mermaid
+graph TD
+    A[Add Subjects] -->|Set minimum % required| B(Set Weekly Schedule)
+    B --> C{Daily Tracking}
+    C -->|Mark Present| D[Stats Update: % Increases]
+    C -->|Mark Absent| E[Stats Update: % Decreases]
+    C -->|Mark No Class| F[Stats Unchanged]
+    D --> G[Review Calendar & Analytics]
+    E --> G
+    F --> G
+```
+
+1. **Setup**: Add your subjects and define the minimum required attendance (e.g., 75%).
+2. **Schedule**: Configure which subjects happen on which days.
+3. **Track**: Mark your daily attendance straight from the Home screen.
+4. **Review**: Check your calendar history and overall statistics at a glance.
+
+---
+
+## ✨ Key Features
+
+| Feature | Description |
+| :--- | :--- |
+| 📊 **Home Dashboard** | View all subjects with visual pie charts showing attendance percentage. Mark attendance quickly (Present / Absent / No Class). |
+| 📅 **Calendar History** | Monthly calendar with color-coded days (🟢 Present, 🔴 Absent, ⚫ No Class) to easily review your history. |
+| 📚 **Subject Management** | Add custom subjects, edit lecture counts, and set individual required attendance percentages. |
+| 📆 **Smart Scheduling** | Toggle which subjects occur on specific days of the week to streamline your daily tracking. |
+| 🎨 **Material 3 & Dark Mode** | Gorgeous dynamic colors (Android 12+) with seamless dark mode support based on system settings. |
+
+---
+
+## 🛠 Tech Stack
 
 - **Language**: Kotlin
-- **UI Framework**: Jetpack Compose with Material 3
+- **UI Framework**: Jetpack Compose (Material 3)
 - **Database**: Room (SQLite)
 - **Architecture**: MVVM (Model-View-ViewModel)
 - **Navigation**: Jetpack Navigation Compose
-- **Minimum SDK**: 26 (Android 8.0)
-- **Target SDK**: 36 (Android 16)
+- **SDK**: Min 26 (Android 8.0) / Target 36 (Android 16)
 
-## Project Structure
+---
 
-```
-app/src/main/java/com/attendance/tracker/
-├── data/
-│   ├── database/
-│   │   ├── AttendanceDatabase.kt    # Room database configuration
-│   │   ├── Converters.kt            # Type converters for Room
-│   │   ├── AttendanceDao.kt         # DAO for attendance records
-│   │   ├── ScheduleDao.kt           # DAO for schedule entries
-│   │   └── SubjectDao.kt            # DAO for subjects
-│   ├── model/
-│   │   ├── Subject.kt               # Subject data model
-│   │   ├── AttendanceRecord.kt      # Attendance record model
-│   │   └── ScheduleEntry.kt         # Schedule entry model
-│   └── repository/
-│       └── AttendanceRepository.kt  # Repository pattern implementation
-├── ui/
-│   ├── components/
-│   │   ├── SubjectCard.kt           # Reusable subject card component
-│   │   └── CalendarView.kt          # Custom calendar component
-│   ├── screens/
-│   │   ├── home/HomeScreen.kt       # Home screen
-│   │   ├── calendar/CalendarScreen.kt
-│   │   ├── subjects/SubjectsScreen.kt
-│   │   ├── schedule/ScheduleScreen.kt
-│   │   └── settings/SettingsScreen.kt
-│   ├── theme/
-│   │   ├── Color.kt                 # App color definitions
-│   │   ├── Theme.kt                 # Material theme setup
-│   │   └── Type.kt                  # Typography definitions
-│   ├── AttendanceApp.kt             # Main app composable with navigation
-│   ├── AttendanceViewModel.kt       # Main ViewModel
-│   └── Screen.kt                    # Navigation routes
-└── MainActivity.kt                  # Main activity entry point
-```
-
-## Building the Project
+## 🏗 Building the Project
 
 ### Prerequisites
-- Android Studio Hedgehog or newer
+- Android Studio Hedgehog (or newer)
 - JDK 17
 - Android SDK 36
 
-### Build Steps
-
-1. Clone the repository:
+### Quick Start
 ```bash
+# Clone the repository
 git clone https://github.com/hrishikeshp7/Self-Attendance-Tracker.git
 cd Self-Attendance-Tracker
-```
 
-2. Open the project in Android Studio
-
-3. Sync Gradle files
-
-4. Build and run on an emulator or physical device:
-```bash
+# Build and run a debug APK
 ./gradlew assembleDebug
 ```
 
-Or use Android Studio's Run button.
+<details>
+<summary><b>📦 Release Builds & Keystore Setup (Click to expand)</b></summary>
+<br/>
+To ensure that users can upgrade between releases without conflicts, all release builds must be signed with the same keystore.
 
-### Release Builds and Keystore Setup
-
-To ensure that users can upgrade between releases without "app not installed - conflicts with other package" errors, all release builds **must be signed with the same keystore**. 
-
-#### For Repository Maintainers
-
-If you're building releases via GitHub Actions, configure the following secrets:
-
-1. Generate a keystore file once (only needs to be done once):
-```bash
-keytool -genkeypair -v -keystore release.keystore -alias release \
-  -keyalg RSA -keysize 2048 -validity 10000 \
-  -storepass YourSecurePassword -keypass YourSecureKeyPassword \
-  -dname "CN=AttendanceTracker, OU=Development, O=AttendanceTracker, L=City, ST=State, C=US"
-```
-
-2. Encode the keystore to base64:
-```bash
-base64 release.keystore > release.keystore.base64
-```
-
-3. Add the following secrets to your GitHub repository (Settings → Secrets and variables → Actions):
-   - `RELEASE_KEYSTORE_BASE64`: Contents of `release.keystore.base64`
-   - `RELEASE_KEYSTORE_PASSWORD`: The password you used for `-storepass`
-   - `RELEASE_KEY_ALIAS`: The alias you used (e.g., "release")
-   - `RELEASE_KEY_PASSWORD`: The password you used for `-keypass`
-
-4. **Important**: Keep the original `release.keystore` file in a secure location as a backup. If you lose it, you won't be able to update the app for existing users.
+#### For Repository Maintainers (GitHub Actions)
+1. Generate a keystore file:
+   ```bash
+   keytool -genkeypair -v -keystore release.keystore -alias release \
+     -keyalg RSA -keysize 2048 -validity 10000 \
+     -storepass YourSecurePassword -keypass YourSecureKeyPassword
+   ```
+2. Encode to base64:
+   ```bash
+   base64 release.keystore > release.keystore.base64
+   ```
+3. Add GitHub Secrets:
+   - `RELEASE_KEYSTORE_BASE64`
+   - `RELEASE_KEYSTORE_PASSWORD`
+   - `RELEASE_KEY_ALIAS`
+   - `RELEASE_KEY_PASSWORD`
 
 #### For Local Release Builds
-
-For release builds, you must use a valid keystore file and set the required environment variables. The build will fail if these are not provided.
-
 ```bash
 export KEYSTORE_FILE=path/to/release.keystore
 export KEYSTORE_PASSWORD=your_password
 export KEY_ALIAS=release
 export KEY_PASSWORD=your_key_password
+
 ./gradlew assembleRelease
 ```
+</details>
 
-## Usage Guide
+---
 
-### Adding Your First Subject
-1. Open the app
-2. Tap the **+** floating action button on the home screen
-3. Enter the subject name and required attendance percentage
-4. Tap "Add"
+## 📂 Project Structure
 
-### Marking Daily Attendance
-1. On the home screen, each subject shows three buttons: Present, Absent, No Class
-2. Tap the appropriate button for each subject
-3. The attendance statistics update automatically
+```text
+app/src/main/java/com/attendance/tracker/
+├── data/
+│   ├── database/    # Room DB, DAOs, Type Converters
+│   ├── model/       # Data Models (Subject, AttendanceRecord, ScheduleEntry)
+│   └── repository/  # Single source of truth for data access
+├── ui/
+│   ├── components/  # Reusable UI elements (SubjectCard, CalendarView)
+│   ├── screens/     # App screens (Home, Calendar, Subjects, Schedule, Settings)
+│   └── theme/       # Material 3 Theme, Colors, Typography
+└── MainActivity.kt  # Entry point
+```
 
-### Setting Up Weekly Schedule
-1. Navigate to the "Schedule" tab
-2. Select a day of the week
-3. Toggle on/off which subjects occur on that day
+---
 
-### Viewing Attendance History
-1. Navigate to the "Calendar" tab
-2. Browse through months using the arrow buttons
-3. Tap on any date to see attendance records for that day
-4. Color indicators show:
-   - 🟢 Green: At least one class marked as Present
-   - 🔴 Red: At least one class marked as Absent
-   - ⚫ Gray: No Class marked
+## 📥 Download
 
-### Editing Subject Settings
-1. Navigate to the "Subjects" tab to edit subject details
-2. Or use the "Settings" tab to adjust only the required attendance percentage
+Grab the latest compiled APK from the [Releases page](https://github.com/hrishikeshp7/Self-Attendance-Tracker/releases).
 
-## Download
+---
 
-You can download the latest APK from the [Releases page](https://github.com/hrishikeshp7/Self-Attendance-Tracker/releases).
-
-### Automated Releases
-APK releases are automatically created:
-- Via manual workflow dispatch from the Actions tab
-
-## Author
+## 📝 License & Author
 
 Made with ❤️ by [hrishikeshp7](https://github.com/hrishikeshp7)
 
-## License
-
-This project is open source and available under the MIT License.
-
+This project is open-source and available under the [MIT License](LICENSE).
