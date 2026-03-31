@@ -326,10 +326,10 @@ class AttendanceViewModel(application: Application) : AndroidViewModel(applicati
     }
 
     // Schedule operations
-    fun addScheduleEntry(subjectId: Long, dayOfWeek: DayOfWeek) {
+    fun addScheduleEntry(subjectId: Long, dayOfWeek: DayOfWeek, lectureCount: Int = 1) {
         viewModelScope.launch {
             repository.insertScheduleEntry(
-                ScheduleEntry(subjectId = subjectId, dayOfWeek = dayOfWeek)
+                ScheduleEntry(subjectId = subjectId, dayOfWeek = dayOfWeek, lectureCount = lectureCount)
             )
         }
     }
