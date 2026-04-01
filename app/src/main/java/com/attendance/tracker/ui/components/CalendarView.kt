@@ -28,7 +28,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.attendance.tracker.data.model.AttendanceRecord
 import com.attendance.tracker.data.model.AttendanceStatus
+import com.attendance.tracker.data.model.ScheduleEntry
 import com.attendance.tracker.ui.theme.AbsentRed
+import com.attendance.tracker.ui.theme.ExtraClassOrange
 import com.attendance.tracker.ui.theme.NoClassGray
 import com.attendance.tracker.ui.theme.PresentGreen
 import java.time.DayOfWeek
@@ -43,6 +45,7 @@ fun CalendarView(
     selectedMonth: YearMonth,
     selectedDate: LocalDate,
     attendanceRecords: List<AttendanceRecord>,
+    scheduleEntries: List<ScheduleEntry> = emptyList(),
     rangeStart: LocalDate? = null,
     rangeEnd: LocalDate? = null,
     onDateSelected: (LocalDate) -> Unit,
@@ -120,6 +123,7 @@ fun CalendarView(
                 month = monthToDisplay,
                 selectedDate = selectedDate,
                 attendanceRecords = attendanceRecords,
+                scheduleEntries = scheduleEntries,
                 rangeStart = rangeStart,
                 rangeEnd = rangeEnd,
                 onDateSelected = onDateSelected
@@ -133,6 +137,7 @@ private fun MonthCalendarGrid(
     month: YearMonth,
     selectedDate: LocalDate,
     attendanceRecords: List<AttendanceRecord>,
+    scheduleEntries: List<ScheduleEntry> = emptyList(),
     rangeStart: LocalDate? = null,
     rangeEnd: LocalDate? = null,
     onDateSelected: (LocalDate) -> Unit
@@ -210,6 +215,7 @@ private fun MonthCalendarGrid(
                     attendanceRecords = date?.let { d ->
                         attendanceRecords.filter { it.date == d }
                     } ?: emptyList(),
+                    scheduleEntries = scheduleEntries,
                     onClick = { date?.let { onDateSelected(it) } }
                 )
             }
@@ -226,6 +232,7 @@ private fun CalendarDay(
     isRangeEnd: Boolean = false,
     isInRange: Boolean = false,
     attendanceRecords: List<AttendanceRecord>,
+    scheduleEntries: List<ScheduleEntry> = emptyList(),
     onClick: () -> Unit
 ) {
     if (date == null) {
@@ -253,6 +260,11 @@ private fun CalendarDay(
     val hasPresent = attendanceRecords.any { it.status == AttendanceStatus.PRESENT }
     val hasAbsent = attendanceRecords.any { it.status == AttendanceStatus.ABSENT }
     val hasNoClass = attendanceRecords.any { it.status == AttendanceStatus.NO_CLASS }
+    // Extra class: subject has attendance on a day not in its regular schedule
+    val hasExtraClass = attendanceRecords.any { record ->
+        val subjectSchedule = scheduleEntries.filter { it.subjectId == record.subjectId }
+        subjectSchedule.isNotEmpty() && subjectSchedule.none { it.dayOfWeek == date.dayOfWeek }
+    }
 
     Column(
         modifier = Modifier
@@ -270,7 +282,7 @@ private fun CalendarDay(
         )
         
         // Show attendance indicator dots
-        if (hasPresent || hasAbsent || hasNoClass) {
+        if (hasPresent || hasAbsent || hasNoClass || hasExtraClass) {
             Spacer(modifier = Modifier.height(1.dp))
             Row(
                 horizontalArrangement = Arrangement.Center,
@@ -283,7 +295,7 @@ private fun CalendarDay(
                             .clip(CircleShape)
                             .background(PresentGreen)
                     )
-                    if (hasAbsent || hasNoClass) Spacer(modifier = Modifier.width(1.dp))
+                    if (hasAbsent || hasNoClass || hasExtraClass) Spacer(modifier = Modifier.width(1.dp))
                 }
                 if (hasAbsent) {
                     Box(
@@ -292,7 +304,7 @@ private fun CalendarDay(
                             .clip(CircleShape)
                             .background(AbsentRed)
                     )
-                    if (hasNoClass) Spacer(modifier = Modifier.width(1.dp))
+                    if (hasNoClass || hasExtraClass) Spacer(modifier = Modifier.width(1.dp))
                 }
                 if (hasNoClass) {
                     Box(
@@ -300,6 +312,15 @@ private fun CalendarDay(
                             .size(3.dp)
                             .clip(CircleShape)
                             .background(NoClassGray)
+                    )
+                    if (hasExtraClass) Spacer(modifier = Modifier.width(1.dp))
+                }
+                if (hasExtraClass) {
+                    Box(
+                        modifier = Modifier
+                            .size(3.dp)
+                            .clip(CircleShape)
+                            .background(ExtraClassOrange)
                     )
                 }
             }

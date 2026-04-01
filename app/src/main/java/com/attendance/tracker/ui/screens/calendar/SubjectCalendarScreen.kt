@@ -13,10 +13,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.attendance.tracker.data.model.AttendanceRecord
 import com.attendance.tracker.data.model.AttendanceStatus
+import com.attendance.tracker.data.model.ScheduleEntry
 import com.attendance.tracker.data.model.Subject
 import com.attendance.tracker.data.model.getDisplayName
 import com.attendance.tracker.ui.components.CalendarView
 import com.attendance.tracker.ui.theme.AbsentRed
+import com.attendance.tracker.ui.theme.ExtraClassOrange
 import com.attendance.tracker.ui.theme.NoClassGray
 import com.attendance.tracker.ui.theme.PresentGreen
 import kotlinx.coroutines.launch
@@ -32,6 +34,7 @@ fun SubjectCalendarScreen(
     selectedMonth: YearMonth,
     selectedDate: LocalDate,
     attendanceRecords: List<AttendanceRecord>,
+    scheduleEntries: List<ScheduleEntry> = emptyList(),
     onDateSelected: (LocalDate) -> Unit,
     onMonthChanged: (YearMonth) -> Unit,
     onMarkAttendance: (AttendanceStatus, LocalDate) -> Unit,
@@ -123,6 +126,7 @@ fun SubjectCalendarScreen(
                 rangeStart = if (rangeEnd != null) (rangeStart ?: selectedDate) else null,
                 rangeEnd = rangeEnd,
                 attendanceRecords = subjectRecords,
+                scheduleEntries = scheduleEntries,
                 onDateSelected = handleDateClick,
                 onMonthChanged = onMonthChanged
             )
@@ -143,6 +147,10 @@ fun SubjectCalendarScreen(
                 val rangeAbsentCount  = rangeRecords.count { it.status == AttendanceStatus.ABSENT }
                 val rangeTotal        = rangePresentCount + rangeAbsentCount
                 val rangePercentage   = if (rangeTotal > 0) rangePresentCount * 100f / rangeTotal else 0f
+                val rangeExtraCount   = rangeRecords.count { record ->
+                    val subjectSchedule = scheduleEntries.filter { it.subjectId == record.subjectId }
+                    subjectSchedule.isNotEmpty() && subjectSchedule.none { it.dayOfWeek == record.date.dayOfWeek }
+                }
 
                 RangeStatsSection(
                     rangeStart     = normalizedStart,
@@ -151,6 +159,7 @@ fun SubjectCalendarScreen(
                     absentCount    = rangeAbsentCount,
                     total          = rangeTotal,
                     percentage     = rangePercentage,
+                    extraCount     = rangeExtraCount,
                     onClearRange   = {
                         rangeEnd = null
                         // Keep rangeStart as the still-selected single date
@@ -159,14 +168,39 @@ fun SubjectCalendarScreen(
             } else {
                 // ── Single-date mode: show mark-attendance section ──
                 val selectedDateRecord = subjectRecords.find { it.date == effectiveSingleDate }
+                // Extra class: subject has a schedule, but this day is not in it
+                val isExtraClassDay = run {
+                    val subjectSchedule = scheduleEntries.filter { it.subjectId == subject.id }
+                    subjectSchedule.isNotEmpty() && subjectSchedule.none { it.dayOfWeek == effectiveSingleDate.dayOfWeek }
+                }
 
                 Divider(modifier = Modifier.padding(vertical = 4.dp))
 
-                Text(
-                    text = effectiveSingleDate.format(dateFormatter),
-                    style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
-                )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = effectiveSingleDate.format(dateFormatter),
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                    if (isExtraClassDay) {
+                        Surface(
+                            color = ExtraClassOrange.copy(alpha = 0.15f),
+                            shape = MaterialTheme.shapes.small
+                        ) {
+                            Text(
+                                text = "Extra Class",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = ExtraClassOrange,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
+                }
 
                 // Hint about range selection
                 Text(
@@ -265,6 +299,7 @@ private fun RangeStatsSection(
     absentCount: Int,
     total: Int,
     percentage: Float,
+    extraCount: Int = 0,
     onClearRange: () -> Unit
 ) {
     val dateRangeFormatter = DateTimeFormatter.ofPattern("MMM d")
@@ -327,6 +362,19 @@ private fun RangeStatsSection(
                         value = if (total > 0) "%.1f%%".format(percentage) else "—",
                         color = if (percentage >= 75f) PresentGreen else AbsentRed
                     )
+                }
+                if (extraCount > 0) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        AttendanceStatItem(
+                            label = "Extra Classes",
+                            value = extraCount.toString(),
+                            color = ExtraClassOrange
+                        )
+                    }
                 }
             }
         }

@@ -45,6 +45,7 @@ val AmoledOnError = Color(0xFF000000)
 val PresentGreen = Color(0xFF22C55E)
 val AbsentRed = Color(0xFFEF4444)
 val NoClassGray = Color(0xFF94A3B8)
+val ExtraClassOrange = Color(0xFFF97316)
 
 // Additional UI Colors
 val SuccessGreen = Color(0xFF15803D)

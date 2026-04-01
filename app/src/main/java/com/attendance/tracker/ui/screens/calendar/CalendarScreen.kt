@@ -10,10 +10,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.attendance.tracker.data.model.AttendanceRecord
 import com.attendance.tracker.data.model.AttendanceStatus
+import com.attendance.tracker.data.model.ScheduleEntry
 import com.attendance.tracker.data.model.Subject
 import com.attendance.tracker.data.model.getDisplayName
 import com.attendance.tracker.ui.components.CalendarView
 import com.attendance.tracker.ui.theme.AbsentRed
+import com.attendance.tracker.ui.theme.ExtraClassOrange
 import com.attendance.tracker.ui.theme.NoClassGray
 import com.attendance.tracker.ui.theme.PresentGreen
 import kotlinx.coroutines.launch
@@ -29,6 +31,7 @@ fun CalendarScreen(
     attendanceRecords: List<AttendanceRecord>,
     subjects: List<Subject>,
     allSubjects: List<Subject>,
+    scheduleEntries: List<ScheduleEntry> = emptyList(),
     onDateSelected: (LocalDate) -> Unit,
     onMonthChanged: (YearMonth) -> Unit,
     onMarkAttendance: (Long, AttendanceStatus, LocalDate) -> Unit,
@@ -76,6 +79,7 @@ fun CalendarScreen(
                 selectedMonth = selectedMonth,
                 selectedDate = selectedDate,
                 attendanceRecords = attendanceRecords,
+                scheduleEntries = scheduleEntries,
                 onDateSelected = onDateSelected,
                 onMonthChanged = onMonthChanged
             )
@@ -90,6 +94,10 @@ fun CalendarScreen(
                 }
             }
             val totalCount = selectedDateRecords.size
+            val extraCount = selectedDateRecords.count { record ->
+                val subjectSchedule = scheduleEntries.filter { it.subjectId == record.subjectId }
+                subjectSchedule.isNotEmpty() && subjectSchedule.none { it.dayOfWeek == selectedDate.dayOfWeek }
+            }
             
             Card(
                 modifier = Modifier
@@ -120,6 +128,13 @@ fun CalendarScreen(
                         value = totalCount.toString(),
                         color = MaterialTheme.colorScheme.primary
                     )
+                    if (extraCount > 0) {
+                        AttendanceStatItem(
+                            label = "Extra",
+                            value = extraCount.toString(),
+                            color = ExtraClassOrange
+                        )
+                    }
                 }
             }
 
@@ -167,10 +182,15 @@ fun CalendarScreen(
                 ) {
                     items(subjects, key = { it.id }) { subject ->
                         val record = selectedDateRecords.find { it.subjectId == subject.id }
+                        val isExtraClass = record != null && run {
+                            val subjectSchedule = scheduleEntries.filter { it.subjectId == subject.id }
+                            subjectSchedule.isNotEmpty() && subjectSchedule.none { it.dayOfWeek == selectedDate.dayOfWeek }
+                        }
                         CalendarAttendanceItem(
                             subject = subject,
                             allSubjects = allSubjects,
                             currentStatus = record?.status,
+                            isExtraClass = isExtraClass,
                             onMarkPresent = { 
                                 onMarkAttendance(subject.id, AttendanceStatus.PRESENT, selectedDate)
                                 showAttendanceSnackbar(subject.name, AttendanceStatus.PRESENT)
@@ -196,6 +216,7 @@ private fun CalendarAttendanceItem(
     subject: Subject,
     allSubjects: List<Subject>,
     currentStatus: AttendanceStatus?,
+    isExtraClass: Boolean = false,
     onMarkPresent: () -> Unit,
     onMarkAbsent: () -> Unit,
     onMarkNoClass: () -> Unit
@@ -211,12 +232,33 @@ private fun CalendarAttendanceItem(
                 .fillMaxWidth()
                 .padding(16.dp)
         ) {
-            Text(
-                text = subject.getDisplayName(allSubjects),
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(bottom = 8.dp)
-            )
-            
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = subject.getDisplayName(allSubjects),
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(bottom = 8.dp)
+                )
+                if (isExtraClass) {
+                    Surface(
+                        color = ExtraClassOrange.copy(alpha = 0.15f),
+                        shape = MaterialTheme.shapes.small
+                    ) {
+                        Text(
+                            text = "Extra Class",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = ExtraClassOrange,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
+                }
+            }
+
             // Attendance Action Buttons
             Row(
                 modifier = Modifier.fillMaxWidth(),

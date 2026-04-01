@@ -7,6 +7,7 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Settings
@@ -27,6 +28,7 @@ import androidx.navigation.navArgument
 import com.attendance.tracker.data.model.AttendanceStatus
 import com.attendance.tracker.ui.screens.about.AboutScreen
 import com.attendance.tracker.ui.screens.backup.BackupRestoreScreen
+import com.attendance.tracker.ui.screens.calendar.CalendarScreen
 import com.attendance.tracker.ui.screens.calendar.SubjectCalendarScreen
 import com.attendance.tracker.ui.screens.home.HomeScreen
 import com.attendance.tracker.ui.screens.schedule.ScheduleScreen
@@ -41,6 +43,7 @@ data class BottomNavItem(
 
 val bottomNavItems = listOf(
     BottomNavItem(Screen.Home, Icons.Default.Home, "Home"),
+    BottomNavItem(Screen.Calendar, Icons.Default.DateRange, "Calendar"),
     BottomNavItem(Screen.Subjects, Icons.Default.Subject, "Subjects"),
     BottomNavItem(Screen.Schedule, Icons.Default.Schedule, "Schedule"),
     BottomNavItem(Screen.Settings, Icons.Default.Settings, "Settings")
@@ -140,6 +143,29 @@ fun AttendanceApp(
                 )
             }
 
+            composable(Screen.Calendar.route) {
+                LaunchedEffect(selectedMonth) {
+                    viewModel.loadAttendanceForMonth(selectedMonth)
+                }
+                CalendarScreen(
+                    selectedMonth = selectedMonth,
+                    selectedDate = selectedDate,
+                    attendanceRecords = attendanceRecords,
+                    subjects = subjects,
+                    allSubjects = allSubjectsIncludingFolders,
+                    scheduleEntries = scheduleEntries,
+                    onDateSelected = { date ->
+                        viewModel.setSelectedDate(date)
+                    },
+                    onMonthChanged = { month ->
+                        viewModel.setSelectedMonth(month)
+                    },
+                    onMarkAttendance = { subjectId, status, date ->
+                        viewModel.markAttendance(subjectId, status, date)
+                    }
+                )
+            }
+
             composable(
                 route = Screen.SubjectCalendar.route,
                 arguments = listOf(navArgument("subjectId") { type = NavType.LongType }),
@@ -160,6 +186,7 @@ fun AttendanceApp(
                     selectedMonth = selectedMonth,
                     selectedDate = selectedDate,
                     attendanceRecords = attendanceRecords,
+                    scheduleEntries = scheduleEntries.filter { it.subjectId == subjectId },
                     onDateSelected = { date ->
                         viewModel.setSelectedDate(date)
                     },
