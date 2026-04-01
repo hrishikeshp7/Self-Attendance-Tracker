@@ -37,7 +37,7 @@ fun SubjectCalendarScreen(
     scheduleEntries: List<ScheduleEntry> = emptyList(),
     onDateSelected: (LocalDate) -> Unit,
     onMonthChanged: (YearMonth) -> Unit,
-    onMarkAttendance: (AttendanceStatus, LocalDate) -> Unit,
+    onMarkAttendance: (AttendanceStatus, LocalDate, Boolean) -> Unit,
     onNavigateBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -126,7 +126,6 @@ fun SubjectCalendarScreen(
                 rangeStart = if (rangeEnd != null) (rangeStart ?: selectedDate) else null,
                 rangeEnd = rangeEnd,
                 attendanceRecords = subjectRecords,
-                scheduleEntries = scheduleEntries,
                 onDateSelected = handleDateClick,
                 onMonthChanged = onMonthChanged
             )
@@ -147,10 +146,7 @@ fun SubjectCalendarScreen(
                 val rangeAbsentCount  = rangeRecords.count { it.status == AttendanceStatus.ABSENT }
                 val rangeTotal        = rangePresentCount + rangeAbsentCount
                 val rangePercentage   = if (rangeTotal > 0) rangePresentCount * 100f / rangeTotal else 0f
-                val rangeExtraCount   = rangeRecords.count { record ->
-                    val subjectSchedule = scheduleEntries.filter { it.subjectId == record.subjectId }
-                    subjectSchedule.isNotEmpty() && subjectSchedule.none { it.dayOfWeek == record.date.dayOfWeek }
-                }
+                val rangeExtraCount   = rangeRecords.count { it.isExtraClass }
 
                 RangeStatsSection(
                     rangeStart     = normalizedStart,
@@ -168,8 +164,8 @@ fun SubjectCalendarScreen(
             } else {
                 // ── Single-date mode: show mark-attendance section ──
                 val selectedDateRecord = subjectRecords.find { it.date == effectiveSingleDate }
-                // Extra class: subject has a schedule, but this day is not in it
-                val isExtraClassDay = run {
+                // Extra class badge: for existing record, read from DB; for new marking, detect from schedule
+                val isExtraClassDay = selectedDateRecord?.isExtraClass ?: run {
                     val subjectSchedule = scheduleEntries.filter { it.subjectId == subject.id }
                     subjectSchedule.isNotEmpty() && subjectSchedule.none { it.dayOfWeek == effectiveSingleDate.dayOfWeek }
                 }
@@ -255,7 +251,7 @@ fun SubjectCalendarScreen(
                                     color = PresentGreen,
                                     onClick = {
                                         if (selectedDateRecord?.status != AttendanceStatus.PRESENT) {
-                                            onMarkAttendance(AttendanceStatus.PRESENT, effectiveSingleDate)
+                                            onMarkAttendance(AttendanceStatus.PRESENT, effectiveSingleDate, isExtraClassDay)
                                             showAttendanceSnackbar(AttendanceStatus.PRESENT)
                                         }
                                     }
@@ -266,7 +262,7 @@ fun SubjectCalendarScreen(
                                     color = AbsentRed,
                                     onClick = {
                                         if (selectedDateRecord?.status != AttendanceStatus.ABSENT) {
-                                            onMarkAttendance(AttendanceStatus.ABSENT, effectiveSingleDate)
+                                            onMarkAttendance(AttendanceStatus.ABSENT, effectiveSingleDate, isExtraClassDay)
                                             showAttendanceSnackbar(AttendanceStatus.ABSENT)
                                         }
                                     }
@@ -277,7 +273,7 @@ fun SubjectCalendarScreen(
                                     color = NoClassGray,
                                     onClick = {
                                         if (selectedDateRecord?.status != AttendanceStatus.NO_CLASS) {
-                                            onMarkAttendance(AttendanceStatus.NO_CLASS, effectiveSingleDate)
+                                            onMarkAttendance(AttendanceStatus.NO_CLASS, effectiveSingleDate, false)
                                             showAttendanceSnackbar(AttendanceStatus.NO_CLASS)
                                         }
                                     }
@@ -299,7 +295,7 @@ private fun RangeStatsSection(
     absentCount: Int,
     total: Int,
     percentage: Float,
-    extraCount: Int = 0,
+    extraCount: Int,
     onClearRange: () -> Unit
 ) {
     val dateRangeFormatter = DateTimeFormatter.ofPattern("MMM d")

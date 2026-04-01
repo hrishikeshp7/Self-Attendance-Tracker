@@ -22,7 +22,6 @@ import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CalendarScreen(
@@ -34,7 +33,7 @@ fun CalendarScreen(
     scheduleEntries: List<ScheduleEntry> = emptyList(),
     onDateSelected: (LocalDate) -> Unit,
     onMonthChanged: (YearMonth) -> Unit,
-    onMarkAttendance: (Long, AttendanceStatus, LocalDate) -> Unit,
+    onMarkAttendance: (Long, AttendanceStatus, LocalDate, Boolean) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val dateFormatter = DateTimeFormatter.ofPattern("EEEE, MMMM d")
@@ -79,7 +78,6 @@ fun CalendarScreen(
                 selectedMonth = selectedMonth,
                 selectedDate = selectedDate,
                 attendanceRecords = attendanceRecords,
-                scheduleEntries = scheduleEntries,
                 onDateSelected = onDateSelected,
                 onMonthChanged = onMonthChanged
             )
@@ -94,10 +92,7 @@ fun CalendarScreen(
                 }
             }
             val totalCount = selectedDateRecords.size
-            val extraCount = selectedDateRecords.count { record ->
-                val subjectSchedule = scheduleEntries.filter { it.subjectId == record.subjectId }
-                subjectSchedule.isNotEmpty() && subjectSchedule.none { it.dayOfWeek == selectedDate.dayOfWeek }
-            }
+            val extraCount = selectedDateRecords.count { it.isExtraClass }
             
             Card(
                 modifier = Modifier
@@ -182,7 +177,8 @@ fun CalendarScreen(
                 ) {
                     items(subjects, key = { it.id }) { subject ->
                         val record = selectedDateRecords.find { it.subjectId == subject.id }
-                        val isExtraClass = record != null && run {
+                        val isExtraClass = record?.isExtraClass ?: run {
+                            // For subjects with no existing record, detect from schedule
                             val subjectSchedule = scheduleEntries.filter { it.subjectId == subject.id }
                             subjectSchedule.isNotEmpty() && subjectSchedule.none { it.dayOfWeek == selectedDate.dayOfWeek }
                         }
@@ -192,15 +188,15 @@ fun CalendarScreen(
                             currentStatus = record?.status,
                             isExtraClass = isExtraClass,
                             onMarkPresent = { 
-                                onMarkAttendance(subject.id, AttendanceStatus.PRESENT, selectedDate)
+                                onMarkAttendance(subject.id, AttendanceStatus.PRESENT, selectedDate, isExtraClass)
                                 showAttendanceSnackbar(subject.name, AttendanceStatus.PRESENT)
                             },
                             onMarkAbsent = { 
-                                onMarkAttendance(subject.id, AttendanceStatus.ABSENT, selectedDate)
+                                onMarkAttendance(subject.id, AttendanceStatus.ABSENT, selectedDate, isExtraClass)
                                 showAttendanceSnackbar(subject.name, AttendanceStatus.ABSENT)
                             },
                             onMarkNoClass = { 
-                                onMarkAttendance(subject.id, AttendanceStatus.NO_CLASS, selectedDate)
+                                onMarkAttendance(subject.id, AttendanceStatus.NO_CLASS, selectedDate, false)
                                 showAttendanceSnackbar(subject.name, AttendanceStatus.NO_CLASS)
                             }
                         )
@@ -216,7 +212,7 @@ private fun CalendarAttendanceItem(
     subject: Subject,
     allSubjects: List<Subject>,
     currentStatus: AttendanceStatus?,
-    isExtraClass: Boolean = false,
+    isExtraClass: Boolean,
     onMarkPresent: () -> Unit,
     onMarkAbsent: () -> Unit,
     onMarkNoClass: () -> Unit

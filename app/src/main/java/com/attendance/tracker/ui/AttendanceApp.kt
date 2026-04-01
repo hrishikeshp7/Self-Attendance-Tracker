@@ -113,8 +113,8 @@ fun AttendanceApp(
                     allSubjects = allSubjectsIncludingFolders,
                     todayAttendance = todayAttendance,
                     scheduleEntries = scheduleEntries,
-                    onMarkAttendance = { subjectId, status ->
-                        viewModel.markAttendance(subjectId, status)
+                    onMarkAttendance = { subjectId, status, isExtraClass ->
+                        viewModel.markAttendance(subjectId, status, isExtraClass = isExtraClass)
                     },
                     onClearAttendance = { subjectId ->
                         viewModel.clearAttendance(subjectId)
@@ -160,8 +160,8 @@ fun AttendanceApp(
                     onMonthChanged = { month ->
                         viewModel.setSelectedMonth(month)
                     },
-                    onMarkAttendance = { subjectId, status, date ->
-                        viewModel.markAttendance(subjectId, status, date)
+                    onMarkAttendance = { subjectId, status, date, isExtraClass ->
+                        viewModel.markAttendance(subjectId, status, date, isExtraClass)
                     }
                 )
             }
@@ -193,8 +193,8 @@ fun AttendanceApp(
                     onMonthChanged = { month ->
                         viewModel.setSelectedMonth(month)
                     },
-                    onMarkAttendance = { status, date ->
-                        viewModel.markAttendance(subjectId, status, date)
+                    onMarkAttendance = { status, date, isExtraClass ->
+                        viewModel.markAttendance(subjectId, status, date, isExtraClass)
                     },
                     onNavigateBack = {
                         navController.popBackStack()

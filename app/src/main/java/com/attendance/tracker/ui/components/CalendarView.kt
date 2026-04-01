@@ -28,7 +28,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.attendance.tracker.data.model.AttendanceRecord
 import com.attendance.tracker.data.model.AttendanceStatus
-import com.attendance.tracker.data.model.ScheduleEntry
 import com.attendance.tracker.ui.theme.AbsentRed
 import com.attendance.tracker.ui.theme.ExtraClassOrange
 import com.attendance.tracker.ui.theme.NoClassGray
@@ -45,7 +44,6 @@ fun CalendarView(
     selectedMonth: YearMonth,
     selectedDate: LocalDate,
     attendanceRecords: List<AttendanceRecord>,
-    scheduleEntries: List<ScheduleEntry> = emptyList(),
     rangeStart: LocalDate? = null,
     rangeEnd: LocalDate? = null,
     onDateSelected: (LocalDate) -> Unit,
@@ -123,7 +121,6 @@ fun CalendarView(
                 month = monthToDisplay,
                 selectedDate = selectedDate,
                 attendanceRecords = attendanceRecords,
-                scheduleEntries = scheduleEntries,
                 rangeStart = rangeStart,
                 rangeEnd = rangeEnd,
                 onDateSelected = onDateSelected
@@ -137,7 +134,6 @@ private fun MonthCalendarGrid(
     month: YearMonth,
     selectedDate: LocalDate,
     attendanceRecords: List<AttendanceRecord>,
-    scheduleEntries: List<ScheduleEntry> = emptyList(),
     rangeStart: LocalDate? = null,
     rangeEnd: LocalDate? = null,
     onDateSelected: (LocalDate) -> Unit
@@ -215,7 +211,6 @@ private fun MonthCalendarGrid(
                     attendanceRecords = date?.let { d ->
                         attendanceRecords.filter { it.date == d }
                     } ?: emptyList(),
-                    scheduleEntries = scheduleEntries,
                     onClick = { date?.let { onDateSelected(it) } }
                 )
             }
@@ -232,7 +227,6 @@ private fun CalendarDay(
     isRangeEnd: Boolean = false,
     isInRange: Boolean = false,
     attendanceRecords: List<AttendanceRecord>,
-    scheduleEntries: List<ScheduleEntry> = emptyList(),
     onClick: () -> Unit
 ) {
     if (date == null) {
@@ -260,11 +254,8 @@ private fun CalendarDay(
     val hasPresent = attendanceRecords.any { it.status == AttendanceStatus.PRESENT }
     val hasAbsent = attendanceRecords.any { it.status == AttendanceStatus.ABSENT }
     val hasNoClass = attendanceRecords.any { it.status == AttendanceStatus.NO_CLASS }
-    // Extra class: subject has attendance on a day not in its regular schedule
-    val hasExtraClass = attendanceRecords.any { record ->
-        val subjectSchedule = scheduleEntries.filter { it.subjectId == record.subjectId }
-        subjectSchedule.isNotEmpty() && subjectSchedule.none { it.dayOfWeek == date.dayOfWeek }
-    }
+    // Extra class: read directly from the stored flag in the database
+    val hasExtraClass = attendanceRecords.any { it.isExtraClass }
 
     Column(
         modifier = Modifier
