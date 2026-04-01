@@ -10,17 +10,18 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.attendance.tracker.data.model.AttendanceRecord
 import com.attendance.tracker.data.model.AttendanceStatus
+import com.attendance.tracker.data.model.ScheduleEntry
 import com.attendance.tracker.data.model.Subject
 import com.attendance.tracker.data.model.getDisplayName
 import com.attendance.tracker.ui.components.CalendarView
 import com.attendance.tracker.ui.theme.AbsentRed
+import com.attendance.tracker.ui.theme.ExtraClassOrange
 import com.attendance.tracker.ui.theme.NoClassGray
 import com.attendance.tracker.ui.theme.PresentGreen
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CalendarScreen(
@@ -29,9 +30,10 @@ fun CalendarScreen(
     attendanceRecords: List<AttendanceRecord>,
     subjects: List<Subject>,
     allSubjects: List<Subject>,
+    scheduleEntries: List<ScheduleEntry> = emptyList(),
     onDateSelected: (LocalDate) -> Unit,
     onMonthChanged: (YearMonth) -> Unit,
-    onMarkAttendance: (Long, AttendanceStatus, LocalDate) -> Unit,
+    onMarkAttendance: (Long, AttendanceStatus, LocalDate, Boolean) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val dateFormatter = DateTimeFormatter.ofPattern("EEEE, MMMM d")
@@ -90,6 +92,7 @@ fun CalendarScreen(
                 }
             }
             val totalCount = selectedDateRecords.size
+            val extraCount = selectedDateRecords.count { it.isExtraClass }
             
             Card(
                 modifier = Modifier
@@ -120,6 +123,13 @@ fun CalendarScreen(
                         value = totalCount.toString(),
                         color = MaterialTheme.colorScheme.primary
                     )
+                    if (extraCount > 0) {
+                        AttendanceStatItem(
+                            label = "Extra",
+                            value = extraCount.toString(),
+                            color = ExtraClassOrange
+                        )
+                    }
                 }
             }
 
@@ -167,20 +177,26 @@ fun CalendarScreen(
                 ) {
                     items(subjects, key = { it.id }) { subject ->
                         val record = selectedDateRecords.find { it.subjectId == subject.id }
+                        val isExtraClass = record?.isExtraClass ?: run {
+                            // For subjects with no existing record, detect from schedule
+                            val subjectSchedule = scheduleEntries.filter { it.subjectId == subject.id }
+                            subjectSchedule.isNotEmpty() && subjectSchedule.none { it.dayOfWeek == selectedDate.dayOfWeek }
+                        }
                         CalendarAttendanceItem(
                             subject = subject,
                             allSubjects = allSubjects,
                             currentStatus = record?.status,
+                            isExtraClass = isExtraClass,
                             onMarkPresent = { 
-                                onMarkAttendance(subject.id, AttendanceStatus.PRESENT, selectedDate)
+                                onMarkAttendance(subject.id, AttendanceStatus.PRESENT, selectedDate, isExtraClass)
                                 showAttendanceSnackbar(subject.name, AttendanceStatus.PRESENT)
                             },
                             onMarkAbsent = { 
-                                onMarkAttendance(subject.id, AttendanceStatus.ABSENT, selectedDate)
+                                onMarkAttendance(subject.id, AttendanceStatus.ABSENT, selectedDate, isExtraClass)
                                 showAttendanceSnackbar(subject.name, AttendanceStatus.ABSENT)
                             },
                             onMarkNoClass = { 
-                                onMarkAttendance(subject.id, AttendanceStatus.NO_CLASS, selectedDate)
+                                onMarkAttendance(subject.id, AttendanceStatus.NO_CLASS, selectedDate, false)
                                 showAttendanceSnackbar(subject.name, AttendanceStatus.NO_CLASS)
                             }
                         )
@@ -196,6 +212,7 @@ private fun CalendarAttendanceItem(
     subject: Subject,
     allSubjects: List<Subject>,
     currentStatus: AttendanceStatus?,
+    isExtraClass: Boolean,
     onMarkPresent: () -> Unit,
     onMarkAbsent: () -> Unit,
     onMarkNoClass: () -> Unit
@@ -211,12 +228,33 @@ private fun CalendarAttendanceItem(
                 .fillMaxWidth()
                 .padding(16.dp)
         ) {
-            Text(
-                text = subject.getDisplayName(allSubjects),
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(bottom = 8.dp)
-            )
-            
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = subject.getDisplayName(allSubjects),
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(bottom = 8.dp)
+                )
+                if (isExtraClass) {
+                    Surface(
+                        color = ExtraClassOrange.copy(alpha = 0.15f),
+                        shape = MaterialTheme.shapes.small
+                    ) {
+                        Text(
+                            text = "Extra Class",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = ExtraClassOrange,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
+                }
+            }
+
             // Attendance Action Buttons
             Row(
                 modifier = Modifier.fillMaxWidth(),

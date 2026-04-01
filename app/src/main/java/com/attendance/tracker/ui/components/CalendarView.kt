@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import com.attendance.tracker.data.model.AttendanceRecord
 import com.attendance.tracker.data.model.AttendanceStatus
 import com.attendance.tracker.ui.theme.AbsentRed
+import com.attendance.tracker.ui.theme.ExtraClassOrange
 import com.attendance.tracker.ui.theme.NoClassGray
 import com.attendance.tracker.ui.theme.PresentGreen
 import java.time.DayOfWeek
@@ -253,6 +254,8 @@ private fun CalendarDay(
     val hasPresent = attendanceRecords.any { it.status == AttendanceStatus.PRESENT }
     val hasAbsent = attendanceRecords.any { it.status == AttendanceStatus.ABSENT }
     val hasNoClass = attendanceRecords.any { it.status == AttendanceStatus.NO_CLASS }
+    // Extra class: read directly from the stored flag in the database
+    val hasExtraClass = attendanceRecords.any { it.isExtraClass }
 
     Column(
         modifier = Modifier
@@ -270,7 +273,7 @@ private fun CalendarDay(
         )
         
         // Show attendance indicator dots
-        if (hasPresent || hasAbsent || hasNoClass) {
+        if (hasPresent || hasAbsent || hasNoClass || hasExtraClass) {
             Spacer(modifier = Modifier.height(1.dp))
             Row(
                 horizontalArrangement = Arrangement.Center,
@@ -283,7 +286,7 @@ private fun CalendarDay(
                             .clip(CircleShape)
                             .background(PresentGreen)
                     )
-                    if (hasAbsent || hasNoClass) Spacer(modifier = Modifier.width(1.dp))
+                    if (hasAbsent || hasNoClass || hasExtraClass) Spacer(modifier = Modifier.width(1.dp))
                 }
                 if (hasAbsent) {
                     Box(
@@ -292,7 +295,7 @@ private fun CalendarDay(
                             .clip(CircleShape)
                             .background(AbsentRed)
                     )
-                    if (hasNoClass) Spacer(modifier = Modifier.width(1.dp))
+                    if (hasNoClass || hasExtraClass) Spacer(modifier = Modifier.width(1.dp))
                 }
                 if (hasNoClass) {
                     Box(
@@ -300,6 +303,15 @@ private fun CalendarDay(
                             .size(3.dp)
                             .clip(CircleShape)
                             .background(NoClassGray)
+                    )
+                    if (hasExtraClass) Spacer(modifier = Modifier.width(1.dp))
+                }
+                if (hasExtraClass) {
+                    Box(
+                        modifier = Modifier
+                            .size(3.dp)
+                            .clip(CircleShape)
+                            .background(ExtraClassOrange)
                     )
                 }
             }

@@ -38,7 +38,7 @@ fun HomeScreen(
     allSubjects: List<Subject>,
     todayAttendance: Map<Long, AttendanceRecord>,
     scheduleEntries: List<ScheduleEntry>,
-    onMarkAttendance: (Long, AttendanceStatus) -> Unit,
+    onMarkAttendance: (Long, AttendanceStatus, Boolean) -> Unit,
     onClearAttendance: (Long) -> Unit,
     onAddSubject: () -> Unit,
     onEditSubject: (Subject) -> Unit,
@@ -160,13 +160,13 @@ fun HomeScreen(
                             lectureCount = lectureCount,
                             currentRecord = todayAttendance[subject.id],
                             onMarkPresent = {
-                                onMarkAttendance(subject.id, AttendanceStatus.PRESENT)
+                                onMarkAttendance(subject.id, AttendanceStatus.PRESENT, false)
                             },
                             onMarkAbsent = {
-                                onMarkAttendance(subject.id, AttendanceStatus.ABSENT)
+                                onMarkAttendance(subject.id, AttendanceStatus.ABSENT, false)
                             },
                             onMarkNoClass = {
-                                onMarkAttendance(subject.id, AttendanceStatus.NO_CLASS)
+                                onMarkAttendance(subject.id, AttendanceStatus.NO_CLASS, false)
                             },
                             onClearAttendance = {
                                 onClearAttendance(subject.id)
@@ -180,13 +180,13 @@ fun HomeScreen(
                             allSubjects = allSubjects,
                             currentRecord = todayAttendance[subject.id],
                             onMarkPresent = {
-                                onMarkAttendance(subject.id, AttendanceStatus.PRESENT)
+                                onMarkAttendance(subject.id, AttendanceStatus.PRESENT, false)
                             },
                             onMarkAbsent = {
-                                onMarkAttendance(subject.id, AttendanceStatus.ABSENT)
+                                onMarkAttendance(subject.id, AttendanceStatus.ABSENT, false)
                             },
                             onMarkNoClass = {
-                                onMarkAttendance(subject.id, AttendanceStatus.NO_CLASS)
+                                onMarkAttendance(subject.id, AttendanceStatus.NO_CLASS, false)
                             },
                             onClearAttendance = {
                                 onClearAttendance(subject.id)
@@ -227,7 +227,7 @@ fun HomeScreen(
             allSubjects = allSubjects,
             onDismiss = { showExtraClassDialog = false },
             onMarkAttendance = { subjectId, status ->
-                onMarkAttendance(subjectId, status)
+                onMarkAttendance(subjectId, status, true)
                 showExtraClassDialog = false
             }
         )

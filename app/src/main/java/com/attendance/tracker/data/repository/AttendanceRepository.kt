@@ -32,12 +32,12 @@ class AttendanceRepository(
 
     suspend fun deleteSubject(subject: Subject) = subjectDao.deleteSubject(subject)
 
-    suspend fun markPresent(subjectId: Long, date: LocalDate) {
+    suspend fun markPresent(subjectId: Long, date: LocalDate, isExtraClass: Boolean = false) {
         // Check if there's already a record for this subject on this date
         val existingRecord = attendanceDao.getAttendanceRecord(subjectId, date)
         
         if (existingRecord != null && existingRecord.status == AttendanceStatus.PRESENT) {
-            // If already marked present, increment the count
+            // If already marked present, increment the count (preserve isExtraClass flag)
             val updatedRecord = existingRecord.copy(count = existingRecord.count + 1)
             attendanceDao.insertAttendance(updatedRecord)
             // Also increment subject counts
@@ -76,7 +76,8 @@ class AttendanceRepository(
                     subjectId = subjectId,
                     date = date,
                     status = AttendanceStatus.PRESENT,
-                    count = 1
+                    count = 1,
+                    isExtraClass = isExtraClass
                 )
             )
         } else {
@@ -87,18 +88,19 @@ class AttendanceRepository(
                     subjectId = subjectId,
                     date = date,
                     status = AttendanceStatus.PRESENT,
-                    count = 1
+                    count = 1,
+                    isExtraClass = isExtraClass
                 )
             )
         }
     }
 
-    suspend fun markAbsent(subjectId: Long, date: LocalDate) {
+    suspend fun markAbsent(subjectId: Long, date: LocalDate, isExtraClass: Boolean = false) {
         // Check if there's already a record for this subject on this date
         val existingRecord = attendanceDao.getAttendanceRecord(subjectId, date)
         
         if (existingRecord != null && existingRecord.status == AttendanceStatus.ABSENT) {
-            // If already marked absent, increment the count
+            // If already marked absent, increment the count (preserve isExtraClass flag)
             val updatedRecord = existingRecord.copy(count = existingRecord.count + 1)
             attendanceDao.insertAttendance(updatedRecord)
             // Also increment subject counts
@@ -137,7 +139,8 @@ class AttendanceRepository(
                     subjectId = subjectId,
                     date = date,
                     status = AttendanceStatus.ABSENT,
-                    count = 1
+                    count = 1,
+                    isExtraClass = isExtraClass
                 )
             )
         } else {
@@ -148,7 +151,8 @@ class AttendanceRepository(
                     subjectId = subjectId,
                     date = date,
                     status = AttendanceStatus.ABSENT,
-                    count = 1
+                    count = 1,
+                    isExtraClass = isExtraClass
                 )
             )
         }
@@ -212,14 +216,15 @@ class AttendanceRepository(
         }
     }
     
-    suspend fun setAttendanceStatus(subjectId: Long, date: LocalDate, status: AttendanceStatus, count: Int = 1) {
+    suspend fun setAttendanceStatus(subjectId: Long, date: LocalDate, status: AttendanceStatus, count: Int = 1, isExtraClass: Boolean = false) {
         // Insert/update attendance record without modifying subject counts
         attendanceDao.insertAttendance(
             AttendanceRecord(
                 subjectId = subjectId,
                 date = date,
                 status = status,
-                count = count
+                count = count,
+                isExtraClass = isExtraClass
             )
         )
     }

@@ -63,6 +63,7 @@ object BackupManager {
             obj.put("date", r.date.toString())
             obj.put("status", r.status.name)
             obj.put("count", r.count)
+            obj.put("isExtraClass", r.isExtraClass)
             recordsArray.put(obj)
         }
         root.put("attendanceRecords", recordsArray)
@@ -123,7 +124,8 @@ object BackupManager {
                     subjectId = obj.getLong("subjectId"),
                     date = LocalDate.parse(obj.getString("date")),
                     status = AttendanceStatus.valueOf(obj.getString("status")),
-                    count = obj.optInt("count", 1)
+                    count = obj.optInt("count", 1),
+                    isExtraClass = obj.optBoolean("isExtraClass", false)
                 )
             }
 
@@ -154,11 +156,11 @@ object BackupManager {
     ): String {
         val subjectMap = subjects.associateBy { it.id }
         val sb = StringBuilder()
-        sb.appendLine("Subject,Date,Status,Count")
+        sb.appendLine("Subject,Date,Status,Count,IsExtraClass")
         attendanceRecords.sortedWith(compareBy({ it.date }, { it.subjectId }))
             .forEach { r ->
                 val name = subjectMap[r.subjectId]?.name ?: r.subjectId.toString()
-                sb.appendLine("${csvEscape(name)},${r.date},${r.status.name},${r.count}")
+                sb.appendLine("${csvEscape(name)},${r.date},${r.status.name},${r.count},${r.isExtraClass}")
             }
         return sb.toString()
     }
