@@ -205,8 +205,8 @@ fun AttendanceApp(
                     subjects = subjects,
                     allSubjects = allSubjectsIncludingFolders,
                     scheduleEntries = scheduleEntries,
-                    onAddScheduleEntry = { subjectId, day ->
-                        viewModel.addScheduleEntry(subjectId, day)
+                    onAddScheduleEntry = { subjectId, day, lectureCount ->
+                        viewModel.addScheduleEntry(subjectId, day, lectureCount)
                     },
                     onRemoveScheduleEntry = { entry ->
                         viewModel.removeScheduleEntry(entry)

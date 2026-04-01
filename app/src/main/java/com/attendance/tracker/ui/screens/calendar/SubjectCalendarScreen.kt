@@ -209,7 +209,8 @@ fun SubjectCalendarScreen(
                                 modifier = Modifier.padding(bottom = 12.dp)
                             )
 
-                            // Attendance Action Buttons
+                            // Attendance Action Buttons — single-click policy:
+                            // clicking an already-selected status is a no-op.
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceEvenly
@@ -219,8 +220,10 @@ fun SubjectCalendarScreen(
                                     isSelected = selectedDateRecord?.status == AttendanceStatus.PRESENT,
                                     color = PresentGreen,
                                     onClick = {
-                                        onMarkAttendance(AttendanceStatus.PRESENT, effectiveSingleDate)
-                                        showAttendanceSnackbar(AttendanceStatus.PRESENT)
+                                        if (selectedDateRecord?.status != AttendanceStatus.PRESENT) {
+                                            onMarkAttendance(AttendanceStatus.PRESENT, effectiveSingleDate)
+                                            showAttendanceSnackbar(AttendanceStatus.PRESENT)
+                                        }
                                     }
                                 )
                                 SubjectCalendarAttendanceButton(
@@ -228,8 +231,10 @@ fun SubjectCalendarScreen(
                                     isSelected = selectedDateRecord?.status == AttendanceStatus.ABSENT,
                                     color = AbsentRed,
                                     onClick = {
-                                        onMarkAttendance(AttendanceStatus.ABSENT, effectiveSingleDate)
-                                        showAttendanceSnackbar(AttendanceStatus.ABSENT)
+                                        if (selectedDateRecord?.status != AttendanceStatus.ABSENT) {
+                                            onMarkAttendance(AttendanceStatus.ABSENT, effectiveSingleDate)
+                                            showAttendanceSnackbar(AttendanceStatus.ABSENT)
+                                        }
                                     }
                                 )
                                 SubjectCalendarAttendanceButton(
@@ -237,8 +242,10 @@ fun SubjectCalendarScreen(
                                     isSelected = selectedDateRecord?.status == AttendanceStatus.NO_CLASS,
                                     color = NoClassGray,
                                     onClick = {
-                                        onMarkAttendance(AttendanceStatus.NO_CLASS, effectiveSingleDate)
-                                        showAttendanceSnackbar(AttendanceStatus.NO_CLASS)
+                                        if (selectedDateRecord?.status != AttendanceStatus.NO_CLASS) {
+                                            onMarkAttendance(AttendanceStatus.NO_CLASS, effectiveSingleDate)
+                                            showAttendanceSnackbar(AttendanceStatus.NO_CLASS)
+                                        }
                                     }
                                 )
                             }

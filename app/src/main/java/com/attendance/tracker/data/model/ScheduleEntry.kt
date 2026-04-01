@@ -26,5 +26,6 @@ data class ScheduleEntry(
     val id: Long = 0,
     val subjectId: Long,
     val dayOfWeek: DayOfWeek,
-    val isScheduled: Boolean = true
+    val isScheduled: Boolean = true,
+    val lectureCount: Int = 1
 )
