@@ -31,7 +31,7 @@ private const val STATS_BACKGROUND_ALPHA = 0.5f
 @Composable
 fun SubjectCard(
     subject: Subject,
-    allSubjects: List<Subject>,
+    allSubjects: Map<Long, Subject>,
     currentRecord: AttendanceRecord?,
     onMarkPresent: () -> Unit,
     onMarkAbsent: () -> Unit,

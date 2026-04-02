@@ -26,6 +26,7 @@ import com.attendance.tracker.ui.theme.PresentGreen
 @Composable
 fun SubjectsScreen(
     subjects: List<Subject>,
+    allSubjects: Map<Long, Subject>,
     onAddSubject: (String, Int, Long?) -> Unit,
     onAddFolder: (String) -> Unit,
     onUpdateSubject: (Subject) -> Unit,

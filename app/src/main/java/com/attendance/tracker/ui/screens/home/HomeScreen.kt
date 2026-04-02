@@ -34,7 +34,7 @@ import kotlin.math.roundToInt
 @Composable
 fun HomeScreen(
     subjects: List<Subject>,
-    allSubjects: List<Subject>,
+    allSubjects: Map<Long, Subject>,
     todayAttendance: Map<Long, AttendanceRecord>,
     scheduleEntries: List<ScheduleEntry>,
     onMarkAttendance: (Long, AttendanceStatus) -> Unit,
@@ -207,7 +207,7 @@ fun HomeScreen(
 @Composable
 private fun ExtraClassDialog(
     subjects: List<Subject>,
-    allSubjects: List<Subject>,
+    allSubjects: Map<Long, Subject>,
     onDismiss: () -> Unit,
     onMarkAttendance: (Long, AttendanceStatus) -> Unit
 ) {

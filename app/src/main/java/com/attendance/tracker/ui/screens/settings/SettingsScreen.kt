@@ -16,7 +16,7 @@ import com.attendance.tracker.notification.ReminderScheduler
 @Composable
 fun SettingsScreen(
     subjects: List<Subject>,
-    allSubjects: List<Subject>,
+    allSubjects: Map<Long, Subject>,
     onUpdateRequiredAttendance: (Long, Int) -> Unit,
     onNavigateToAbout: () -> Unit,
     onNavigateToCustomizations: () -> Unit,

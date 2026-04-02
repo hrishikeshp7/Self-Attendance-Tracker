@@ -22,7 +22,7 @@ import java.util.Locale
 @Composable
 fun ScheduleScreen(
     subjects: List<Subject>,
-    allSubjects: List<Subject>,
+    allSubjects: Map<Long, Subject>,
     scheduleEntries: List<ScheduleEntry>,
     onAddScheduleEntry: (Long, DayOfWeek) -> Unit,
     onRemoveScheduleEntry: (ScheduleEntry) -> Unit,
@@ -87,6 +87,11 @@ fun ScheduleScreen(
                 }
             }
 
+            // Optimized lookup for schedule entries
+            val entryMap = remember(scheduleEntries) {
+                scheduleEntries.associateBy { it.subjectId to it.dayOfWeek }
+            }
+
             // Horizontal Pager for swipeable days
             HorizontalPager(
                 state = pagerState,
@@ -98,7 +103,7 @@ fun ScheduleScreen(
                     day = day,
                     subjects = subjects,
                     allSubjects = allSubjects,
-                    scheduleEntries = scheduleEntries,
+                    entryMap = entryMap,
                     onAddScheduleEntry = onAddScheduleEntry,
                     onRemoveScheduleEntry = onRemoveScheduleEntry
                 )
@@ -111,8 +116,8 @@ fun ScheduleScreen(
 private fun DayScheduleContent(
     day: DayOfWeek,
     subjects: List<Subject>,
-    allSubjects: List<Subject>,
-    scheduleEntries: List<ScheduleEntry>,
+    allSubjects: Map<Long, Subject>,
+    entryMap: Map<Pair<Long, DayOfWeek>, ScheduleEntry>,
     onAddScheduleEntry: (Long, DayOfWeek) -> Unit,
     onRemoveScheduleEntry: (ScheduleEntry) -> Unit
 ) {
@@ -150,12 +155,8 @@ private fun DayScheduleContent(
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
             ) {
                 items(subjects, key = { it.id }) { subject ->
-                    val isScheduled = scheduleEntries.any { 
-                        it.subjectId == subject.id && it.dayOfWeek == day 
-                    }
-                    val entry = scheduleEntries.find { 
-                        it.subjectId == subject.id && it.dayOfWeek == day 
-                    }
+                    val entry = entryMap[subject.id to day]
+                    val isScheduled = entry != null
 
                     ScheduleSubjectItem(
                         subject = subject,
@@ -178,7 +179,7 @@ private fun DayScheduleContent(
 @Composable
 private fun ScheduleSubjectItem(
     subject: Subject,
-    allSubjects: List<Subject>,
+    allSubjects: Map<Long, Subject>,
     isScheduled: Boolean,
     onToggle: (Boolean) -> Unit
 ) {

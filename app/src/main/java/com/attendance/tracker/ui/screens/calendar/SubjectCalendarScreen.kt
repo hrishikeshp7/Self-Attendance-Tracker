@@ -28,7 +28,7 @@ import java.time.format.DateTimeFormatter
 @Composable
 fun SubjectCalendarScreen(
     subject: Subject,
-    allSubjects: List<Subject>,
+    allSubjects: Map<Long, Subject>,
     selectedMonth: YearMonth,
     selectedDate: LocalDate,
     attendanceRecords: List<AttendanceRecord>,
