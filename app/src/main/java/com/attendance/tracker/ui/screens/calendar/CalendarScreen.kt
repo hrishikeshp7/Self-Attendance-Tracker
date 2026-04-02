@@ -1,0 +1,370 @@
+package com.attendance.tracker.ui.screens.calendar
+
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import com.attendance.tracker.data.model.AttendanceRecord
+import com.attendance.tracker.data.model.AttendanceStatus
+import com.attendance.tracker.data.model.ScheduleEntry
+import com.attendance.tracker.data.model.Subject
+import com.attendance.tracker.data.model.getDisplayName
+import com.attendance.tracker.ui.components.CalendarView
+import com.attendance.tracker.ui.theme.AbsentRed
+import com.attendance.tracker.ui.theme.ExtraClassOrange
+import com.attendance.tracker.ui.theme.NoClassGray
+import com.attendance.tracker.ui.theme.PresentGreen
+import kotlinx.coroutines.launch
+import java.time.LocalDate
+import java.time.YearMonth
+import java.time.format.DateTimeFormatter
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun CalendarScreen(
+    selectedMonth: YearMonth,
+    selectedDate: LocalDate,
+    attendanceRecords: List<AttendanceRecord>,
+    subjects: List<Subject>,
+    allSubjects: List<Subject>,
+    scheduleEntries: List<ScheduleEntry> = emptyList(),
+    onDateSelected: (LocalDate) -> Unit,
+    onMonthChanged: (YearMonth) -> Unit,
+    onMarkAttendance: (Long, AttendanceStatus, LocalDate, Boolean) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val dateFormatter = DateTimeFormatter.ofPattern("EEEE, MMMM d")
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+    
+    // Helper function to show snackbar with attendance status
+    val showAttendanceSnackbar: (String, AttendanceStatus) -> Unit = { subjectName, status ->
+        scope.launch {
+            val statusText = when (status) {
+                AttendanceStatus.PRESENT -> "Marked Present"
+                AttendanceStatus.ABSENT -> "Marked Absent"
+                AttendanceStatus.NO_CLASS -> "Marked No Class"
+            }
+            snackbarHostState.showSnackbar(
+                message = "$subjectName: $statusText",
+                duration = SnackbarDuration.Short
+            )
+        }
+    }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Calendar") },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    titleContentColor = MaterialTheme.colorScheme.onPrimary
+                )
+            )
+        },
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+        modifier = modifier
+    ) { paddingValues ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+        ) {
+            // Calendar View
+            CalendarView(
+                selectedMonth = selectedMonth,
+                selectedDate = selectedDate,
+                attendanceRecords = attendanceRecords,
+                onDateSelected = onDateSelected,
+                onMonthChanged = onMonthChanged
+            )
+
+            // Attendance Statistics Bar for selected date
+            val selectedDateRecords = attendanceRecords.filter { it.date == selectedDate }
+            val (presentCount, absentCount) = selectedDateRecords.fold(Pair(0, 0)) { acc, record ->
+                when (record.status) {
+                    AttendanceStatus.PRESENT -> Pair(acc.first + 1, acc.second)
+                    AttendanceStatus.ABSENT -> Pair(acc.first, acc.second + 1)
+                    else -> acc
+                }
+            }
+            val totalCount = selectedDateRecords.size
+            val extraCount = selectedDateRecords.count { it.isExtraClass }
+            
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer
+                )
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    horizontalArrangement = Arrangement.SpaceEvenly
+                ) {
+                    AttendanceStatItem(
+                        label = "Present",
+                        value = presentCount.toString(),
+                        color = PresentGreen
+                    )
+                    AttendanceStatItem(
+                        label = "Absent",
+                        value = absentCount.toString(),
+                        color = AbsentRed
+                    )
+                    AttendanceStatItem(
+                        label = "Total",
+                        value = totalCount.toString(),
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    if (extraCount > 0) {
+                        AttendanceStatItem(
+                            label = "Extra",
+                            value = extraCount.toString(),
+                            color = ExtraClassOrange
+                        )
+                    }
+                }
+            }
+
+            Divider(modifier = Modifier.padding(vertical = 4.dp))
+
+            // Selected Date Attendance Details
+            Text(
+                text = selectedDate.format(dateFormatter),
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+            )
+            
+            val isFutureDate = selectedDate.isAfter(LocalDate.now())
+
+            if (subjects.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(32.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "No subjects added yet",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            } else if (isFutureDate) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(32.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "Cannot mark attendance for future dates",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(16.dp)
+                ) {
+                    items(subjects, key = { it.id }) { subject ->
+                        val record = selectedDateRecords.find { it.subjectId == subject.id }
+                        val isExtraClass = record?.isExtraClass ?: run {
+                            // For subjects with no existing record, detect from schedule
+                            val subjectSchedule = scheduleEntries.filter { it.subjectId == subject.id }
+                            subjectSchedule.isNotEmpty() && subjectSchedule.none { it.dayOfWeek == selectedDate.dayOfWeek }
+                        }
+                        CalendarAttendanceItem(
+                            subject = subject,
+                            allSubjects = allSubjects,
+                            currentStatus = record?.status,
+                            isExtraClass = isExtraClass,
+                            onMarkPresent = { 
+                                onMarkAttendance(subject.id, AttendanceStatus.PRESENT, selectedDate, isExtraClass)
+                                showAttendanceSnackbar(subject.name, AttendanceStatus.PRESENT)
+                            },
+                            onMarkAbsent = { 
+                                onMarkAttendance(subject.id, AttendanceStatus.ABSENT, selectedDate, isExtraClass)
+                                showAttendanceSnackbar(subject.name, AttendanceStatus.ABSENT)
+                            },
+                            onMarkNoClass = { 
+                                onMarkAttendance(subject.id, AttendanceStatus.NO_CLASS, selectedDate, false)
+                                showAttendanceSnackbar(subject.name, AttendanceStatus.NO_CLASS)
+                            }
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CalendarAttendanceItem(
+    subject: Subject,
+    allSubjects: List<Subject>,
+    currentStatus: AttendanceStatus?,
+    isExtraClass: Boolean,
+    onMarkPresent: () -> Unit,
+    onMarkAbsent: () -> Unit,
+    onMarkNoClass: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = subject.getDisplayName(allSubjects),
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(bottom = 8.dp)
+                )
+                if (isExtraClass) {
+                    Surface(
+                        color = ExtraClassOrange.copy(alpha = 0.15f),
+                        shape = MaterialTheme.shapes.small
+                    ) {
+                        Text(
+                            text = "Extra Class",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = ExtraClassOrange,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
+                }
+            }
+
+            // Attendance Action Buttons
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                CalendarAttendanceButton(
+                    text = "Present",
+                    isSelected = currentStatus == AttendanceStatus.PRESENT,
+                    color = PresentGreen,
+                    onClick = onMarkPresent
+                )
+                CalendarAttendanceButton(
+                    text = "Absent",
+                    isSelected = currentStatus == AttendanceStatus.ABSENT,
+                    color = AbsentRed,
+                    onClick = onMarkAbsent
+                )
+                CalendarAttendanceButton(
+                    text = "No Class",
+                    isSelected = currentStatus == AttendanceStatus.NO_CLASS,
+                    color = NoClassGray,
+                    onClick = onMarkNoClass
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun CalendarAttendanceButton(
+    text: String,
+    isSelected: Boolean,
+    color: androidx.compose.ui.graphics.Color,
+    onClick: () -> Unit
+) {
+    Button(
+        onClick = onClick,
+        colors = ButtonDefaults.buttonColors(
+            containerColor = if (isSelected) color else color.copy(alpha = 0.3f),
+            contentColor = if (isSelected) MaterialTheme.colorScheme.onPrimary else color
+        ),
+        modifier = Modifier.width(100.dp)
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelMedium
+        )
+    }
+}
+
+@Composable
+private fun AttendanceStatItem(
+    label: String,
+    value: String,
+    color: androidx.compose.ui.graphics.Color
+) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(
+            text = value,
+            style = MaterialTheme.typography.titleSmall,
+            color = color
+        )
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+@Composable
+private fun AttendanceRecordItem(
+    subjectName: String,
+    status: AttendanceStatus
+) {
+    val statusColor = when (status) {
+        AttendanceStatus.PRESENT -> PresentGreen
+        AttendanceStatus.ABSENT -> AbsentRed
+        AttendanceStatus.NO_CLASS -> NoClassGray
+    }
+    val statusText = when (status) {
+        AttendanceStatus.PRESENT -> "Present"
+        AttendanceStatus.ABSENT -> "Absent"
+        AttendanceStatus.NO_CLASS -> "No Class"
+    }
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = statusColor.copy(alpha = 0.1f)
+        )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = subjectName,
+                style = MaterialTheme.typography.bodyLarge
+            )
+            Text(
+                text = statusText,
+                style = MaterialTheme.typography.bodyMedium,
+                color = statusColor
+            )
+        }
+    }
+}
