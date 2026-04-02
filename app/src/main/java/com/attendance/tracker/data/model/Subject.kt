@@ -93,3 +93,19 @@ fun Subject.getDisplayName(allSubjects: List<Subject>): String {
         name
     }
 }
+
+/**
+ * Get the display name for a subject, using a map for $O(1)$ lookup
+ */
+fun Subject.getDisplayName(allSubjectsMap: Map<Long, Subject>): String {
+    return if (parentSubjectId != null) {
+        val folder = allSubjectsMap[parentSubjectId]
+        if (folder != null) {
+            "${folder.name} / $name"
+        } else {
+            name
+        }
+    } else {
+        name
+    }
+}

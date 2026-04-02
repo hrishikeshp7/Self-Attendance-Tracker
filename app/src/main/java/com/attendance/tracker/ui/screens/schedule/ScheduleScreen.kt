@@ -18,15 +18,13 @@ import java.time.DayOfWeek
 import java.time.format.TextStyle
 import java.util.Locale
 
-private const val MAX_LECTURES_PER_DAY = 9
-
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun ScheduleScreen(
     subjects: List<Subject>,
-    allSubjects: List<Subject>,
+    allSubjects: Map<Long, Subject>,
     scheduleEntries: List<ScheduleEntry>,
-    onAddScheduleEntry: (Long, DayOfWeek, Int) -> Unit,
+    onAddScheduleEntry: (Long, DayOfWeek) -> Unit,
     onRemoveScheduleEntry: (ScheduleEntry) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -89,6 +87,11 @@ fun ScheduleScreen(
                 }
             }
 
+            // Optimized lookup for schedule entries
+            val entryMap = remember(scheduleEntries) {
+                scheduleEntries.associateBy { it.subjectId to it.dayOfWeek }
+            }
+
             // Horizontal Pager for swipeable days
             HorizontalPager(
                 state = pagerState,
@@ -100,7 +103,7 @@ fun ScheduleScreen(
                     day = day,
                     subjects = subjects,
                     allSubjects = allSubjects,
-                    scheduleEntries = scheduleEntries,
+                    entryMap = entryMap,
                     onAddScheduleEntry = onAddScheduleEntry,
                     onRemoveScheduleEntry = onRemoveScheduleEntry
                 )
@@ -113,14 +116,11 @@ fun ScheduleScreen(
 private fun DayScheduleContent(
     day: DayOfWeek,
     subjects: List<Subject>,
-    allSubjects: List<Subject>,
-    scheduleEntries: List<ScheduleEntry>,
-    onAddScheduleEntry: (Long, DayOfWeek, Int) -> Unit,
+    allSubjects: Map<Long, Subject>,
+    entryMap: Map<Pair<Long, DayOfWeek>, ScheduleEntry>,
+    onAddScheduleEntry: (Long, DayOfWeek) -> Unit,
     onRemoveScheduleEntry: (ScheduleEntry) -> Unit
 ) {
-    // State for the "how many lectures?" dialog
-    var pendingSubject by remember { mutableStateOf<Subject?>(null) }
-
     Column(
         modifier = Modifier.fillMaxSize()
     ) {
@@ -155,20 +155,16 @@ private fun DayScheduleContent(
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
             ) {
                 items(subjects, key = { it.id }) { subject ->
-                    val entry = scheduleEntries.find {
-                        it.subjectId == subject.id && it.dayOfWeek == day
-                    }
+                    val entry = entryMap[subject.id to day]
                     val isScheduled = entry != null
 
                     ScheduleSubjectItem(
                         subject = subject,
                         allSubjects = allSubjects,
                         isScheduled = isScheduled,
-                        lectureCount = entry?.lectureCount ?: 1,
                         onToggle = { checked ->
                             if (checked) {
-                                // Show dialog to ask how many lectures
-                                pendingSubject = subject
+                                onAddScheduleEntry(subject.id, day)
                             } else {
                                 entry?.let { onRemoveScheduleEntry(it) }
                             }
@@ -178,83 +174,13 @@ private fun DayScheduleContent(
             }
         }
     }
-
-    // Dialog: ask how many lectures per day for the selected subject
-    val subjectForDialog = pendingSubject
-    if (subjectForDialog != null) {
-        LectureCountDialog(
-            subjectName = subjectForDialog.getDisplayName(allSubjects),
-            onConfirm = { count ->
-                onAddScheduleEntry(subjectForDialog.id, day, count)
-                pendingSubject = null
-            },
-            onDismiss = { pendingSubject = null }
-        )
-    }
-}
-
-@Composable
-private fun LectureCountDialog(
-    subjectName: String,
-    onConfirm: (Int) -> Unit,
-    onDismiss: () -> Unit
-) {
-    var count by remember { mutableIntStateOf(1) }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Lectures per day") },
-        text = {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(
-                    text = "How many lectures of \"$subjectName\" are there on this day?",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(modifier = Modifier.height(20.dp))
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    FilledTonalIconButton(
-                        onClick = { if (count > 1) count-- },
-                        enabled = count > 1
-                    ) {
-                        Text("−", style = MaterialTheme.typography.titleLarge)
-                    }
-                    Text(
-                        text = count.toString(),
-                        style = MaterialTheme.typography.headlineMedium,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    FilledTonalIconButton(
-                        onClick = { if (count < MAX_LECTURES_PER_DAY) count++ },
-                        enabled = count < MAX_LECTURES_PER_DAY
-                    ) {
-                        Text("+", style = MaterialTheme.typography.titleLarge)
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            Button(onClick = { onConfirm(count) }) {
-                Text("Confirm")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel")
-            }
-        }
-    )
 }
 
 @Composable
 private fun ScheduleSubjectItem(
     subject: Subject,
-    allSubjects: List<Subject>,
+    allSubjects: Map<Long, Subject>,
     isScheduled: Boolean,
-    lectureCount: Int,
     onToggle: (Boolean) -> Unit
 ) {
     Card(
@@ -270,19 +196,11 @@ private fun ScheduleSubjectItem(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = subject.getDisplayName(allSubjects),
-                    style = MaterialTheme.typography.bodyLarge
-                )
-                if (isScheduled && lectureCount > 1) {
-                    Text(
-                        text = "$lectureCount lectures",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                }
-            }
+            Text(
+                text = subject.getDisplayName(allSubjects),
+                style = MaterialTheme.typography.bodyLarge,
+                modifier = Modifier.weight(1f)
+            )
             Switch(
                 checked = isScheduled,
                 onCheckedChange = onToggle

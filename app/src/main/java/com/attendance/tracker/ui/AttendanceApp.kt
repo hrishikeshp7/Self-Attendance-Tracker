@@ -7,7 +7,6 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Settings
@@ -28,7 +27,6 @@ import androidx.navigation.navArgument
 import com.attendance.tracker.data.model.AttendanceStatus
 import com.attendance.tracker.ui.screens.about.AboutScreen
 import com.attendance.tracker.ui.screens.backup.BackupRestoreScreen
-import com.attendance.tracker.ui.screens.calendar.CalendarScreen
 import com.attendance.tracker.ui.screens.calendar.SubjectCalendarScreen
 import com.attendance.tracker.ui.screens.home.HomeScreen
 import com.attendance.tracker.ui.screens.schedule.ScheduleScreen
@@ -43,7 +41,6 @@ data class BottomNavItem(
 
 val bottomNavItems = listOf(
     BottomNavItem(Screen.Home, Icons.Default.Home, "Home"),
-    BottomNavItem(Screen.Calendar, Icons.Default.DateRange, "Calendar"),
     BottomNavItem(Screen.Subjects, Icons.Default.Subject, "Subjects"),
     BottomNavItem(Screen.Schedule, Icons.Default.Schedule, "Schedule"),
     BottomNavItem(Screen.Settings, Icons.Default.Settings, "Settings")
@@ -58,6 +55,7 @@ fun AttendanceApp(
     // Collect state from ViewModel
     val subjects by viewModel.subjects.collectAsState()
     val allSubjectsIncludingFolders by viewModel.allSubjectsIncludingFolders.collectAsState()
+    val subjectsMap by viewModel.subjectsMap.collectAsState()
     val scheduleEntries by viewModel.scheduleEntries.collectAsState()
     val selectedDate by viewModel.selectedDate.collectAsState()
     val selectedMonth by viewModel.selectedMonth.collectAsState()
@@ -110,11 +108,11 @@ fun AttendanceApp(
             composable(Screen.Home.route) {
                 HomeScreen(
                     subjects = subjects,
-                    allSubjects = allSubjectsIncludingFolders,
+                    allSubjects = subjectsMap,
                     todayAttendance = todayAttendance,
                     scheduleEntries = scheduleEntries,
-                    onMarkAttendance = { subjectId, status, isExtraClass ->
-                        viewModel.markAttendance(subjectId, status, isExtraClass = isExtraClass)
+                    onMarkAttendance = { subjectId, status ->
+                        viewModel.markAttendance(subjectId, status)
                     },
                     onClearAttendance = { subjectId ->
                         viewModel.clearAttendance(subjectId)
@@ -143,29 +141,6 @@ fun AttendanceApp(
                 )
             }
 
-            composable(Screen.Calendar.route) {
-                LaunchedEffect(selectedMonth) {
-                    viewModel.loadAttendanceForMonth(selectedMonth)
-                }
-                CalendarScreen(
-                    selectedMonth = selectedMonth,
-                    selectedDate = selectedDate,
-                    attendanceRecords = attendanceRecords,
-                    subjects = subjects,
-                    allSubjects = allSubjectsIncludingFolders,
-                    scheduleEntries = scheduleEntries,
-                    onDateSelected = { date ->
-                        viewModel.setSelectedDate(date)
-                    },
-                    onMonthChanged = { month ->
-                        viewModel.setSelectedMonth(month)
-                    },
-                    onMarkAttendance = { subjectId, status, date, isExtraClass ->
-                        viewModel.markAttendance(subjectId, status, date, isExtraClass)
-                    }
-                )
-            }
-
             composable(
                 route = Screen.SubjectCalendar.route,
                 arguments = listOf(navArgument("subjectId") { type = NavType.LongType }),
@@ -173,7 +148,7 @@ fun AttendanceApp(
                 popExitTransition = { slideOutHorizontally(targetOffsetX = { it }, animationSpec = tween(200)) }
             ) { backStackEntry ->
                 val subjectId = backStackEntry.arguments?.getLong("subjectId") ?: return@composable
-                val subject = allSubjectsIncludingFolders.find { it.id == subjectId } ?: return@composable
+                val subject = subjectsMap[subjectId] ?: return@composable
                 
                 // Load attendance for selected month when entering calendar screen
                 LaunchedEffect(selectedMonth) {
@@ -182,19 +157,18 @@ fun AttendanceApp(
 
                 SubjectCalendarScreen(
                     subject = subject,
-                    allSubjects = allSubjectsIncludingFolders,
+                    allSubjects = subjectsMap,
                     selectedMonth = selectedMonth,
                     selectedDate = selectedDate,
                     attendanceRecords = attendanceRecords,
-                    scheduleEntries = scheduleEntries.filter { it.subjectId == subjectId },
                     onDateSelected = { date ->
                         viewModel.setSelectedDate(date)
                     },
                     onMonthChanged = { month ->
                         viewModel.setSelectedMonth(month)
                     },
-                    onMarkAttendance = { status, date, isExtraClass ->
-                        viewModel.markAttendance(subjectId, status, date, isExtraClass)
+                    onMarkAttendance = { status, date ->
+                        viewModel.markAttendance(subjectId, status, date)
                     },
                     onNavigateBack = {
                         navController.popBackStack()
@@ -205,6 +179,7 @@ fun AttendanceApp(
             composable(Screen.Subjects.route) {
                 SubjectsScreen(
                     subjects = allSubjectsIncludingFolders,
+                    allSubjects = subjectsMap,
                     onAddSubject = { name, required, parentId ->
                         if (parentId != null) {
                             viewModel.addSubSubject(name, parentId, required)
@@ -230,10 +205,10 @@ fun AttendanceApp(
             composable(Screen.Schedule.route) {
                 ScheduleScreen(
                     subjects = subjects,
-                    allSubjects = allSubjectsIncludingFolders,
+                    allSubjects = subjectsMap,
                     scheduleEntries = scheduleEntries,
-                    onAddScheduleEntry = { subjectId, day, lectureCount ->
-                        viewModel.addScheduleEntry(subjectId, day, lectureCount)
+                    onAddScheduleEntry = { subjectId, day ->
+                        viewModel.addScheduleEntry(subjectId, day)
                     },
                     onRemoveScheduleEntry = { entry ->
                         viewModel.removeScheduleEntry(entry)
@@ -244,7 +219,7 @@ fun AttendanceApp(
             composable(Screen.Settings.route) {
                 SettingsScreen(
                     subjects = subjects,
-                    allSubjects = allSubjectsIncludingFolders,
+                    allSubjects = subjectsMap,
                     onUpdateRequiredAttendance = { subjectId, required ->
                         viewModel.updateRequiredAttendance(subjectId, required)
                     },
