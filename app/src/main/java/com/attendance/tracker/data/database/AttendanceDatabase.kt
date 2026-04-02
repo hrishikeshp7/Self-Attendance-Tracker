@@ -13,7 +13,7 @@ import com.attendance.tracker.data.model.Subject
 
 @Database(
     entities = [Subject::class, AttendanceRecord::class, ScheduleEntry::class, com.attendance.tracker.data.model.ThemePreference::class],
-    version = 6,
+    version = 4,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -58,20 +58,6 @@ abstract class AttendanceDatabase : RoomDatabase() {
             }
         }
 
-        private val MIGRATION_4_5 = object : Migration(4, 5) {
-            override fun migrate(db: SupportSQLiteDatabase) {
-                // Add lectureCount column to schedule_entries table
-                db.execSQL("ALTER TABLE schedule_entries ADD COLUMN lectureCount INTEGER NOT NULL DEFAULT 1")
-            }
-        }
-
-        private val MIGRATION_5_6 = object : Migration(5, 6) {
-            override fun migrate(db: SupportSQLiteDatabase) {
-                // Add isExtraClass column to attendance_records table
-                db.execSQL("ALTER TABLE attendance_records ADD COLUMN isExtraClass INTEGER NOT NULL DEFAULT 0")
-            }
-        }
-
         fun getDatabase(context: Context): AttendanceDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -79,7 +65,7 @@ abstract class AttendanceDatabase : RoomDatabase() {
                     AttendanceDatabase::class.java,
                     "attendance_database"
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
                     .build()
                 INSTANCE = instance
                 instance

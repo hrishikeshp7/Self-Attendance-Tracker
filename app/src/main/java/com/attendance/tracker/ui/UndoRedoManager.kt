@@ -66,7 +66,5 @@ data class AttendanceAction(
     val newStatus: AttendanceStatus,
     val newCount: Int,  // count of new status
     val oldPresentCount: Int,
-    val oldAbsentCount: Int,
-    val oldIsExtraClass: Boolean = false,
-    val newIsExtraClass: Boolean = false
+    val oldAbsentCount: Int
 )

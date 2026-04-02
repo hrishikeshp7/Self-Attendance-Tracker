@@ -24,7 +24,6 @@ import com.attendance.tracker.data.model.AttendanceStatus
 import com.attendance.tracker.data.model.ScheduleEntry
 import com.attendance.tracker.data.model.Subject
 import com.attendance.tracker.data.model.getDisplayName
-import com.attendance.tracker.ui.components.MultiLectureSubjectCard
 import com.attendance.tracker.ui.components.SubjectCard
 import kotlinx.coroutines.launch
 import java.time.LocalDate
@@ -38,7 +37,7 @@ fun HomeScreen(
     allSubjects: Map<Long, Subject>,
     todayAttendance: Map<Long, AttendanceRecord>,
     scheduleEntries: List<ScheduleEntry>,
-    onMarkAttendance: (Long, AttendanceStatus, Boolean) -> Unit,
+    onMarkAttendance: (Long, AttendanceStatus) -> Unit,
     onClearAttendance: (Long) -> Unit,
     onAddSubject: () -> Unit,
     onEditSubject: (Subject) -> Unit,
@@ -64,11 +63,6 @@ fun HomeScreen(
     val todayDayOfWeek = today.dayOfWeek
     val todaysScheduledIds: Set<Long> = remember(scheduleEntries, todayDayOfWeek) {
         scheduleEntries.filter { it.dayOfWeek == todayDayOfWeek }.map { it.subjectId }.toSet()
-    }
-    // Map of subjectId → how many lectures are scheduled today
-    val todayLectureCounts: Map<Long, Int> = remember(scheduleEntries, todayDayOfWeek) {
-        scheduleEntries.filter { it.dayOfWeek == todayDayOfWeek }
-            .associate { it.subjectId to it.lectureCount }
     }
     // If the user has not set up any schedule at all, fall back to showing all subjects
     val hasAnySchedule = scheduleEntries.isNotEmpty()
@@ -150,52 +144,28 @@ fun HomeScreen(
                     }
                 }
 
-                // Subject Cards – only today's scheduled subjects
+                // Subject Cards – only today's scheduled subjects, single-mark mode
                 items(todaysSubjects, key = { it.id }) { subject ->
-                    val lectureCount = todayLectureCounts[subject.id] ?: 1
-                    if (lectureCount > 1) {
-                        MultiLectureSubjectCard(
-                            subject = subject,
-                            allSubjects = allSubjects,
-                            lectureCount = lectureCount,
-                            currentRecord = todayAttendance[subject.id],
-                            onMarkPresent = {
-                                onMarkAttendance(subject.id, AttendanceStatus.PRESENT, false)
-                            },
-                            onMarkAbsent = {
-                                onMarkAttendance(subject.id, AttendanceStatus.ABSENT, false)
-                            },
-                            onMarkNoClass = {
-                                onMarkAttendance(subject.id, AttendanceStatus.NO_CLASS, false)
-                            },
-                            onClearAttendance = {
-                                onClearAttendance(subject.id)
-                            },
-                            onEditClick = { onEditSubject(subject) },
-                            onCardClick = { onSubjectClick(subject) }
-                        )
-                    } else {
-                        SubjectCard(
-                            subject = subject,
-                            allSubjects = allSubjects,
-                            currentRecord = todayAttendance[subject.id],
-                            onMarkPresent = {
-                                onMarkAttendance(subject.id, AttendanceStatus.PRESENT, false)
-                            },
-                            onMarkAbsent = {
-                                onMarkAttendance(subject.id, AttendanceStatus.ABSENT, false)
-                            },
-                            onMarkNoClass = {
-                                onMarkAttendance(subject.id, AttendanceStatus.NO_CLASS, false)
-                            },
-                            onClearAttendance = {
-                                onClearAttendance(subject.id)
-                            },
-                            onEditClick = { onEditSubject(subject) },
-                            onCardClick = { onSubjectClick(subject) },
-                            allowMultipleMark = false
-                        )
-                    }
+                    SubjectCard(
+                        subject = subject,
+                        allSubjects = allSubjects,
+                        currentRecord = todayAttendance[subject.id],
+                        onMarkPresent = {
+                            onMarkAttendance(subject.id, AttendanceStatus.PRESENT)
+                        },
+                        onMarkAbsent = {
+                            onMarkAttendance(subject.id, AttendanceStatus.ABSENT)
+                        },
+                        onMarkNoClass = {
+                            onMarkAttendance(subject.id, AttendanceStatus.NO_CLASS)
+                        },
+                        onClearAttendance = {
+                            onClearAttendance(subject.id)
+                        },
+                        onEditClick = { onEditSubject(subject) },
+                        onCardClick = { onSubjectClick(subject) },
+                        allowMultipleMark = false
+                    )
                 }
 
                 // "Add Extra Class" button at the bottom of the list
@@ -227,7 +197,7 @@ fun HomeScreen(
             allSubjects = allSubjects,
             onDismiss = { showExtraClassDialog = false },
             onMarkAttendance = { subjectId, status ->
-                onMarkAttendance(subjectId, status, true)
+                onMarkAttendance(subjectId, status)
                 showExtraClassDialog = false
             }
         )
