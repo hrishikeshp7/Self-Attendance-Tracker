@@ -70,13 +70,14 @@ class AttendanceRepository(
                 }
                 else -> {}
             }
-            // Insert new present record
+            // Insert new present record, carrying over the previous count so the
+            // per-day record stays consistent with the aggregate adjustment above
             attendanceDao.insertAttendance(
                 AttendanceRecord(
                     subjectId = subjectId,
                     date = date,
                     status = AttendanceStatus.PRESENT,
-                    count = 1
+                    count = existingRecord.count
                 )
             )
         } else {
@@ -131,13 +132,14 @@ class AttendanceRepository(
                 }
                 else -> {}
             }
-            // Insert new absent record
+            // Insert new absent record, carrying over the previous count so the
+            // per-day record stays consistent with the aggregate adjustment above
             attendanceDao.insertAttendance(
                 AttendanceRecord(
                     subjectId = subjectId,
                     date = date,
                     status = AttendanceStatus.ABSENT,
-                    count = 1
+                    count = existingRecord.count
                 )
             )
         } else {
@@ -190,13 +192,14 @@ class AttendanceRepository(
                 }
                 else -> {}
             }
-            // Insert new no class record
+            // Insert new no class record, carrying over the previous count so the
+            // per-day record stays consistent with the aggregate adjustment above
             attendanceDao.insertAttendance(
                 AttendanceRecord(
                     subjectId = subjectId,
                     date = date,
                     status = AttendanceStatus.NO_CLASS,
-                    count = 1
+                    count = existingRecord.count
                 )
             )
         } else {

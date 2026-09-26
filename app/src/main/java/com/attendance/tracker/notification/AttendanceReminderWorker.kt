@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.attendance.tracker.data.database.AttendanceDatabase
+import com.attendance.tracker.data.database.SubjectDao
 import java.time.LocalDate
 
 class AttendanceReminderWorker(
@@ -29,8 +30,8 @@ class AttendanceReminderWorker(
 
         val todayScheduledEntries = scheduleDao.getScheduleForDayOnce(todayDayOfWeek)
         if (todayScheduledEntries.isEmpty()) {
-            // No classes scheduled today – send general reminder
-            NotificationHelper.showDailyReminderNotification(applicationContext)
+            // No classes scheduled today – fall back to an at-risk check, then a general reminder
+            notifyAtRiskOrDefault(subjectDao)
             return Result.success()
         }
 
@@ -54,10 +55,26 @@ class AttendanceReminderWorker(
             // Send missed-mark notification
             NotificationHelper.showMissedMarkNotification(applicationContext, unmarkedSubjectNames)
         } else {
-            // All scheduled classes are marked – send a general reminder
-            NotificationHelper.showDailyReminderNotification(applicationContext)
+            // All scheduled classes are marked – check for at-risk subjects before a general reminder
+            notifyAtRiskOrDefault(subjectDao)
         }
 
         return Result.success()
+    }
+
+    /**
+     * Warns about subjects whose attendance has fallen below the required percentage;
+     * falls back to the general daily reminder when nothing is at risk.
+     */
+    private suspend fun notifyAtRiskOrDefault(subjectDao: SubjectDao) {
+        val atRiskSubjectNames = subjectDao.getAllSubjectsOnce()
+            .filter { !it.isFolder && it.totalLectures > 0 && !it.isAboveRequired }
+            .map { it.name }
+
+        if (atRiskSubjectNames.isNotEmpty()) {
+            NotificationHelper.showAtRiskNotification(applicationContext, atRiskSubjectNames)
+        } else {
+            NotificationHelper.showDailyReminderNotification(applicationContext)
+        }
     }
 }

@@ -195,9 +195,6 @@ fun AttendanceApp(
                     },
                     onDeleteSubject = { subject ->
                         viewModel.deleteSubject(subject)
-                    },
-                    onUpdateAttendanceCounts = { id, present, absent ->
-                        viewModel.updateAttendanceCounts(id, present, absent)
                     }
                 )
             }

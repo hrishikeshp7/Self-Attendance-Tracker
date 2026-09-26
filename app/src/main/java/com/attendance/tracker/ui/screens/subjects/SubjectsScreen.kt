@@ -31,7 +31,6 @@ fun SubjectsScreen(
     onAddFolder: (String) -> Unit,
     onUpdateSubject: (Subject) -> Unit,
     onDeleteSubject: (Subject) -> Unit,
-    onUpdateAttendanceCounts: (Long, Int, Int) -> Unit,
     modifier: Modifier = Modifier
 ) {
     var showAddDialog by remember { mutableStateOf(false) }
@@ -163,9 +162,8 @@ fun SubjectsScreen(
                 showEditDialog = false
                 selectedSubject = null
             },
-            onConfirm = { updatedSubject, present, absent ->
+            onConfirm = { updatedSubject ->
                 onUpdateSubject(updatedSubject)
-                onUpdateAttendanceCounts(updatedSubject.id, present, absent)
                 showEditDialog = false
                 selectedSubject = null
             }
@@ -418,7 +416,7 @@ private fun AddSubjectDialog(
 private fun EditSubjectDialog(
     subject: Subject,
     onDismiss: () -> Unit,
-    onConfirm: (Subject, Int, Int) -> Unit
+    onConfirm: (Subject) -> Unit
 ) {
     var name by remember { mutableStateOf(subject.name) }
     var requiredAttendance by remember { mutableStateOf(subject.requiredAttendance.toString()) }
@@ -479,11 +477,17 @@ private fun EditSubjectDialog(
                         val required = if (subject.isFolder) subject.requiredAttendance else (requiredAttendance.toIntOrNull() ?: 75)
                         val present = if (subject.isFolder) subject.presentLectures else (presentLectures.toIntOrNull() ?: 0)
                         val absent = if (subject.isFolder) subject.absentLectures else (absentLectures.toIntOrNull() ?: 0)
+                        // Present/absent/total are folded into the same Subject update so the
+                        // write is atomic — writing counts via a second, separate DB call raced
+                        // with this one and could silently revert the edited counts.
                         val updatedSubject = subject.copy(
                             name = name.trim(),
-                            requiredAttendance = required.coerceIn(0, 100)
+                            requiredAttendance = required.coerceIn(0, 100),
+                            presentLectures = present,
+                            absentLectures = absent,
+                            totalLectures = present + absent
                         )
-                        onConfirm(updatedSubject, present, absent)
+                        onConfirm(updatedSubject)
                     }
                 },
                 enabled = name.isNotBlank()
