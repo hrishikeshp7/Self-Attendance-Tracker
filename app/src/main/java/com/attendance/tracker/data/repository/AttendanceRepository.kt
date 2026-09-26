@@ -239,10 +239,6 @@ class AttendanceRepository(
         subjectDao.updateAttendanceCounts(subjectId, present, absent)
     }
 
-    suspend fun updateRequiredAttendance(subjectId: Long, required: Int) {
-        subjectDao.updateRequiredAttendance(subjectId, required)
-    }
-
     // Attendance operations
     fun getAttendanceForSubject(subjectId: Long): Flow<List<AttendanceRecord>> =
         attendanceDao.getAttendanceForSubject(subjectId)

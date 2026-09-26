@@ -49,9 +49,6 @@ interface SubjectDao {
     @Query("UPDATE subjects SET presentLectures = :present, absentLectures = :absent, totalLectures = :present + :absent WHERE id = :subjectId")
     suspend fun updateAttendanceCounts(subjectId: Long, present: Int, absent: Int)
 
-    @Query("UPDATE subjects SET requiredAttendance = :required WHERE id = :subjectId")
-    suspend fun updateRequiredAttendance(subjectId: Long, required: Int)
-
     @Query("SELECT * FROM subjects ORDER BY id ASC")
     suspend fun getAllSubjectsOnce(): List<Subject>
 

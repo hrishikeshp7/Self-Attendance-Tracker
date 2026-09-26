@@ -215,11 +215,6 @@ fun AttendanceApp(
 
             composable(Screen.Settings.route) {
                 SettingsScreen(
-                    subjects = subjects,
-                    allSubjects = subjectsMap,
-                    onUpdateRequiredAttendance = { subjectId, required ->
-                        viewModel.updateRequiredAttendance(subjectId, required)
-                    },
                     onNavigateToAbout = {
                         navController.navigate(Screen.About.route)
                     },

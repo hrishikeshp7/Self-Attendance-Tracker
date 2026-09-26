@@ -67,11 +67,6 @@ private class FakeSubjectDao : SubjectDao {
         subjects[subjectId] = s.copy(presentLectures = present, absentLectures = absent, totalLectures = present + absent)
     }
 
-    override suspend fun updateRequiredAttendance(subjectId: Long, required: Int) {
-        val s = subjects[subjectId] ?: return
-        subjects[subjectId] = s.copy(requiredAttendance = required)
-    }
-
     override suspend fun getAllSubjectsOnce(): List<Subject> = subjects.values.sortedBy { it.id }
     override suspend fun insertSubjects(subjects: List<Subject>) {
         subjects.forEach { this.subjects[it.id] = it }

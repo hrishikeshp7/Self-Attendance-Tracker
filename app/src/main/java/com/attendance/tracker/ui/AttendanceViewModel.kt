@@ -156,12 +156,6 @@ class AttendanceViewModel(application: Application) : AndroidViewModel(applicati
         }
     }
 
-    fun updateRequiredAttendance(subjectId: Long, required: Int) {
-        viewModelScope.launch {
-            repository.updateRequiredAttendance(subjectId, required)
-        }
-    }
-
     // Attendance operations
     fun markAttendance(subjectId: Long, status: AttendanceStatus, date: LocalDate = LocalDate.now()) {
         viewModelScope.launch {

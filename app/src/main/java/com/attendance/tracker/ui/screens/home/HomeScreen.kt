@@ -163,8 +163,7 @@ fun HomeScreen(
                             onClearAttendance(subject.id)
                         },
                         onEditClick = { onEditSubject(subject) },
-                        onCardClick = { onSubjectClick(subject) },
-                        allowMultipleMark = false
+                        onCardClick = { onSubjectClick(subject) }
                     )
                 }
 
