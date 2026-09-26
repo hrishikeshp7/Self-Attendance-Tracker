@@ -39,7 +39,6 @@ fun SubjectCard(
     onClearAttendance: () -> Unit,
     onEditClick: () -> Unit,
     onCardClick: () -> Unit,
-    allowMultipleMark: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     val haptic = LocalHapticFeedback.current

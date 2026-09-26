@@ -8,16 +8,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import com.attendance.tracker.data.model.Subject
 import com.attendance.tracker.notification.NotificationHelper
 import com.attendance.tracker.notification.ReminderScheduler
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
-    subjects: List<Subject>,
-    allSubjects: Map<Long, Subject>,
-    onUpdateRequiredAttendance: (Long, Int) -> Unit,
     onNavigateToAbout: () -> Unit,
     onNavigateToCustomizations: () -> Unit,
     onNavigateToBackupRestore: () -> Unit,

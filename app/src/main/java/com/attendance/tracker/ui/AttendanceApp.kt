@@ -195,9 +195,6 @@ fun AttendanceApp(
                     },
                     onDeleteSubject = { subject ->
                         viewModel.deleteSubject(subject)
-                    },
-                    onUpdateAttendanceCounts = { id, present, absent ->
-                        viewModel.updateAttendanceCounts(id, present, absent)
                     }
                 )
             }
@@ -218,11 +215,6 @@ fun AttendanceApp(
 
             composable(Screen.Settings.route) {
                 SettingsScreen(
-                    subjects = subjects,
-                    allSubjects = subjectsMap,
-                    onUpdateRequiredAttendance = { subjectId, required ->
-                        viewModel.updateRequiredAttendance(subjectId, required)
-                    },
                     onNavigateToAbout = {
                         navController.navigate(Screen.About.route)
                     },

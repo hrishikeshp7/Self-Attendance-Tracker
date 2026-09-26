@@ -156,18 +156,6 @@ class AttendanceViewModel(application: Application) : AndroidViewModel(applicati
         }
     }
 
-    fun updateRequiredAttendance(subjectId: Long, required: Int) {
-        viewModelScope.launch {
-            repository.updateRequiredAttendance(subjectId, required)
-        }
-    }
-
-    fun updateAttendanceCounts(subjectId: Long, present: Int, absent: Int) {
-        viewModelScope.launch {
-            repository.updateAttendanceCounts(subjectId, present, absent)
-        }
-    }
-
     // Attendance operations
     fun markAttendance(subjectId: Long, status: AttendanceStatus, date: LocalDate = LocalDate.now()) {
         viewModelScope.launch {
@@ -294,28 +282,31 @@ class AttendanceViewModel(application: Application) : AndroidViewModel(applicati
                 // Get current subject to calculate new counts
                 val subject = repository.getSubjectById(action.subjectId)
                 if (subject != null) {
-                    // Calculate what the counts should be after redo
-                    val presentDiff = when {
-                        action.newStatus == AttendanceStatus.PRESENT && action.oldStatus != AttendanceStatus.PRESENT -> action.newCount
-                        action.newStatus != AttendanceStatus.PRESENT && action.oldStatus == AttendanceStatus.PRESENT -> -action.oldCount
-                        else -> 0
-                    }
-                    val absentDiff = when {
-                        action.newStatus == AttendanceStatus.ABSENT && action.oldStatus != AttendanceStatus.ABSENT -> action.newCount
-                        action.newStatus != AttendanceStatus.ABSENT && action.oldStatus == AttendanceStatus.ABSENT -> -action.oldCount
-                        else -> 0
-                    }
-                    
+                    // Calculate what the counts should be after redo. Using the count
+                    // contributed by each status (rather than a same-status/different-status
+                    // branch) also correctly handles redoing a repeated same-status mark
+                    // (e.g. PRESENT count 1 -> PRESENT count 2).
+                    val presentDiff = (if (action.newStatus == AttendanceStatus.PRESENT) action.newCount else 0) -
+                        (if (action.oldStatus == AttendanceStatus.PRESENT) action.oldCount else 0)
+                    val absentDiff = (if (action.newStatus == AttendanceStatus.ABSENT) action.newCount else 0) -
+                        (if (action.oldStatus == AttendanceStatus.ABSENT) action.oldCount else 0)
+
                     // Update subject counts
                     repository.updateAttendanceCounts(
                         action.subjectId,
                         subject.presentLectures + presentDiff,
                         subject.absentLectures + absentDiff
                     )
-                    
-                    // Set the attendance record with the new status and count
-                    repository.setAttendanceStatus(action.subjectId, action.date, action.newStatus, action.newCount)
-                    
+
+                    // Set the attendance record with the new status and count, or delete it
+                    // if the action being redone was a clear (newCount == 0) — otherwise a
+                    // bogus zero-count record would be left behind.
+                    if (action.newCount > 0) {
+                        repository.setAttendanceStatus(action.subjectId, action.date, action.newStatus, action.newCount)
+                    } else {
+                        repository.deleteAttendanceRecord(action.subjectId, action.date)
+                    }
+
                     loadAttendanceForDate(action.date)
                     updateUndoRedoState()
                 }

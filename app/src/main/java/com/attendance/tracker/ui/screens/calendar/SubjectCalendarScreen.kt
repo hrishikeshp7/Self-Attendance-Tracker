@@ -139,8 +139,11 @@ fun SubjectCalendarScreen(
                         !it.date.isBefore(normalizedStart) && !it.date.isAfter(normalizedEnd)
                     }
                 }
-                val rangePresentCount = rangeRecords.count { it.status == AttendanceStatus.PRESENT }
-                val rangeAbsentCount  = rangeRecords.count { it.status == AttendanceStatus.ABSENT }
+                // Sum each day's lecture count rather than counting matching days, so a
+                // multi-lecture day (e.g. count = 2) contributes 2 — consistent with how
+                // the subject's own presentLectures/absentLectures aggregate is computed.
+                val rangePresentCount = rangeRecords.filter { it.status == AttendanceStatus.PRESENT }.sumOf { it.count }
+                val rangeAbsentCount  = rangeRecords.filter { it.status == AttendanceStatus.ABSENT }.sumOf { it.count }
                 val rangeTotal        = rangePresentCount + rangeAbsentCount
                 val rangePercentage   = if (rangeTotal > 0) rangePresentCount * 100f / rangeTotal else 0f
 

@@ -106,6 +106,38 @@ object NotificationHelper {
         NotificationManagerCompat.from(context).notify(NOTIFICATION_ID_MISSED_MARK, notification)
     }
 
+    fun showAtRiskNotification(context: Context, subjectNames: List<String>) {
+        if (subjectNames.isEmpty() || !hasNotificationPermission(context)) return
+
+        val intent = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+        }
+        val pendingIntent = PendingIntent.getActivity(
+            context, 2, intent, PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val bodyText = if (subjectNames.size == 1) {
+            "Your attendance in ${subjectNames[0]} has fallen below the required percentage."
+        } else {
+            "Your attendance in ${subjectNames.size} subjects has fallen below the required percentage."
+        }
+
+        val notification = NotificationCompat.Builder(context, CHANNEL_ID_ALERT)
+            .setSmallIcon(R.mipmap.ic_launcher)
+            .setContentTitle("Attendance At Risk")
+            .setContentText(bodyText)
+            .setStyle(
+                NotificationCompat.BigTextStyle()
+                    .bigText(bodyText + if (subjectNames.size > 1) "\n" + subjectNames.joinToString(", ") else "")
+            )
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setContentIntent(pendingIntent)
+            .setAutoCancel(true)
+            .build()
+
+        NotificationManagerCompat.from(context).notify(NOTIFICATION_ID_AT_RISK, notification)
+    }
+
     fun hasNotificationPermission(context: Context): Boolean {
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             ContextCompat.checkSelfPermission(
