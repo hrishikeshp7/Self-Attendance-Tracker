@@ -33,6 +33,13 @@ interface SubjectDao {
     @Delete
     suspend fun deleteSubject(subject: Subject)
 
+    // parentSubjectId has no foreign-key/cascade relationship, so deleting a folder
+    // without this would leave its children pointing at a nonexistent parent id —
+    // invisible both at top-level (parentSubjectId still non-null) and inside the
+    // folder (which no longer exists), permanently unreachable from the Subjects screen.
+    @Query("UPDATE subjects SET parentSubjectId = NULL WHERE parentSubjectId = :parentId")
+    suspend fun clearParentForSubjects(parentId: Long)
+
     @Query("UPDATE subjects SET presentLectures = presentLectures + 1, totalLectures = totalLectures + 1 WHERE id = :subjectId")
     suspend fun markPresent(subjectId: Long)
 

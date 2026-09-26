@@ -48,6 +48,10 @@ private class FakeSubjectDao : SubjectDao {
         subjects.remove(subject.id)
     }
 
+    override suspend fun clearParentForSubjects(parentId: Long) {
+        subjects.replaceAll { _, s -> if (s.parentSubjectId == parentId) s.copy(parentSubjectId = null) else s }
+    }
+
     override suspend fun markPresent(subjectId: Long) {
         val s = subjects[subjectId] ?: return
         subjects[subjectId] = s.copy(presentLectures = s.presentLectures + 1, totalLectures = s.totalLectures + 1)
@@ -255,5 +259,24 @@ class AttendanceRepositoryTest {
         assertEquals(2, subject.presentLectures)
         assertEquals(0, subject.absentLectures)
         assertEquals(2, repository.getAttendanceRecord(1L, date)?.count)
+    }
+
+    @Test
+    fun `deleting a folder promotes its sub-subjects to top-level instead of orphaning them`() = runBlocking {
+        val folder = Subject(id = 10L, name = "Pathology", isFolder = true)
+        subjectDao.insertSubject(folder)
+        subjectDao.insertSubject(Subject(id = 11L, name = "Lecture", parentSubjectId = 10L))
+        subjectDao.insertSubject(Subject(id = 12L, name = "Practical", parentSubjectId = 10L))
+
+        repository.deleteSubject(folder)
+
+        assertNull(repository.getSubjectById(10L))
+        val lecture = repository.getSubjectById(11L)!!
+        val practical = repository.getSubjectById(12L)!!
+        // Both children must become reachable as top-level subjects again — otherwise,
+        // with their parentSubjectId still pointing at the deleted folder, they'd be
+        // invisible both at top-level and inside the (now-nonexistent) folder.
+        assertNull(lecture.parentSubjectId)
+        assertNull(practical.parentSubjectId)
     }
 }

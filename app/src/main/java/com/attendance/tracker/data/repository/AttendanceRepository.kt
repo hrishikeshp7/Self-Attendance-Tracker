@@ -30,7 +30,15 @@ class AttendanceRepository(
 
     suspend fun updateSubject(subject: Subject) = subjectDao.updateSubject(subject)
 
-    suspend fun deleteSubject(subject: Subject) = subjectDao.deleteSubject(subject)
+    suspend fun deleteSubject(subject: Subject) {
+        if (subject.isFolder) {
+            // Promote any sub-subjects to top-level rather than orphaning them under a
+            // now-deleted folder id — preserves their attendance history and keeps them
+            // reachable from the Subjects screen instead of vanishing permanently.
+            subjectDao.clearParentForSubjects(subject.id)
+        }
+        subjectDao.deleteSubject(subject)
+    }
 
     suspend fun markPresent(subjectId: Long, date: LocalDate) {
         // Check if there's already a record for this subject on this date
