@@ -14,6 +14,7 @@ import androidx.compose.ui.unit.dp
 import com.attendance.tracker.data.model.ScheduleEntry
 import com.attendance.tracker.data.model.Subject
 import com.attendance.tracker.data.model.getDisplayName
+import kotlinx.coroutines.launch
 import java.time.DayOfWeek
 import java.time.format.TextStyle
 import java.util.Locale
@@ -28,28 +29,18 @@ fun ScheduleScreen(
     onRemoveScheduleEntry: (ScheduleEntry) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var selectedDay by remember { mutableStateOf(DayOfWeek.MONDAY) }
-    
     // Initialize pager state for days of the week
     val pagerState = rememberPagerState(
         initialPage = DayOfWeek.MONDAY.ordinal,
         pageCount = { DayOfWeek.entries.size }
     )
-    
-    // Sync selected day with pager state changes (from swipe)
-    LaunchedEffect(pagerState.currentPage) {
-        val newDay = DayOfWeek.entries[pagerState.currentPage]
-        if (selectedDay != newDay) {
-            selectedDay = newDay
-        }
-    }
-    
-    // Sync pager with selected day changes (from tab clicks)
-    LaunchedEffect(selectedDay, pagerState.isScrollInProgress) {
-        if (pagerState.currentPage != selectedDay.ordinal && !pagerState.isScrollInProgress) {
-            pagerState.animateScrollToPage(selectedDay.ordinal)
-        }
-    }
+    val coroutineScope = rememberCoroutineScope()
+
+    // The pager is the single source of truth for the selected day; deriving it
+    // (instead of mirroring it into separate state via LaunchedEffects) avoids a
+    // race where an in-flight animateScrollToPage gets overwritten by intermediate
+    // page changes and lands one day off from the tapped tab.
+    val selectedDay = DayOfWeek.entries[pagerState.currentPage]
 
     Scaffold(
         topBar = {
@@ -77,7 +68,11 @@ fun ScheduleScreen(
                 DayOfWeek.entries.forEach { day ->
                     Tab(
                         selected = selectedDay == day,
-                        onClick = { selectedDay = day },
+                        onClick = {
+                            coroutineScope.launch {
+                                pagerState.animateScrollToPage(day.ordinal)
+                            }
+                        },
                         text = {
                             Text(
                                 text = day.getDisplayName(TextStyle.SHORT, Locale.getDefault())
