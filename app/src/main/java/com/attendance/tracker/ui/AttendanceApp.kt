@@ -30,6 +30,7 @@ import com.attendance.tracker.ui.screens.backup.BackupRestoreScreen
 import com.attendance.tracker.ui.screens.calendar.SubjectCalendarScreen
 import com.attendance.tracker.ui.screens.home.HomeScreen
 import com.attendance.tracker.ui.screens.schedule.ScheduleScreen
+import com.attendance.tracker.ui.screens.schedule.WeeklyCalendarScreen
 import com.attendance.tracker.ui.screens.settings.SettingsScreen
 import com.attendance.tracker.ui.screens.subjects.SubjectsScreen
 
@@ -200,6 +201,27 @@ fun AttendanceApp(
             }
 
             composable(Screen.Schedule.route) {
+                WeeklyCalendarScreen(
+                    subjects = subjects,
+                    allSubjects = subjectsMap,
+                    scheduleEntries = scheduleEntries,
+                    onAddLecture = { subjectId, day, start, end ->
+                        viewModel.addLectureSlot(subjectId, day, start, end)
+                    },
+                    onUpdateLecture = { entry, subjectId, day, start, end ->
+                        viewModel.updateLectureSlot(entry, subjectId, day, start, end)
+                    },
+                    onDeleteLecture = { entry ->
+                        viewModel.removeScheduleEntry(entry)
+                    }
+                )
+            }
+
+            composable(
+                Screen.ClassicSchedule.route,
+                enterTransition = { slideInHorizontally(initialOffsetX = { it }, animationSpec = tween(200)) },
+                popExitTransition = { slideOutHorizontally(targetOffsetX = { it }, animationSpec = tween(200)) }
+            ) {
                 ScheduleScreen(
                     subjects = subjects,
                     allSubjects = subjectsMap,
@@ -209,6 +231,9 @@ fun AttendanceApp(
                     },
                     onRemoveScheduleEntry = { entry ->
                         viewModel.removeScheduleEntry(entry)
+                    },
+                    onNavigateBack = {
+                        navController.popBackStack()
                     }
                 )
             }
@@ -223,6 +248,9 @@ fun AttendanceApp(
                     },
                     onNavigateToBackupRestore = {
                         navController.navigate(Screen.BackupRestore.route)
+                    },
+                    onNavigateToClassicSchedule = {
+                        navController.navigate(Screen.ClassicSchedule.route)
                     }
                 )
             }

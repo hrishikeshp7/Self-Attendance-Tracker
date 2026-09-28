@@ -7,16 +7,16 @@ import java.time.DayOfWeek
 
 @Dao
 interface ScheduleDao {
-    @Query("SELECT * FROM schedule_entries ORDER BY dayOfWeek ASC")
+    @Query("SELECT * FROM schedule_entries ORDER BY dayOfWeek ASC, startTime ASC")
     fun getAllScheduleEntries(): Flow<List<ScheduleEntry>>
 
-    @Query("SELECT * FROM schedule_entries WHERE dayOfWeek = :dayOfWeek")
+    @Query("SELECT * FROM schedule_entries WHERE dayOfWeek = :dayOfWeek ORDER BY startTime ASC")
     fun getScheduleForDay(dayOfWeek: DayOfWeek): Flow<List<ScheduleEntry>>
 
-    @Query("SELECT * FROM schedule_entries WHERE dayOfWeek = :dayOfWeek")
+    @Query("SELECT * FROM schedule_entries WHERE dayOfWeek = :dayOfWeek ORDER BY startTime ASC")
     suspend fun getScheduleForDayOnce(dayOfWeek: DayOfWeek): List<ScheduleEntry>
 
-    @Query("SELECT * FROM schedule_entries WHERE subjectId = :subjectId")
+    @Query("SELECT * FROM schedule_entries WHERE subjectId = :subjectId ORDER BY dayOfWeek ASC, startTime ASC")
     fun getScheduleForSubject(subjectId: Long): Flow<List<ScheduleEntry>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)

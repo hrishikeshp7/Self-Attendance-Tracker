@@ -13,7 +13,7 @@ import com.attendance.tracker.data.model.Subject
 
 @Database(
     entities = [Subject::class, AttendanceRecord::class, ScheduleEntry::class, com.attendance.tracker.data.model.ThemePreference::class],
-    version = 4,
+    version = 5,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -58,6 +58,26 @@ abstract class AttendanceDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // Add start/end time to schedule_entries (stored as minutes since midnight,
+                // matching Converters.fromLocalTime). Existing rows default to 9–10 AM —
+                // the new weekly calendar view is where a user re-sets the real time.
+                db.execSQL("ALTER TABLE schedule_entries ADD COLUMN startTime INTEGER NOT NULL DEFAULT 540")
+                db.execSQL("ALTER TABLE schedule_entries ADD COLUMN endTime INTEGER NOT NULL DEFAULT 600")
+
+                // The (subjectId, dayOfWeek) index used to be UNIQUE, limiting a subject to one
+                // slot per day. Multiple slots per day are now allowed (e.g. lecture + lab), so
+                // the index is recreated without the uniqueness constraint, keeping the same
+                // auto-generated name Room expects for this column list.
+                db.execSQL("DROP INDEX IF EXISTS index_schedule_entries_subjectId_dayOfWeek")
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_schedule_entries_subjectId_dayOfWeek " +
+                        "ON schedule_entries (subjectId, dayOfWeek)"
+                )
+            }
+        }
+
         fun getDatabase(context: Context): AttendanceDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -65,7 +85,7 @@ abstract class AttendanceDatabase : RoomDatabase() {
                     AttendanceDatabase::class.java,
                     "attendance_database"
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                     .build()
                 INSTANCE = instance
                 instance

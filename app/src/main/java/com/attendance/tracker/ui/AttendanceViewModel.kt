@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import java.time.DayOfWeek
 import java.time.LocalDate
+import java.time.LocalTime
 import java.time.YearMonth
 
 class AttendanceViewModel(application: Application) : AndroidViewModel(application) {
@@ -353,6 +354,40 @@ class AttendanceViewModel(application: Application) : AndroidViewModel(applicati
     fun removeScheduleEntry(entry: ScheduleEntry) {
         viewModelScope.launch {
             repository.deleteScheduleEntry(entry)
+        }
+    }
+
+    /** Creates a new timed lecture slot (used by the weekly calendar view). */
+    fun addLectureSlot(subjectId: Long, dayOfWeek: DayOfWeek, startTime: LocalTime, endTime: LocalTime) {
+        viewModelScope.launch {
+            repository.insertScheduleEntry(
+                ScheduleEntry(
+                    subjectId = subjectId,
+                    dayOfWeek = dayOfWeek,
+                    startTime = startTime,
+                    endTime = endTime
+                )
+            )
+        }
+    }
+
+    /** Updates an existing lecture slot's subject/day/time (used by the weekly calendar view). */
+    fun updateLectureSlot(
+        entry: ScheduleEntry,
+        subjectId: Long,
+        dayOfWeek: DayOfWeek,
+        startTime: LocalTime,
+        endTime: LocalTime
+    ) {
+        viewModelScope.launch {
+            repository.updateScheduleEntry(
+                entry.copy(
+                    subjectId = subjectId,
+                    dayOfWeek = dayOfWeek,
+                    startTime = startTime,
+                    endTime = endTime
+                )
+            )
         }
     }
 
