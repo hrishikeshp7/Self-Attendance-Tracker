@@ -163,12 +163,18 @@ fun ScheduleScreen(
 
                 DayScheduleContent(
                     day = day,
+                    isToday = day == today,
                     subjects = subjects,
                     allSubjects = allSubjects,
                     entryMap = entryMap,
                     weeklyCountBySubject = weeklyCountBySubject,
                     onAddScheduleEntry = onAddScheduleEntry,
-                    onRemoveScheduleEntry = onRemoveScheduleEntry
+                    onRemoveScheduleEntry = onRemoveScheduleEntry,
+                    onJumpToToday = {
+                        coroutineScope.launch {
+                            pagerState.animateScrollToPage(today.ordinal)
+                        }
+                    }
                 )
             }
         }
@@ -178,12 +184,14 @@ fun ScheduleScreen(
 @Composable
 private fun DayScheduleContent(
     day: DayOfWeek,
+    isToday: Boolean,
     subjects: List<Subject>,
     allSubjects: Map<Long, Subject>,
     entryMap: Map<Pair<Long, DayOfWeek>, ScheduleEntry>,
     weeklyCountBySubject: Map<Long, Int>,
     onAddScheduleEntry: (Long, DayOfWeek) -> Unit,
-    onRemoveScheduleEntry: (ScheduleEntry) -> Unit
+    onRemoveScheduleEntry: (ScheduleEntry) -> Unit,
+    onJumpToToday: () -> Unit
 ) {
     val scheduledCount = subjects.count { entryMap.containsKey(it.id to day) }
 
@@ -215,11 +223,18 @@ private fun DayScheduleContent(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            Icon(
-                imageVector = Icons.Filled.CalendarMonth,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
-            )
+            // Jumps the pager back to today's schedule. Previously this was a bare
+            // Icon with no click handling at all, so tapping it did nothing.
+            IconButton(
+                onClick = onJumpToToday,
+                enabled = !isToday
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.CalendarMonth,
+                    contentDescription = "Jump to today",
+                    tint = MaterialTheme.colorScheme.primary.copy(alpha = if (isToday) 0.3f else 0.8f)
+                )
+            }
         }
 
         Spacer(modifier = Modifier.height(12.dp))

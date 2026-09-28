@@ -3,6 +3,8 @@ package com.attendance.tracker.ui.screens.calendar
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.*
@@ -10,6 +12,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.attendance.tracker.data.model.AttendanceRecord
 import com.attendance.tracker.data.model.AttendanceStatus
@@ -50,26 +53,33 @@ fun SubjectCalendarScreen(
     // Range selection state (null = user hasn't explicitly selected yet)
     var rangeStart by remember { mutableStateOf<LocalDate?>(null) }
     var rangeEnd   by remember { mutableStateOf<LocalDate?>(null) }
+    // Range selection must be explicitly opted into — otherwise a plain tap on a
+    // second date always just moves the single-date selection there. Without this,
+    // there was no way to pick a different date without accidentally spanning a
+    // range from whatever was previously selected.
+    var isRangeMode by remember { mutableStateOf(false) }
 
     val handleDateClick: (LocalDate) -> Unit = { date ->
-        when {
-            rangeEnd != null -> {
-                // Reset: start fresh with a new single-date selection
-                rangeEnd = null
-                rangeStart = date
-                onDateSelected(date)
-            }
-            rangeStart == date -> {
-                // Tapped the same date again: stay in single-date mode
-            }
-            rangeStart == null -> {
-                // First explicit tap: select a single date
-                rangeStart = date
-                onDateSelected(date)
-            }
-            else -> {
-                // Second tap on a different date: form a range
-                rangeEnd = date
+        if (!isRangeMode) {
+            // Single-date mode: every tap simply moves the selection to that date.
+            rangeStart = date
+            rangeEnd = null
+            onDateSelected(date)
+        } else {
+            when {
+                rangeStart == null || rangeEnd != null -> {
+                    // Start a fresh range anchor
+                    rangeStart = date
+                    rangeEnd = null
+                    onDateSelected(date)
+                }
+                rangeStart == date -> {
+                    // Tapped the anchor again: keep waiting for the second date
+                }
+                else -> {
+                    // Second tap on a different date: complete the range
+                    rangeEnd = date
+                }
             }
         }
     }
@@ -115,6 +125,11 @@ fun SubjectCalendarScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
+                // On months that need 6 calendar rows, the calendar card alone can take up
+                // most of the screen height; without scrolling, the panel below it (mark
+                // attendance / range stats) had nowhere to go and rendered squeezed into a
+                // sliver. Scrolling lets it lay out at full size and simply extend below the fold.
+                .verticalScroll(rememberScrollState())
         ) {
             // Calendar View
             CalendarView(
@@ -156,6 +171,7 @@ fun SubjectCalendarScreen(
                     percentage     = rangePercentage,
                     onClearRange   = {
                         rangeEnd = null
+                        isRangeMode = false
                         // Keep rangeStart as the still-selected single date
                     }
                 )
@@ -165,15 +181,33 @@ fun SubjectCalendarScreen(
 
                 Divider(modifier = Modifier.padding(vertical = 4.dp))
 
-                Text(
-                    text = effectiveSingleDate.format(dateFormatter),
-                    style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
-                )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = effectiveSingleDate.format(dateFormatter),
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                    TextButton(onClick = {
+                        isRangeMode = !isRangeMode
+                        rangeEnd = null
+                    }) {
+                        Text(if (isRangeMode) "Cancel Range" else "Select Range")
+                    }
+                }
 
-                // Hint about range selection
+                // Hint about range selection — only shown once the user has explicitly
+                // opted into range mode, so a normal tap never surprises them with a range.
                 Text(
-                    text = "Tap another date to view range statistics",
+                    text = if (isRangeMode) {
+                        "Tap another date to complete the range"
+                    } else {
+                        "Use \"Select Range\" to compare attendance across multiple dates"
+                    },
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 4.dp)
@@ -212,10 +246,15 @@ fun SubjectCalendarScreen(
                                 modifier = Modifier.padding(bottom = 12.dp)
                             )
 
-                            // Attendance Action Buttons
+                            // Attendance Action Buttons.
+                            // Each button gets an equal share of the width via `weight(1f)`
+                            // with a fixed gap between them, instead of a fixed 100.dp width
+                            // under `SpaceEvenly` — on narrower screens that left almost no
+                            // gap, so the three pill-shaped buttons visually merged into one
+                            // flattened bar.
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceEvenly
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
                             ) {
                                 SubjectCalendarAttendanceButton(
                                     text = "Present",
@@ -224,7 +263,8 @@ fun SubjectCalendarScreen(
                                     onClick = {
                                         onMarkAttendance(AttendanceStatus.PRESENT, effectiveSingleDate)
                                         showAttendanceSnackbar(AttendanceStatus.PRESENT)
-                                    }
+                                    },
+                                    modifier = Modifier.weight(1f)
                                 )
                                 SubjectCalendarAttendanceButton(
                                     text = "Absent",
@@ -233,7 +273,8 @@ fun SubjectCalendarScreen(
                                     onClick = {
                                         onMarkAttendance(AttendanceStatus.ABSENT, effectiveSingleDate)
                                         showAttendanceSnackbar(AttendanceStatus.ABSENT)
-                                    }
+                                    },
+                                    modifier = Modifier.weight(1f)
                                 )
                                 SubjectCalendarAttendanceButton(
                                     text = "No Class",
@@ -242,7 +283,8 @@ fun SubjectCalendarScreen(
                                     onClick = {
                                         onMarkAttendance(AttendanceStatus.NO_CLASS, effectiveSingleDate)
                                         showAttendanceSnackbar(AttendanceStatus.NO_CLASS)
-                                    }
+                                    },
+                                    modifier = Modifier.weight(1f)
                                 )
                             }
                         }
@@ -334,7 +376,8 @@ private fun SubjectCalendarAttendanceButton(
     text: String,
     isSelected: Boolean,
     color: Color,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     Button(
         onClick = onClick,
@@ -342,11 +385,14 @@ private fun SubjectCalendarAttendanceButton(
             containerColor = if (isSelected) color else color.copy(alpha = 0.3f),
             contentColor = if (isSelected) MaterialTheme.colorScheme.onPrimary else color
         ),
-        modifier = Modifier.width(100.dp)
+        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp),
+        modifier = modifier
     ) {
         Text(
             text = text,
-            style = MaterialTheme.typography.labelMedium
+            style = MaterialTheme.typography.labelMedium,
+            maxLines = 1,
+            textAlign = TextAlign.Center
         )
     }
 }

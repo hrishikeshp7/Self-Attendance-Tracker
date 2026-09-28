@@ -67,6 +67,14 @@ class AttendanceViewModel(application: Application) : AndroidViewModel(applicati
     private var todayAttendanceJob: Job? = null
     private var monthAttendanceJob: Job? = null
 
+    // Guards markAttendance/clearAttendance against being re-entered for the same
+    // subject+date before the previous call's read-modify-write on the attendance
+    // record has finished. Without this, two rapid clicks (e.g. a double tap that
+    // slips through before the UI state reflects the first mark) could both read the
+    // record as "not yet present" and each insert/increment it, leaving a bogus
+    // count of 2 after a single intended tap.
+    private val pendingAttendanceOps = mutableSetOf<String>()
+
     // Theme preferences
     val themePreference = themeRepository.themePreference
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
@@ -158,89 +166,103 @@ class AttendanceViewModel(application: Application) : AndroidViewModel(applicati
 
     // Attendance operations
     fun markAttendance(subjectId: Long, status: AttendanceStatus, date: LocalDate = LocalDate.now()) {
+        val opKey = "$subjectId|$date"
+        // Ignore this call if a mark/clear for the same subject+date is still in flight.
+        if (!pendingAttendanceOps.add(opKey)) return
         viewModelScope.launch {
-            // Get current state before marking
-            val subject = repository.getSubjectById(subjectId)
-            val oldRecord = repository.getAttendanceRecord(subjectId, date)
-            
-            if (subject != null) {
-                // Mark the new status first to get the new count
-                when (status) {
-                    AttendanceStatus.PRESENT -> repository.markPresent(subjectId, date)
-                    AttendanceStatus.ABSENT -> repository.markAbsent(subjectId, date)
-                    AttendanceStatus.NO_CLASS -> repository.markNoClass(subjectId, date)
+            try {
+                // Get current state before marking
+                val subject = repository.getSubjectById(subjectId)
+                val oldRecord = repository.getAttendanceRecord(subjectId, date)
+
+                if (subject != null) {
+                    // Mark the new status first to get the new count
+                    when (status) {
+                        AttendanceStatus.PRESENT -> repository.markPresent(subjectId, date)
+                        AttendanceStatus.ABSENT -> repository.markAbsent(subjectId, date)
+                        AttendanceStatus.NO_CLASS -> repository.markNoClass(subjectId, date)
+                    }
+
+                    // Get the updated record to capture the new count
+                    val newRecord = repository.getAttendanceRecord(subjectId, date)
+                    val updatedSubject = repository.getSubjectById(subjectId)
+
+                    if (newRecord != null && updatedSubject != null) {
+                        // Record action for undo/redo
+                        val action = AttendanceAction(
+                            subjectId = subjectId,
+                            date = date,
+                            oldStatus = oldRecord?.status,
+                            oldCount = oldRecord?.count ?: 0,
+                            newStatus = newRecord.status,
+                            newCount = newRecord.count,
+                            oldPresentCount = subject.presentLectures,
+                            oldAbsentCount = subject.absentLectures
+                        )
+                        undoRedoManager.recordAction(action)
+                        updateUndoRedoState()
+                    }
+
+                    loadAttendanceForDate(date)
                 }
-                
-                // Get the updated record to capture the new count
-                val newRecord = repository.getAttendanceRecord(subjectId, date)
-                val updatedSubject = repository.getSubjectById(subjectId)
-                
-                if (newRecord != null && updatedSubject != null) {
-                    // Record action for undo/redo
-                    val action = AttendanceAction(
-                        subjectId = subjectId,
-                        date = date,
-                        oldStatus = oldRecord?.status,
-                        oldCount = oldRecord?.count ?: 0,
-                        newStatus = newRecord.status,
-                        newCount = newRecord.count,
-                        oldPresentCount = subject.presentLectures,
-                        oldAbsentCount = subject.absentLectures
-                    )
-                    undoRedoManager.recordAction(action)
-                    updateUndoRedoState()
-                }
-                
-                loadAttendanceForDate(date)
+            } finally {
+                pendingAttendanceOps.remove(opKey)
             }
         }
     }
 
     fun clearAttendance(subjectId: Long, date: LocalDate = LocalDate.now()) {
+        val opKey = "$subjectId|$date"
+        // Ignore this call if a mark/clear for the same subject+date is still in flight.
+        if (!pendingAttendanceOps.add(opKey)) return
         viewModelScope.launch {
-            val record = repository.getAttendanceRecord(subjectId, date)
-            val subject = repository.getSubjectById(subjectId)
+            try {
+                val record = repository.getAttendanceRecord(subjectId, date)
+                val subject = repository.getSubjectById(subjectId)
 
-            if (record != null && subject != null) {
-                // Adjust counts based on the status we're removing
-                when (record.status) {
-                    AttendanceStatus.PRESENT -> {
-                        repository.updateAttendanceCounts(
-                            subjectId,
-                            subject.presentLectures - record.count,
-                            subject.absentLectures
-                        )
+                if (record != null && subject != null) {
+                    // Adjust counts based on the status we're removing
+                    when (record.status) {
+                        AttendanceStatus.PRESENT -> {
+                            repository.updateAttendanceCounts(
+                                subjectId,
+                                subject.presentLectures - record.count,
+                                subject.absentLectures
+                            )
+                        }
+                        AttendanceStatus.ABSENT -> {
+                            repository.updateAttendanceCounts(
+                                subjectId,
+                                subject.presentLectures,
+                                subject.absentLectures - record.count
+                            )
+                        }
+                        AttendanceStatus.NO_CLASS -> {
+                            // NO_CLASS does not affect present/absent counts
+                        }
                     }
-                    AttendanceStatus.ABSENT -> {
-                        repository.updateAttendanceCounts(
-                            subjectId,
-                            subject.presentLectures,
-                            subject.absentLectures - record.count
-                        )
-                    }
-                    AttendanceStatus.NO_CLASS -> {
-                        // NO_CLASS does not affect present/absent counts
-                    }
+
+                    // Record the clear action for undo
+                    val action = AttendanceAction(
+                        subjectId = subjectId,
+                        date = date,
+                        oldStatus = record.status,
+                        oldCount = record.count,
+                        newStatus = AttendanceStatus.PRESENT, // arbitrary, won't be used since newCount is 0 conceptually
+                        newCount = 0,
+                        oldPresentCount = subject.presentLectures,
+                        oldAbsentCount = subject.absentLectures
+                    )
+                    undoRedoManager.recordAction(action)
+                    updateUndoRedoState()
+
+                    // Delete the record
+                    repository.deleteAttendanceRecord(subjectId, date)
+
+                    loadAttendanceForDate(date)
                 }
-
-                // Record the clear action for undo
-                val action = AttendanceAction(
-                    subjectId = subjectId,
-                    date = date,
-                    oldStatus = record.status,
-                    oldCount = record.count,
-                    newStatus = AttendanceStatus.PRESENT, // arbitrary, won't be used since newCount is 0 conceptually
-                    newCount = 0,
-                    oldPresentCount = subject.presentLectures,
-                    oldAbsentCount = subject.absentLectures
-                )
-                undoRedoManager.recordAction(action)
-                updateUndoRedoState()
-
-                // Delete the record
-                repository.deleteAttendanceRecord(subjectId, date)
-
-                loadAttendanceForDate(date)
+            } finally {
+                pendingAttendanceOps.remove(opKey)
             }
         }
     }
