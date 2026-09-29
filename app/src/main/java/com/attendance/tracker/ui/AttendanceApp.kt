@@ -31,6 +31,7 @@ import com.attendance.tracker.ui.screens.calendar.SubjectCalendarScreen
 import com.attendance.tracker.ui.screens.home.HomeScreen
 import com.attendance.tracker.ui.screens.schedule.ScheduleScreen
 import com.attendance.tracker.ui.screens.schedule.WeeklyCalendarScreen
+import com.attendance.tracker.ui.screens.settings.CalendarSyncScreen
 import com.attendance.tracker.ui.screens.settings.SettingsScreen
 import com.attendance.tracker.ui.screens.subjects.SubjectsScreen
 
@@ -251,6 +252,23 @@ fun AttendanceApp(
                     },
                     onNavigateToClassicSchedule = {
                         navController.navigate(Screen.ClassicSchedule.route)
+                    },
+                    onNavigateToCalendarSync = {
+                        navController.navigate(Screen.CalendarSync.route)
+                    }
+                )
+            }
+
+            composable(
+                Screen.CalendarSync.route,
+                enterTransition = { slideInHorizontally(initialOffsetX = { it }, animationSpec = tween(200)) },
+                popExitTransition = { slideOutHorizontally(targetOffsetX = { it }, animationSpec = tween(200)) }
+            ) {
+                CalendarSyncScreen(
+                    scheduleEntries = scheduleEntries,
+                    allSubjects = subjectsMap,
+                    onNavigateBack = {
+                        navController.popBackStack()
                     }
                 )
             }

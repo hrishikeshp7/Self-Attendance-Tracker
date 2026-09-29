@@ -18,6 +18,7 @@ fun SettingsScreen(
     onNavigateToCustomizations: () -> Unit,
     onNavigateToBackupRestore: () -> Unit,
     onNavigateToClassicSchedule: () -> Unit,
+    onNavigateToCalendarSync: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -117,6 +118,37 @@ fun SettingsScreen(
                         )
                         Text(
                             text = "Export / import data, Google Drive backup",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Text(
+                        text = "→",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+
+            // Calendar Sync Option
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                onClick = onNavigateToCalendarSync
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text(
+                            text = "Calendar Sync",
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                        Text(
+                            text = "Get your timetable into Google Calendar, Notion Calendar, or export as .ics",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
