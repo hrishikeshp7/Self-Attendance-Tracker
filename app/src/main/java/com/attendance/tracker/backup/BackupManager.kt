@@ -8,6 +8,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.time.DayOfWeek
 import java.time.LocalDate
+import java.time.LocalTime
 
 /**
  * Handles serialisation and deserialisation of attendance data for backup / restore.
@@ -73,6 +74,8 @@ object BackupManager {
             val obj = JSONObject()
             obj.put("subjectId", e.subjectId)
             obj.put("dayOfWeek", e.dayOfWeek.name)
+            obj.put("startTime", e.startTime.toString())
+            obj.put("endTime", e.endTime.toString())
             obj.put("isScheduled", e.isScheduled)
             scheduleArray.put(obj)
         }
@@ -134,6 +137,10 @@ object BackupManager {
                 ScheduleEntry(
                     subjectId = obj.getLong("subjectId"),
                     dayOfWeek = DayOfWeek.valueOf(obj.getString("dayOfWeek")),
+                    // Older backups predate per-slot times — default to 9–10 AM, same as a
+                    // fresh migration, rather than failing to restore the whole backup.
+                    startTime = obj.optString("startTime", "09:00").let { LocalTime.parse(it) },
+                    endTime = obj.optString("endTime", "10:00").let { LocalTime.parse(it) },
                     isScheduled = obj.optBoolean("isScheduled", true)
                 )
             }

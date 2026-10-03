@@ -2,6 +2,8 @@ package com.attendance.tracker.ui.components
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.togetherWith
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
@@ -132,10 +134,16 @@ fun CalendarView(
                     AnimatedContent(
                         targetState = selectedMonth,
                         transitionSpec = {
+                            // Slide by the full height (not half) and fade the outgoing/incoming
+                            // labels so they never sit fully opaque on top of each other mid-transition
+                            // — a half-height slide with no fade left both month names visibly
+                            // overlapping for the whole animation.
                             if (targetState > initialState) {
-                                (slideInVertically { h -> h / 2 }) togetherWith (slideOutVertically { h -> -h / 2 })
+                                (slideInVertically { h -> h } + fadeIn()) togetherWith
+                                    (slideOutVertically { h -> -h } + fadeOut())
                             } else {
-                                (slideInVertically { h -> -h / 2 }) togetherWith (slideOutVertically { h -> h / 2 })
+                                (slideInVertically { h -> -h } + fadeIn()) togetherWith
+                                    (slideOutVertically { h -> h } + fadeOut())
                             }
                         },
                         label = "month-label"

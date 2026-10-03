@@ -10,6 +10,7 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.EventBusy
 import androidx.compose.material3.*
@@ -25,23 +26,12 @@ import androidx.compose.ui.unit.dp
 import com.attendance.tracker.data.model.ScheduleEntry
 import com.attendance.tracker.data.model.Subject
 import com.attendance.tracker.data.model.getDisplayName
+import com.attendance.tracker.ui.theme.subjectAvatarColor
 import kotlinx.coroutines.launch
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.format.TextStyle
 import java.util.Locale
-
-// A small, pleasant rotation of tints used to give each subject a distinct,
-// stable avatar color (derived from its id) without needing a color field
-// on the Subject model itself.
-private val SubjectAvatarPalette = listOf(
-    Color(0xFF4361EE), Color(0xFF4CC9F0), Color(0xFFF72585),
-    Color(0xFFF9A826), Color(0xFF06D6A0), Color(0xFF7209B7),
-    Color(0xFFE63946), Color(0xFF3A86FF)
-)
-
-private fun subjectAvatarColor(subjectId: Long): Color =
-    SubjectAvatarPalette[(subjectId.mod(SubjectAvatarPalette.size.toLong())).toInt()]
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
@@ -51,6 +41,7 @@ fun ScheduleScreen(
     scheduleEntries: List<ScheduleEntry>,
     onAddScheduleEntry: (Long, DayOfWeek) -> Unit,
     onRemoveScheduleEntry: (ScheduleEntry) -> Unit,
+    onNavigateBack: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     // Initialize pager state for days of the week
@@ -72,11 +63,16 @@ fun ScheduleScreen(
     val countsByDay: Map<DayOfWeek, Int> = remember(scheduleEntries) {
         scheduleEntries.groupBy { it.dayOfWeek }.mapValues { it.value.size }
     }
+    // Counts distinct days rather than total slots, since a subject can now have more
+    // than one lecture slot on the same day (e.g. lecture + lab).
     val weeklyCountBySubject: Map<Long, Int> = remember(scheduleEntries) {
-        scheduleEntries.groupBy { it.subjectId }.mapValues { it.value.size }
+        scheduleEntries.groupBy { it.subjectId }
+            .mapValues { (_, entries) -> entries.map { it.dayOfWeek }.distinct().size }
     }
-    val entryMap = remember(scheduleEntries) {
-        scheduleEntries.associateBy { it.subjectId to it.dayOfWeek }
+    // A subject can have multiple entries on the same day, so this must keep all of
+    // them (associateBy would silently keep only the last one per key).
+    val entryMap: Map<Pair<Long, DayOfWeek>, List<ScheduleEntry>> = remember(scheduleEntries) {
+        scheduleEntries.groupBy { it.subjectId to it.dayOfWeek }
     }
 
     Scaffold(
@@ -90,6 +86,13 @@ fun ScheduleScreen(
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
+                    }
+                },
+                navigationIcon = {
+                    onNavigateBack?.let { navigateBack ->
+                        IconButton(onClick = navigateBack) {
+                            Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -163,12 +166,18 @@ fun ScheduleScreen(
 
                 DayScheduleContent(
                     day = day,
+                    isToday = day == today,
                     subjects = subjects,
                     allSubjects = allSubjects,
                     entryMap = entryMap,
                     weeklyCountBySubject = weeklyCountBySubject,
                     onAddScheduleEntry = onAddScheduleEntry,
-                    onRemoveScheduleEntry = onRemoveScheduleEntry
+                    onRemoveScheduleEntry = onRemoveScheduleEntry,
+                    onJumpToToday = {
+                        coroutineScope.launch {
+                            pagerState.animateScrollToPage(today.ordinal)
+                        }
+                    }
                 )
             }
         }
@@ -178,12 +187,14 @@ fun ScheduleScreen(
 @Composable
 private fun DayScheduleContent(
     day: DayOfWeek,
+    isToday: Boolean,
     subjects: List<Subject>,
     allSubjects: Map<Long, Subject>,
-    entryMap: Map<Pair<Long, DayOfWeek>, ScheduleEntry>,
+    entryMap: Map<Pair<Long, DayOfWeek>, List<ScheduleEntry>>,
     weeklyCountBySubject: Map<Long, Int>,
     onAddScheduleEntry: (Long, DayOfWeek) -> Unit,
-    onRemoveScheduleEntry: (ScheduleEntry) -> Unit
+    onRemoveScheduleEntry: (ScheduleEntry) -> Unit,
+    onJumpToToday: () -> Unit
 ) {
     val scheduledCount = subjects.count { entryMap.containsKey(it.id to day) }
 
@@ -215,11 +226,18 @@ private fun DayScheduleContent(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            Icon(
-                imageVector = Icons.Filled.CalendarMonth,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
-            )
+            // Jumps the pager back to today's schedule. Previously this was a bare
+            // Icon with no click handling at all, so tapping it did nothing.
+            IconButton(
+                onClick = onJumpToToday,
+                enabled = !isToday
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.CalendarMonth,
+                    contentDescription = "Jump to today",
+                    tint = MaterialTheme.colorScheme.primary.copy(alpha = if (isToday) 0.3f else 0.8f)
+                )
+            }
         }
 
         Spacer(modifier = Modifier.height(12.dp))
@@ -237,8 +255,8 @@ private fun DayScheduleContent(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 items(subjects, key = { it.id }) { subject ->
-                    val entry = entryMap[subject.id to day]
-                    val isScheduled = entry != null
+                    val entriesForDay = entryMap[subject.id to day].orEmpty()
+                    val isScheduled = entriesForDay.isNotEmpty()
 
                     ScheduleSubjectItem(
                         subject = subject,
@@ -249,7 +267,9 @@ private fun DayScheduleContent(
                             if (checked) {
                                 onAddScheduleEntry(subject.id, day)
                             } else {
-                                entry?.let { onRemoveScheduleEntry(it) }
+                                // Clear every slot this subject has on this day — it may have
+                                // more than one (e.g. set up via the timetable grid).
+                                entriesForDay.forEach { onRemoveScheduleEntry(it) }
                             }
                         }
                     )
