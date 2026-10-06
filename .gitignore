@@ -36,3 +36,6 @@ Thumbs.db
 
 # Log files
 *.log
+
+# CodeGraph index
+.codegraph/
