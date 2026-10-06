@@ -52,6 +52,11 @@ graph TD
 | 📚 **Subject Management** | Add custom subjects, edit lecture counts, and set individual required attendance percentages. |
 | 📆 **Smart Scheduling** | Toggle which subjects occur on specific days of the week to streamline your daily tracking. |
 | 🎨 **Material 3 & Dark Mode** | Gorgeous dynamic colors (Android 12+) with seamless dark mode support based on system settings. |
+| 🗂 **Folders** | Group subjects into folders (file-explorer style). Subjects inside folders still appear on Home for marking. |
+| 🧩 **Widgets** | Compact 2x2 (read-only), Original 3x2 (read-only) and Large 5x2 (mark P / A / NC from the home screen). |
+| 🎛 **Customizations** | Settings → Customizations: System / Light / Dark / AMOLED themes and custom primary & secondary colors. |
+| 👆 **Swipe Navigation** | Swipe left/right to change months in the calendar and days in the schedule. |
+| 💾 **Backup & Import** | JSON backup/restore (local or Google Drive), CSV export, and bulk CSV import of subjects and timetable. |
 
 ---
 
@@ -115,6 +120,16 @@ export KEY_PASSWORD=your_key_password
 ./gradlew assembleRelease
 ```
 </details>
+
+---
+
+## 📌 Quick Notes
+
+- **Folders**: Subjects tab → **+** → toggle "Create as folder". Tap a folder to open it; the toolbar back button returns to the main list.
+- **Extra class**: on Home use "Add Extra Class"; in a subject's calendar use "+ Add extra class" on a date already marked Present/Absent. Re-tapping a status does not double-count.
+- **CSV import**: Backup & Restore → Import from CSV. Columns: `subject, target_percentage, attended, total, day, start, end`. The file is previewed first and existing subjects are never overwritten.
+- **Release signing**: every release must use the same keystore (see above), otherwise Android reports "App not installed as it conflicts with other package" on upgrade.
+- **CI versioning**: the release workflow reads version info via the `printVersionInfo` Gradle task (`./gradlew -q printVersionInfo`) because `versionName`/`versionCode` are computed in `build.gradle.kts`.
 
 ---
 
