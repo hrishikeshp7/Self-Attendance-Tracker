@@ -465,6 +465,28 @@ class AttendanceViewModel(application: Application) : AndroidViewModel(applicati
         }
     }
 
+    /** Parses a CSV for the import preview; writes nothing. */
+    fun previewCsvImport(text: String): com.attendance.tracker.backup.CsvImporter.Result =
+        com.attendance.tracker.backup.CsvImporter.parse(text)
+
+    /** Writes a previously previewed (error-free) CSV import. */
+    fun importCsv(data: com.attendance.tracker.backup.CsvImporter.Result) {
+        viewModelScope.launch {
+            _backupRestoreStatus.value = BackupRestoreStatus.IN_PROGRESS
+            try {
+                val r = repository.importCsv(data)
+                _backupRestoreStatus.value = BackupRestoreStatus.SUCCESS
+                _backupRestoreMessage.value =
+                    "Import complete: ${r.subjectsAdded} subjects added" +
+                    (if (r.subjectsExisting > 0) " (${r.subjectsExisting} already existed, left unchanged)" else "") +
+                    ", ${r.slotsAdded} timetable slots added."
+            } catch (e: Exception) {
+                _backupRestoreStatus.value = BackupRestoreStatus.ERROR
+                _backupRestoreMessage.value = "Import failed: ${e.message}"
+            }
+        }
+    }
+
     fun resetBackupRestoreStatus() {
         _backupRestoreStatus.value = BackupRestoreStatus.IDLE
         _backupRestoreMessage.value = ""
