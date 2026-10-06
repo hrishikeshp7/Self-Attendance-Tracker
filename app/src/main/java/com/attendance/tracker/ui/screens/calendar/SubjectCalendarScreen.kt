@@ -38,6 +38,7 @@ fun SubjectCalendarScreen(
     onDateSelected: (LocalDate) -> Unit,
     onMonthChanged: (YearMonth) -> Unit,
     onMarkAttendance: (AttendanceStatus, LocalDate) -> Unit,
+    onAddExtraClass: (AttendanceStatus, LocalDate) -> Unit,
     onNavigateBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -286,6 +287,34 @@ fun SubjectCalendarScreen(
                                     },
                                     modifier = Modifier.weight(1f)
                                 )
+                            }
+
+                            // Extra lecture on a day that already has Present/Absent marked.
+                            // Re-tapping the status button is intentionally a no-op, so this
+                            // is the explicit way to count another lecture on the same date.
+                            val recorded = selectedDateRecord
+                            if (recorded != null && recorded.status != AttendanceStatus.NO_CLASS) {
+                                val label = if (recorded.status == AttendanceStatus.PRESENT) "present" else "absent"
+                                Text(
+                                    text = "${recorded.count} lecture${if (recorded.count != 1) "s" else ""} marked $label on this date",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(top = 12.dp)
+                                )
+                                OutlinedButton(
+                                    onClick = {
+                                        onAddExtraClass(recorded.status, effectiveSingleDate)
+                                        scope.launch {
+                                            snackbarHostState.showSnackbar(
+                                                message = "Extra class added ($label)",
+                                                duration = SnackbarDuration.Short
+                                            )
+                                        }
+                                    },
+                                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp)
+                                ) {
+                                    Text("+ Add extra class ($label)")
+                                }
                             }
                         }
                     }

@@ -99,6 +99,17 @@ class AttendanceRepository(
         }
     }
 
+    /** Adds one more lecture on [date] with the same status (PRESENT/ABSENT) already recorded. */
+    suspend fun addExtraLecture(subjectId: Long, date: LocalDate) {
+        val record = attendanceDao.getAttendanceRecord(subjectId, date) ?: return
+        when (record.status) {
+            AttendanceStatus.PRESENT -> subjectDao.markPresent(subjectId)
+            AttendanceStatus.ABSENT -> subjectDao.markAbsent(subjectId)
+            AttendanceStatus.NO_CLASS -> return
+        }
+        attendanceDao.insertAttendance(record.copy(count = record.count + 1))
+    }
+
     suspend fun markAbsent(subjectId: Long, date: LocalDate) {
         // Check if there's already a record for this subject on this date
         val existingRecord = attendanceDao.getAttendanceRecord(subjectId, date)

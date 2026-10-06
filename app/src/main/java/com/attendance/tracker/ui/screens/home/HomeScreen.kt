@@ -38,6 +38,7 @@ fun HomeScreen(
     todayAttendance: Map<Long, AttendanceRecord>,
     scheduleEntries: List<ScheduleEntry>,
     onMarkAttendance: (Long, AttendanceStatus) -> Unit,
+    onAddExtraClass: (Long, AttendanceStatus) -> Unit,
     onClearAttendance: (Long) -> Unit,
     onAddSubject: () -> Unit,
     onEditSubject: (Subject) -> Unit,
@@ -196,7 +197,7 @@ fun HomeScreen(
             allSubjects = allSubjects,
             onDismiss = { showExtraClassDialog = false },
             onMarkAttendance = { subjectId, status ->
-                onMarkAttendance(subjectId, status)
+                onAddExtraClass(subjectId, status)
                 showExtraClassDialog = false
             }
         )

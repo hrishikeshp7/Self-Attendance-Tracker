@@ -213,6 +213,49 @@ class AttendanceViewModel(application: Application) : AndroidViewModel(applicati
         }
     }
 
+    /**
+     * Records an extra lecture on [date]. If the day already has the same status the lecture
+     * count goes up by one; otherwise it behaves like a normal mark.
+     */
+    fun addExtraClass(subjectId: Long, status: AttendanceStatus, date: LocalDate = LocalDate.now()) {
+        val opKey = "$subjectId|$date"
+        if (status == AttendanceStatus.NO_CLASS || !pendingAttendanceOps.add(opKey)) {
+            if (status == AttendanceStatus.NO_CLASS) markAttendance(subjectId, status, date)
+            return
+        }
+        viewModelScope.launch {
+            try {
+                val subject = repository.getSubjectById(subjectId)
+                val oldRecord = repository.getAttendanceRecord(subjectId, date)
+                if (subject == null || oldRecord?.status != status) {
+                    pendingAttendanceOps.remove(opKey)
+                    markAttendance(subjectId, status, date)
+                    return@launch
+                }
+                repository.addExtraLecture(subjectId, date)
+                val newRecord = repository.getAttendanceRecord(subjectId, date)
+                if (newRecord != null) {
+                    undoRedoManager.recordAction(
+                        AttendanceAction(
+                            subjectId = subjectId,
+                            date = date,
+                            oldStatus = oldRecord.status,
+                            oldCount = oldRecord.count,
+                            newStatus = newRecord.status,
+                            newCount = newRecord.count,
+                            oldPresentCount = subject.presentLectures,
+                            oldAbsentCount = subject.absentLectures
+                        )
+                    )
+                    updateUndoRedoState()
+                }
+                loadAttendanceForDate(date)
+            } finally {
+                pendingAttendanceOps.remove(opKey)
+            }
+        }
+    }
+
     fun clearAttendance(subjectId: Long, date: LocalDate = LocalDate.now()) {
         val opKey = "$subjectId|$date"
         // Ignore this call if a mark/clear for the same subject+date is still in flight.

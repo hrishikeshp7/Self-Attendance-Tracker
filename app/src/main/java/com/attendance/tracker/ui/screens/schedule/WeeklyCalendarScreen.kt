@@ -42,7 +42,7 @@ private val HOUR_HEIGHT = 64.dp
 private val GRID_TOP_PADDING = 8.dp
 private val HALF_HOUR_HEIGHT = HOUR_HEIGHT / 2
 private val DAY_COLUMN_WIDTH = 108.dp
-private val TIME_AXIS_WIDTH = 48.dp
+private val TIME_AXIS_WIDTH = 64.dp
 private const val DEFAULT_GRID_START_HOUR = 7
 private const val DEFAULT_GRID_END_HOUR = 21 // exclusive
 
@@ -324,17 +324,22 @@ private fun WeekGrid(
                 // Each label's Box starts exactly at its hour boundary (y=0 for gridStartHour),
                 // matching the background cells below and the lecture blocks' own offsets —
                 // they all share the same origin so a tap and a block line up with the label.
+                // The hour/half-hour lines continue through the axis so each time reads as
+                // part of the same row as the grid lines beside it.
+                val hourLine = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.9f)
+                val halfLine = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)
                 for (hour in gridStartHour until gridEndHour) {
-                    Box(modifier = Modifier.height(HOUR_HEIGHT)) {
+                    Box(modifier = Modifier.height(HOUR_HEIGHT).fillMaxWidth()) {
+                        Divider(color = hourLine)
+                        Divider(color = halfLine, modifier = Modifier.offset(y = HALF_HOUR_HEIGHT))
                         Text(
                             text = LocalTime.of(hour, 0).format(timeLabelFormatter),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSurface,
                             modifier = Modifier
                                 .align(Alignment.TopEnd)
-                                // Centre the label on its hour line, like a real calendar.
-                                .offset(y = (-7).dp)
-                                .padding(end = 6.dp)
+                                .padding(top = 4.dp, end = 8.dp)
                         )
                     }
                 }

@@ -116,6 +116,9 @@ fun AttendanceApp(
                     onMarkAttendance = { subjectId, status ->
                         viewModel.markAttendance(subjectId, status)
                     },
+                    onAddExtraClass = { subjectId, status ->
+                        viewModel.addExtraClass(subjectId, status)
+                    },
                     onClearAttendance = { subjectId ->
                         viewModel.clearAttendance(subjectId)
                     },
@@ -171,6 +174,9 @@ fun AttendanceApp(
                     },
                     onMarkAttendance = { status, date ->
                         viewModel.markAttendance(subjectId, status, date)
+                    },
+                    onAddExtraClass = { status, date ->
+                        viewModel.addExtraClass(subjectId, status, date)
                     },
                     onNavigateBack = {
                         navController.popBackStack()

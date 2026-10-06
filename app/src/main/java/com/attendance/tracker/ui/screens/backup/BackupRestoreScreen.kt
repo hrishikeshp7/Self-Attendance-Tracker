@@ -15,6 +15,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.FileDownload
+import androidx.compose.material.icons.filled.FileUpload
 import androidx.compose.material.icons.filled.RestorePage
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -41,7 +42,6 @@ fun BackupRestoreScreen(
 
     var showRestoreConfirmDialog by remember { mutableStateOf(false) }
     var pendingRestoreUri by remember { mutableStateOf<Uri?>(null) }
-    var showCsvImport by remember { mutableStateOf(false) }
     var csvPreview by remember { mutableStateOf<CsvImporter.Result?>(null) }
 
     // ---------------------------------------------------------------
@@ -336,26 +336,23 @@ fun BackupRestoreScreen(
                 restoreLauncher.launch(arrayOf("application/json", "application/octet-stream"))
             }
 
-            // ---- Advanced: CSV import (collapsed by default, most people never need it) ----
+            // ---- Import section ----
             Divider()
-            TextButton(onClick = { showCsvImport = !showCsvImport }) {
-                Text(if (showCsvImport) "Advanced: import from CSV  ▲" else "Advanced: import from CSV  ▼")
+            Text("Import from CSV", style = MaterialTheme.typography.titleMedium)
+
+            BackupActionCard(
+                title = "Import subjects & timetable from CSV",
+                description = "Bulk-add subjects (target %, attended, total) and weekly lectures " +
+                    "from a spreadsheet. Columns: subject, target_percentage, attended, total, " +
+                    "day, start, end. The file is checked first and nothing is saved until you confirm. " +
+                    "Existing subjects are never overwritten.",
+                icon = { Icon(Icons.Default.FileUpload, contentDescription = null) },
+                buttonLabel = "Choose CSV File"
+            ) {
+                csvImportLauncher.launch(arrayOf("text/*", "application/vnd.ms-excel"))
             }
-            if (showCsvImport) {
-                BackupActionCard(
-                    title = "Import subjects & timetable from CSV",
-                    description = "Bulk-add subjects (target %, attended, total) and weekly lectures " +
-                        "from a spreadsheet. Columns: subject, target_percentage, attended, total, " +
-                        "day, start, end. The file is checked first and nothing is saved until you confirm. " +
-                        "Existing subjects are never overwritten.",
-                    icon = { Icon(Icons.Default.FileDownload, contentDescription = null) },
-                    buttonLabel = "Choose CSV File"
-                ) {
-                    csvImportLauncher.launch(arrayOf("text/*", "application/vnd.ms-excel"))
-                }
-                TextButton(onClick = { csvTemplateLauncher.launch("attendance_import_template.csv") }) {
-                    Text("Download a template CSV")
-                }
+            TextButton(onClick = { csvTemplateLauncher.launch("attendance_import_template.csv") }) {
+                Text("Download a template CSV")
             }
         }
     }
