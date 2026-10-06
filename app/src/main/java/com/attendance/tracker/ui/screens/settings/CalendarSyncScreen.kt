@@ -101,18 +101,15 @@ fun CalendarSyncScreen(
     if (showEndDatePicker) {
         val zone = ZoneId.of("UTC")
         val pickerState = rememberDatePickerState(
-            initialSelectedDateMillis = rangeEnd.atStartOfDay(zone).toInstant().toEpochMilli(),
-            selectableDates = object : SelectableDates {
-                override fun isSelectableDate(utcTimeMillis: Long) =
-                    !Instant.ofEpochMilli(utcTimeMillis).atZone(zone).toLocalDate().isBefore(LocalDate.now())
-            }
+            initialSelectedDateMillis = rangeEnd.atStartOfDay(zone).toInstant().toEpochMilli()
         )
         DatePickerDialog(
             onDismissRequest = { showEndDatePicker = false },
             confirmButton = {
                 TextButton(onClick = {
                     pickerState.selectedDateMillis?.let {
-                        rangeEnd = Instant.ofEpochMilli(it).atZone(zone).toLocalDate()
+                        // This Material3 version can't grey out past dates, so clamp to today.
+                        rangeEnd = maxOf(Instant.ofEpochMilli(it).atZone(zone).toLocalDate(), LocalDate.now())
                     }
                     showEndDatePicker = false
                 }) { Text("OK") }
