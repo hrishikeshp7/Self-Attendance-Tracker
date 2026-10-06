@@ -45,11 +45,8 @@ class AttendanceRepository(
         val existingRecord = attendanceDao.getAttendanceRecord(subjectId, date)
         
         if (existingRecord != null && existingRecord.status == AttendanceStatus.PRESENT) {
-            // If already marked present, increment the count
-            val updatedRecord = existingRecord.copy(count = existingRecord.count + 1)
-            attendanceDao.insertAttendance(updatedRecord)
-            // Also increment subject counts
-            subjectDao.markPresent(subjectId)
+            // Already marked with this status: repeated taps must not add another lecture
+            return
         } else if (existingRecord != null) {
             // Different status exists, replace it
             // First, adjust subject counts based on previous status
@@ -107,11 +104,8 @@ class AttendanceRepository(
         val existingRecord = attendanceDao.getAttendanceRecord(subjectId, date)
         
         if (existingRecord != null && existingRecord.status == AttendanceStatus.ABSENT) {
-            // If already marked absent, increment the count
-            val updatedRecord = existingRecord.copy(count = existingRecord.count + 1)
-            attendanceDao.insertAttendance(updatedRecord)
-            // Also increment subject counts
-            subjectDao.markAbsent(subjectId)
+            // Already marked with this status: repeated taps must not add another lecture
+            return
         } else if (existingRecord != null) {
             // Different status exists, replace it
             // First, adjust subject counts based on previous status
@@ -169,9 +163,8 @@ class AttendanceRepository(
         val existingRecord = attendanceDao.getAttendanceRecord(subjectId, date)
         
         if (existingRecord != null && existingRecord.status == AttendanceStatus.NO_CLASS) {
-            // If already marked no class, increment the count
-            val updatedRecord = existingRecord.copy(count = existingRecord.count + 1)
-            attendanceDao.insertAttendance(updatedRecord)
+            // Already marked with this status: repeated taps must not add another lecture
+            return
         } else if (existingRecord != null) {
             // Different status exists, replace it
             // Adjust subject counts based on previous status

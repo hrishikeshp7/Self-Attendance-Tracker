@@ -10,11 +10,14 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -36,6 +39,7 @@ import java.time.format.TextStyle
 import java.util.Locale
 
 private val HOUR_HEIGHT = 64.dp
+private val GRID_TOP_PADDING = 8.dp
 private val HALF_HOUR_HEIGHT = HOUR_HEIGHT / 2
 private val DAY_COLUMN_WIDTH = 108.dp
 private val TIME_AXIS_WIDTH = 48.dp
@@ -103,6 +107,8 @@ fun WeeklyCalendarScreen(
                         )
                     }
                 },
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
                 shape = RoundedCornerShape(16.dp)
             ) {
                 Icon(Icons.Default.Add, contentDescription = "Add Lecture")
@@ -174,6 +180,45 @@ fun WeeklyCalendarScreen(
 private fun defaultEndTime(start: LocalTime): LocalTime {
     val endMinutes = start.hour * 60 + start.minute + 60
     return if (endMinutes >= 24 * 60) LocalTime.of(23, 59) else LocalTime.of(endMinutes / 60, endMinutes % 60)
+}
+
+private fun endAfter(start: LocalTime, minutes: Int): LocalTime {
+    val end = start.hour * 60 + start.minute + minutes
+    return if (end >= 24 * 60) LocalTime.of(23, 59) else LocalTime.of(end / 60, end % 60)
+}
+
+private fun formatDuration(minutes: Int): String = when {
+    minutes < 60 -> "${minutes}m"
+    minutes % 60 == 0 -> "${minutes / 60}h"
+    else -> "${minutes / 60}h ${minutes % 60}m"
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun TimeField(label: String, time: LocalTime, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    OutlinedCard(onClick = onClick, modifier = modifier) {
+        Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp)) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = time.format(timeSheetFormatter),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.weight(1f)
+                )
+                Icon(
+                    Icons.Default.Schedule,
+                    contentDescription = "Change $label time",
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        }
+    }
 }
 
 private data class LectureEditorState(
@@ -274,6 +319,7 @@ private fun WeekGrid(
                 modifier = Modifier
                     .width(TIME_AXIS_WIDTH)
                     .verticalScroll(vScroll)
+                    .padding(top = GRID_TOP_PADDING)
             ) {
                 // Each label's Box starts exactly at its hour boundary (y=0 for gridStartHour),
                 // matching the background cells below and the lecture blocks' own offsets —
@@ -286,7 +332,9 @@ private fun WeekGrid(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier
                                 .align(Alignment.TopEnd)
-                                .padding(end = 4.dp, top = 2.dp)
+                                // Centre the label on its hour line, like a real calendar.
+                                .offset(y = (-7).dp)
+                                .padding(end = 6.dp)
                         )
                     }
                 }
@@ -297,6 +345,7 @@ private fun WeekGrid(
                     .weight(1f)
                     .verticalScroll(vScroll)
                     .horizontalScroll(hScroll)
+                    .padding(top = GRID_TOP_PADDING)
             ) {
                 // Background grid: one column per day, split into tappable half-hour cells.
                 Row {
@@ -386,13 +435,23 @@ private fun DayColumnCells(
         val end = gridEndHour * 60
         generateSequence(start) { it + 30 }.takeWhile { it < end }.toList()
     }
+    val dayDividerColor = MaterialTheme.colorScheme.outlineVariant
     Column(
         modifier = Modifier
             .width(DAY_COLUMN_WIDTH)
             .background(
-                if (isToday) MaterialTheme.colorScheme.primary.copy(alpha = 0.03f)
+                if (isToday) MaterialTheme.colorScheme.primary.copy(alpha = 0.06f)
                 else Color.Transparent
             )
+            // Vertical separator on each day's right edge so days read as distinct columns.
+            .drawBehind {
+                drawLine(
+                    color = dayDividerColor,
+                    start = Offset(size.width, 0f),
+                    end = Offset(size.width, size.height),
+                    strokeWidth = 1.dp.toPx()
+                )
+            }
     ) {
         slotMinutes.forEach { minuteOfDay ->
             val isHourMark = minuteOfDay % 60 == 0
@@ -406,9 +465,10 @@ private fun DayColumnCells(
             ) {
                 // Box defaults to top-start content alignment, so this 1dp divider sits
                 // right on the hour boundary rather than centered in the half-hour cell.
-                if (isHourMark) {
-                    Divider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-                }
+                // Hour lines are solid; half-hour lines are fainter so time reads at a glance.
+                Divider(
+                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = if (isHourMark) 0.9f else 0.35f)
+                )
             }
         }
     }
@@ -603,7 +663,7 @@ private fun LectureEditorSheet(
 
             Spacer(modifier = Modifier.height(20.dp))
             Text(
-                text = "Time",
+                text = "Time  (tap a box to open the clock)",
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -612,17 +672,38 @@ private fun LectureEditorSheet(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                OutlinedButton(
+                TimeField(
+                    label = "Starts",
+                    time = startTime,
                     onClick = { showStartPicker = true },
                     modifier = Modifier.weight(1f)
-                ) {
-                    Text(startTime.format(timeSheetFormatter))
-                }
-                OutlinedButton(
+                )
+                TimeField(
+                    label = "Ends",
+                    time = endTime,
                     onClick = { showEndPicker = true },
                     modifier = Modifier.weight(1f)
-                ) {
-                    Text(endTime.format(timeSheetFormatter))
+                )
+            }
+            Spacer(modifier = Modifier.height(12.dp))
+            val durationMinutes = java.time.Duration.between(startTime, endTime).toMinutes().toInt()
+            Text(
+                text = if (isTimeValid) "Duration: ${formatDuration(durationMinutes)} — or pick a quick length:"
+                else "Quick length:",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                listOf(30, 45, 60, 90, 120, 180).forEach { minutes ->
+                    FilterChip(
+                        selected = isTimeValid && durationMinutes == minutes,
+                        onClick = { endTime = endAfter(startTime, minutes) },
+                        label = { Text(formatDuration(minutes)) }
+                    )
                 }
             }
             if (!isTimeValid) {
@@ -672,9 +753,13 @@ private fun LectureEditorSheet(
 
     if (showStartPicker) {
         LectureTimePickerDialog(
+            title = "Select start time",
             initial = startTime,
             onConfirm = {
+                // Keep the lecture's length when moving its start, as calendar apps do.
+                val length = if (isTimeValid) java.time.Duration.between(startTime, endTime).toMinutes().toInt() else 60
                 startTime = it
+                endTime = endAfter(it, length)
                 showStartPicker = false
             },
             onDismiss = { showStartPicker = false }
@@ -682,6 +767,7 @@ private fun LectureEditorSheet(
     }
     if (showEndPicker) {
         LectureTimePickerDialog(
+            title = "Select end time",
             initial = endTime,
             onConfirm = {
                 endTime = it
@@ -695,6 +781,7 @@ private fun LectureEditorSheet(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun LectureTimePickerDialog(
+    title: String,
     initial: LocalTime,
     onConfirm: (LocalTime) -> Unit,
     onDismiss: () -> Unit
@@ -706,6 +793,7 @@ private fun LectureTimePickerDialog(
     )
     AlertDialog(
         onDismissRequest = onDismiss,
+        title = { Text(title) },
         text = { TimePicker(state = pickerState) },
         confirmButton = {
             TextButton(onClick = { onConfirm(LocalTime.of(pickerState.hour, pickerState.minute)) }) {
