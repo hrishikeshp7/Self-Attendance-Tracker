@@ -4,7 +4,7 @@
 
 **A beautiful, modern Android application for effortlessly tracking and managing your class attendance.**
 
-[![Build and Release APK](https://github.com/hrishikeshp7/Self-Attendance-Tracker/actions/workflows/build-release.yml/badge.svg)](https://github.com/hrishikeshp7/Self-Attendance-Tracker/actions/workflows/build-release.yml)
+[![Build APK](https://github.com/hrishikeshp7/Self-Attendance-Tracker/actions/workflows/build.yml/badge.svg)](https://github.com/hrishikeshp7/Self-Attendance-Tracker/actions/workflows/build.yml)
 [![Kotlin](https://img.shields.io/badge/kotlin-%237F52FF.svg?style=flat&logo=kotlin&logoColor=white)](https://kotlinlang.org/)
 [![Jetpack Compose](https://img.shields.io/badge/Jetpack%20Compose-4285F4?style=flat&logo=android&logoColor=white)](https://developer.android.com/jetpack/compose)
 [![Material Design 3](https://img.shields.io/badge/Material%203-EADDFF?style=flat&logo=materialdesign&logoColor=black)](https://m3.material.io/)

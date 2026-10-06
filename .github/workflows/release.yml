@@ -1,17 +1,11 @@
-name: Build and Release APK
+name: Release APK
 
 on:
   workflow_dispatch:
-  pull_request:
-    types: [closed]
-    branches: [main]
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    # Only run if PR was merged or workflow was manually triggered
-    if: github.event.pull_request.merged == true || github.event_name == 'workflow_dispatch'
-    
     # Step 1: Map the secret presence to an environment variable
     # This allows us to use it in 'if' conditions below.
     env:
@@ -92,7 +86,6 @@ jobs:
           path: app/build/outputs/apk/release/*.apk
 
       - name: Create Release
-        if: github.event_name == 'workflow_dispatch'
         uses: softprops/action-gh-release@v1
         with:
           tag_name: v${{ steps.version.outputs.version_name }}-${{ steps.version.outputs.date }}
