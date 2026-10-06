@@ -176,84 +176,32 @@ class AttendanceRepositoryTest {
     }
 
     @Test
-    fun `marking present twice on the same day increments both the record count and the aggregate`() = runBlocking {
+    fun `repeated present or absent taps on the same day never increment the count`() = runBlocking {
         addSubject()
-        repository.markPresent(1L, date)
-        repository.markPresent(1L, date)
-
+        repeat(3) { repository.markPresent(1L, date) }
+        assertEquals(1, repository.getAttendanceRecord(1L, date)?.count)
+        repeat(3) { repository.markAbsent(1L, date) }
+        val subject = repository.getSubjectById(1L)!!
         val record = repository.getAttendanceRecord(1L, date)
-        val subject = repository.getSubjectById(1L)!!
-
-        assertEquals(2, record?.count)
-        assertEquals(2, subject.presentLectures)
-        assertEquals(2, subject.totalLectures)
+        assertEquals(AttendanceStatus.ABSENT, record?.status)
+        assertEquals(1, record?.count)
+        assertEquals(0, subject.presentLectures)
+        assertEquals(1, subject.absentLectures)
+        assertEquals(1, subject.totalLectures)
     }
 
     @Test
-    fun `switching a multi-lecture day from absent to present carries the day's count over`() = runBlocking {
+    fun `repeated no class taps keep count at 1 and switching carries it over`() = runBlocking {
         addSubject()
-        // Two lectures marked absent on the same day (e.g. via the Extra Class flow)
-        repository.markAbsent(1L, date)
-        repository.markAbsent(1L, date)
+        repeat(3) { repository.markNoClass(1L, date) }
+        assertEquals(1, repository.getAttendanceRecord(1L, date)?.count)
 
-        // The student realises the whole day should actually be present
-        repository.markPresent(1L, date)
-
-        val record = repository.getAttendanceRecord(1L, date)
-        val subject = repository.getSubjectById(1L)!!
-
-        // The record's count must stay in sync with the aggregate adjustment (2 lectures
-        // moved, not 1) — otherwise a later clear would only undo 1 of the 2 lectures,
-        // permanently drifting the subject's totals.
-        assertEquals(AttendanceStatus.PRESENT, record?.status)
-        assertEquals(2, record?.count)
-        assertEquals(2, subject.presentLectures)
-        assertEquals(0, subject.absentLectures)
-        assertEquals(2, subject.totalLectures)
-    }
-
-    @Test
-    fun `clearing a switched multi-lecture day fully reverts the aggregate`() = runBlocking {
-        addSubject()
-        repository.markAbsent(1L, date)
         repository.markAbsent(1L, date)
         repository.markPresent(1L, date)
-
-        val record = repository.getAttendanceRecord(1L, date)!!
-        val subjectBeforeClear = repository.getSubjectById(1L)!!
-
-        // Mirrors AttendanceViewModel.clearAttendance's aggregate adjustment
-        repository.updateAttendanceCounts(
-            1L,
-            subjectBeforeClear.presentLectures - record.count,
-            subjectBeforeClear.absentLectures
-        )
-        repository.deleteAttendanceRecord(1L, date)
-
         val subject = repository.getSubjectById(1L)!!
-        assertEquals(0, subject.presentLectures)
+        assertEquals(1, subject.presentLectures)
         assertEquals(0, subject.absentLectures)
-        assertEquals(0, subject.totalLectures)
-        assertNull(repository.getAttendanceRecord(1L, date))
-    }
-
-    @Test
-    fun `marking no class then absent then present correctly threads the count through every switch`() = runBlocking {
-        addSubject()
-        repository.markNoClass(1L, date)
-        repository.markNoClass(1L, date) // count = 2, doesn't affect present/absent
-
-        repository.markAbsent(1L, date) // switch NO_CLASS(2) -> ABSENT, count carries to 2
-        var subject = repository.getSubjectById(1L)!!
-        assertEquals(0, subject.presentLectures)
-        assertEquals(2, subject.absentLectures)
-        assertEquals(2, repository.getAttendanceRecord(1L, date)?.count)
-
-        repository.markPresent(1L, date) // switch ABSENT(2) -> PRESENT, count carries to 2
-        subject = repository.getSubjectById(1L)!!
-        assertEquals(2, subject.presentLectures)
-        assertEquals(0, subject.absentLectures)
-        assertEquals(2, repository.getAttendanceRecord(1L, date)?.count)
+        assertEquals(1, repository.getAttendanceRecord(1L, date)?.count)
     }
 
     @Test

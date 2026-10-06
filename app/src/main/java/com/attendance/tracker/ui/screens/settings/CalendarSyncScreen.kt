@@ -4,6 +4,7 @@ import android.Manifest
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -20,6 +21,7 @@ import com.attendance.tracker.data.model.ScheduleEntry
 import com.attendance.tracker.data.model.Subject
 import kotlinx.coroutines.launch
 import java.time.Instant
+import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
@@ -39,6 +41,9 @@ fun CalendarSyncScreen(
     var showCalendarPicker by remember { mutableStateOf(false) }
     var isBusy by remember { mutableStateOf(false) }
     var resultMessage by remember { mutableStateOf<String?>(null) }
+    // How far ahead to write lectures. Defaults to just the current week.
+    var rangeEnd by remember { mutableStateOf(CalendarSyncManager.endOfCurrentWeek()) }
+    var showEndDatePicker by remember { mutableStateOf(false) }
 
     fun loadCalendarsAndShowPicker() {
         scope.launch {
@@ -55,13 +60,15 @@ fun CalendarSyncScreen(
     }
 
     fun startSync(calendarId: Long, label: String) {
+        if (isBusy) return
+        isBusy = true
         scope.launch {
-            isBusy = true
-            val count = CalendarSyncManager.syncSchedule(context, calendarId, scheduleEntries, allSubjects)
+            val count = CalendarSyncManager.syncSchedule(context, calendarId, scheduleEntries, allSubjects, rangeEnd)
             CalendarSyncManager.saveSyncPrefs(context, calendarId, label)
             syncPrefs = CalendarSyncManager.getSyncPrefs(context)
             isBusy = false
-            resultMessage = "Synced $count lecture${if (count != 1) "s" else ""} to \"$label\"."
+            resultMessage = "Synced $count lecture${if (count != 1) "s" else ""} to \"$label\" through " +
+                "${rangeEnd.format(DateTimeFormatter.ofPattern("MMM d"))}. Syncing again replaces these, never duplicates them."
         }
     }
 
@@ -81,7 +88,7 @@ fun CalendarSyncScreen(
     ) { uri ->
         if (uri != null) {
             scope.launch {
-                val ics = CalendarSyncManager.buildIcsContent(scheduleEntries, allSubjects)
+                val ics = CalendarSyncManager.buildIcsContent(scheduleEntries, allSubjects, rangeEnd)
                 context.contentResolver.openOutputStream(uri)?.use { stream ->
                     stream.write(ics.toByteArray(Charsets.UTF_8))
                 }
@@ -89,6 +96,26 @@ fun CalendarSyncScreen(
                     "or any app that can import an .ics file."
             }
         }
+    }
+
+    if (showEndDatePicker) {
+        val zone = ZoneId.of("UTC")
+        val pickerState = rememberDatePickerState(
+            initialSelectedDateMillis = rangeEnd.atStartOfDay(zone).toInstant().toEpochMilli()
+        )
+        DatePickerDialog(
+            onDismissRequest = { showEndDatePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    pickerState.selectedDateMillis?.let {
+                        // This Material3 version can't grey out past dates, so clamp to today.
+                        rangeEnd = maxOf(Instant.ofEpochMilli(it).atZone(zone).toLocalDate(), LocalDate.now())
+                    }
+                    showEndDatePicker = false
+                }) { Text("OK") }
+            },
+            dismissButton = { TextButton(onClick = { showEndDatePicker = false }) { Text("Cancel") } }
+        ) { DatePicker(state = pickerState) }
     }
 
     if (showCalendarPicker) {
@@ -159,6 +186,37 @@ fun CalendarSyncScreen(
                 )
             }
 
+            Text("How long to add lectures for", style = MaterialTheme.typography.titleMedium)
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    val weekEnd = CalendarSyncManager.endOfCurrentWeek()
+                    val options = listOf(
+                        "This week" to weekEnd,
+                        "2 weeks" to weekEnd.plusWeeks(1),
+                        "4 weeks" to weekEnd.plusWeeks(3)
+                    )
+                    val matchesPreset = options.any { it.second == rangeEnd }
+                    Row(
+                        modifier = Modifier.horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        options.forEach { (label, end) ->
+                            FilterChip(selected = rangeEnd == end, onClick = { rangeEnd = end }, label = { Text(label) })
+                        }
+                        FilterChip(
+                            selected = !matchesPreset,
+                            onClick = { showEndDatePicker = true },
+                            label = { Text("Custom end date") }
+                        )
+                    }
+                    Text(
+                        text = "Lectures are added from today until ${rangeEnd.format(DateTimeFormatter.ofPattern("EEE, MMM d"))}. Nothing is added after that.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
             Text("Sync to device calendar", style = MaterialTheme.typography.titleMedium)
             Card(modifier = Modifier.fillMaxWidth()) {
                 Column(
@@ -225,14 +283,14 @@ fun CalendarSyncScreen(
                     if (syncPrefs.calendarId != null) {
                         TextButton(
                             onClick = {
-                                val calendarId = syncPrefs.calendarId ?: return@TextButton
+                                if (isBusy) return@TextButton
+                                isBusy = true
                                 scope.launch {
-                                    isBusy = true
-                                    CalendarSyncManager.removeSyncedEvents(context, calendarId)
+                                    val removed = CalendarSyncManager.removeSyncedEvents(context)
                                     CalendarSyncManager.clearSyncPrefs(context)
                                     syncPrefs = CalendarSyncManager.getSyncPrefs(context)
                                     isBusy = false
-                                    resultMessage = "Removed the synced events and stopped syncing."
+                                    resultMessage = "Removed $removed synced event${if (removed != 1) "s" else ""} from your calendar."
                                 }
                             },
                             enabled = !isBusy,

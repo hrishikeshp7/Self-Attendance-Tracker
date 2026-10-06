@@ -176,7 +176,8 @@ class AttendanceViewModel(application: Application) : AndroidViewModel(applicati
                 val subject = repository.getSubjectById(subjectId)
                 val oldRecord = repository.getAttendanceRecord(subjectId, date)
 
-                if (subject != null) {
+                // Re-tapping the current status is a no-op: nothing to mark or undo
+                if (subject != null && oldRecord?.status != status) {
                     // Mark the new status first to get the new count
                     when (status) {
                         AttendanceStatus.PRESENT -> repository.markPresent(subjectId, date)
