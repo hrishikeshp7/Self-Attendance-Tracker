@@ -8,7 +8,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
+import com.attendance.tracker.update.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -69,11 +70,13 @@ fun AboutScreen(
             )
             
             Text(
-                text = "Version 1.1",
+                text = "Version ${remember { currentVersionName(context) }}",
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             
+            UpdateSection()
+
             Spacer(modifier = Modifier.height(8.dp))
             
             Divider()

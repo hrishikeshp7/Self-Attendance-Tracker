@@ -81,7 +81,11 @@ fun AttendanceApp(
                         label = { Text(item.label) },
                         selected = currentDestination?.hierarchy?.any { it.route == item.screen.route } == true,
                         onClick = {
-                            // Navigate to the selected screen
+                            // From a sub-screen (e.g. calendar, about) with this tab already in the
+                            // back stack, pop back to it. navigate+restoreState would re-restore the
+                            // sub-screen saved under this tab and the tab root would never show.
+                            val onTabRoot = bottomNavItems.any { it.screen.route == currentDestination?.route }
+                            if (!onTabRoot && navController.popBackStack(item.screen.route, false)) return@NavigationBarItem
                             navController.navigate(item.screen.route) {
                                 // Pop up to the start destination to clear intermediate screens
                                 popUpTo(navController.graph.findStartDestination().id) {
