@@ -23,6 +23,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.attendance.tracker.backup.CsvImporter
 import com.attendance.tracker.ui.AttendanceViewModel
 import kotlinx.coroutines.launch
 import java.time.LocalDate
@@ -40,6 +41,8 @@ fun BackupRestoreScreen(
 
     var showRestoreConfirmDialog by remember { mutableStateOf(false) }
     var pendingRestoreUri by remember { mutableStateOf<Uri?>(null) }
+    var showCsvImport by remember { mutableStateOf(false) }
+    var csvPreview by remember { mutableStateOf<CsvImporter.Result?>(null) }
 
     // ---------------------------------------------------------------
     // SAF launchers
@@ -67,6 +70,26 @@ fun BackupRestoreScreen(
                 writeToUri(context, uri, csv)
             }
         }
+    }
+
+    // CSV import – pick a file, parse it (no writes), then show a preview to confirm
+    val csvImportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) {
+            val text = readFromUri(context, uri)
+            csvPreview = if (text == null) {
+                CsvImporter.Result(emptyList(), emptyList(), listOf("Couldn't read that file."))
+            } else {
+                viewModel.previewCsvImport(text)
+            }
+        }
+    }
+
+    val csvTemplateLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("text/csv")
+    ) { uri ->
+        if (uri != null) scope.launch { writeToUri(context, uri, CsvImporter.TEMPLATE) }
     }
 
     // Google Drive Backup – opens the SAF file-picker pre-navigated to Google Drive.
@@ -144,6 +167,37 @@ fun BackupRestoreScreen(
             dismissButton = {
                 TextButton(onClick = { showRestoreConfirmDialog = false }) { Text("Cancel") }
             }
+        )
+    }
+
+    csvPreview?.let { preview ->
+        val ok = preview.errors.isEmpty() && preview.subjects.isNotEmpty()
+        AlertDialog(
+            onDismissRequest = { csvPreview = null },
+            title = { Text(if (ok) "Ready to import" else "Can't import yet") },
+            text = {
+                Column(
+                    modifier = Modifier.heightIn(max = 320.dp).verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    if (ok) {
+                        Text("${preview.subjects.size} subjects and ${preview.slots.size} timetable slots found. " +
+                            "Subjects you already have are left unchanged.")
+                    } else {
+                        Text("Nothing was imported. Fix these in your file and try again:")
+                        preview.errors.take(30).forEach {
+                            Text("• $it", style = MaterialTheme.typography.bodySmall)
+                        }
+                        if (preview.errors.size > 30) Text("…and ${preview.errors.size - 30} more.")
+                        if (preview.errors.isEmpty()) Text("No subjects were found in the file.")
+                    }
+                }
+            },
+            confirmButton = {
+                if (ok) TextButton(onClick = { viewModel.importCsv(preview); csvPreview = null }) { Text("Import") }
+                else TextButton(onClick = { csvPreview = null }) { Text("OK") }
+            },
+            dismissButton = if (ok) { { TextButton(onClick = { csvPreview = null }) { Text("Cancel") } } } else null
         )
     }
 
@@ -280,6 +334,28 @@ fun BackupRestoreScreen(
                 )
             ) {
                 restoreLauncher.launch(arrayOf("application/json", "application/octet-stream"))
+            }
+
+            // ---- Advanced: CSV import (collapsed by default, most people never need it) ----
+            Divider()
+            TextButton(onClick = { showCsvImport = !showCsvImport }) {
+                Text(if (showCsvImport) "Advanced: import from CSV  ▲" else "Advanced: import from CSV  ▼")
+            }
+            if (showCsvImport) {
+                BackupActionCard(
+                    title = "Import subjects & timetable from CSV",
+                    description = "Bulk-add subjects (target %, attended, total) and weekly lectures " +
+                        "from a spreadsheet. Columns: subject, target_percentage, attended, total, " +
+                        "day, start, end. The file is checked first and nothing is saved until you confirm. " +
+                        "Existing subjects are never overwritten.",
+                    icon = { Icon(Icons.Default.FileDownload, contentDescription = null) },
+                    buttonLabel = "Choose CSV File"
+                ) {
+                    csvImportLauncher.launch(arrayOf("text/*", "application/vnd.ms-excel"))
+                }
+                TextButton(onClick = { csvTemplateLauncher.launch("attendance_import_template.csv") }) {
+                    Text("Download a template CSV")
+                }
             }
         }
     }

@@ -307,4 +307,46 @@ class AttendanceRepository(
         attendanceDao.insertAttendanceRecords(attendanceRecords)
         scheduleDao.insertScheduleEntries(scheduleEntries)
     }
+
+    data class CsvImportSummary(val subjectsAdded: Int, val subjectsExisting: Int, val slotsAdded: Int)
+
+    /**
+     * Adds the parsed CSV rows. Subjects are matched by name (case-insensitive, top-level
+     * only): an existing subject keeps its target and counts and only gains timetable
+     * slots it doesn't already have, so importing the same file twice changes nothing.
+     */
+    suspend fun importCsv(data: com.attendance.tracker.backup.CsvImporter.Result): CsvImportSummary {
+        val idByName = subjectDao.getAllSubjectsOnce()
+            .filter { it.parentSubjectId == null && !it.isFolder }
+            .associate { it.name.lowercase() to it.id }
+            .toMutableMap()
+        var added = 0
+        var existing = 0
+        for (row in data.subjects) {
+            if (row.name.lowercase() in idByName) { existing++; continue }
+            val total = row.total ?: 0
+            val present = row.attended ?: 0
+            idByName[row.name.lowercase()] = subjectDao.insertSubject(
+                Subject(
+                    name = row.name,
+                    requiredAttendance = row.requiredAttendance ?: 75,
+                    totalLectures = total,
+                    presentLectures = present,
+                    absentLectures = total - present
+                )
+            )
+            added++
+        }
+        val known = scheduleDao.getAllScheduleEntriesOnce().toMutableList()
+        var slotsAdded = 0
+        for (slot in data.slots) {
+            val subjectId = idByName[slot.subjectName.lowercase()] ?: continue
+            if (known.any { it.subjectId == subjectId && it.dayOfWeek == slot.day && it.startTime == slot.start && it.endTime == slot.end }) continue
+            val entry = ScheduleEntry(subjectId = subjectId, dayOfWeek = slot.day, startTime = slot.start, endTime = slot.end)
+            scheduleDao.insertScheduleEntry(entry)
+            known += entry.copy(id = -1)
+            slotsAdded++
+        }
+        return CsvImportSummary(added, existing, slotsAdded)
+    }
 }
