@@ -32,7 +32,7 @@ internal fun isNewer(remote: List<Int>, local: List<Int>): Boolean {
     return false
 }
 
-/** Removes any downloaded update APK; run on launch so it never lingers after install. */
+/** Removes any downloaded update APK; run after the app is replaced so it never lingers. */
 fun clearUpdateCache(context: Context) {
     File(context.cacheDir, "updates").deleteRecursively()
 }

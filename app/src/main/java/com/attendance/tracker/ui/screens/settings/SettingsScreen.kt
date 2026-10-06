@@ -276,7 +276,7 @@ fun SettingsScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "About",
+                        text = "About & Updates",
                         style = MaterialTheme.typography.titleMedium
                     )
                     Text(
