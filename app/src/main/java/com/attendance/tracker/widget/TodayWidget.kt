@@ -2,6 +2,12 @@ package com.attendance.tracker.widget
 
 import android.content.Context
 import android.content.Intent
+import androidx.work.CoroutineWorker
+import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.PeriodicWorkRequestBuilder
+import androidx.work.WorkManager
+import androidx.work.WorkerParameters
+import java.util.concurrent.TimeUnit
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -47,11 +53,16 @@ import com.attendance.tracker.data.model.Subject
 import com.attendance.tracker.data.model.getDisplayName
 import com.attendance.tracker.data.repository.AttendanceRepository
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.withContext
+import java.time.Duration
 import java.time.LocalDate
+import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 
 private val SubjectIdKey = ActionParameters.Key<Long>("subjectId")
@@ -72,18 +83,30 @@ class TodayWidget : GlanceAppWidget() {
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val db = AttendanceDatabase.getDatabase(context)
         val repository = AttendanceRepository(db.subjectDao(), db.attendanceDao(), db.scheduleDao())
-        val today = LocalDate.now()
         // Collected inside the composition: an already-running Glance session is woken by
         // updateAll but does not re-run provideGlance, so a one-off snapshot here went stale.
-        val flow = combine(
-            repository.allSubjects,
-            repository.allScheduleEntries,
-            repository.getAttendanceForDate(today)
-        ) { all, schedule, records -> buildToday(today, all, schedule, records) }.flowOn(Dispatchers.IO)
+        // The date is part of the flow too, so a session that outlives midnight rolls over.
+        val flow = currentDateFlow().flatMapLatest { today ->
+            combine(
+                repository.allSubjects,
+                repository.allScheduleEntries,
+                repository.getAttendanceForDate(today)
+            ) { all, schedule, records -> buildToday(today, all, schedule, records) }
+        }.flowOn(Dispatchers.IO)
         val initial = withContext(Dispatchers.IO) { flow.first() }
         provideContent {
             val data by flow.collectAsState(initial)
             GlanceTheme { TodayContent(data) }
+        }
+    }
+
+    /** Emits today's date now and again just after each midnight. */
+    private fun currentDateFlow() = flow {
+        while (true) {
+            val date = LocalDate.now()
+            emit(date)
+            val untilMidnight = Duration.between(LocalDateTime.now(), date.plusDays(1).atStartOfDay())
+            delay(untilMidnight.toMillis() + 1_000)
         }
     }
 
@@ -204,6 +227,7 @@ private fun standing(s: Subject): String {
     val pct = "%.0f%%".format(s.currentAttendancePercentage)
     return when {
         !s.isAboveRequired -> if (s.classesToAttend >= 999) "$pct · can't reach target" else "$pct · attend ${s.classesToAttend} more"
+        s.requiredAttendance <= 0 -> "$pct · no minimum"
         s.classesCanBunk > 0 -> "$pct · can skip ${s.classesCanBunk}"
         else -> "$pct · on target"
     }
@@ -232,4 +256,35 @@ suspend fun refreshAllWidgets(context: Context) = TodayWidget().updateAll(contex
 
 class TodayWidgetReceiver : GlanceAppWidgetReceiver() {
     override val glanceAppWidget: GlanceAppWidget = TodayWidget()
+
+    override fun onEnabled(context: Context) {
+        super.onEnabled(context)
+        WidgetDayRollover.schedule(context)
+    }
+}
+
+/**
+ * Re-renders the widget just after every midnight. Android's own widget timer is slow and
+ * unreliable, so without this the widget keeps showing yesterday's classes and marks.
+ */
+class WidgetDayRolloverWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
+    override suspend fun doWork(): Result {
+        refreshAllWidgets(applicationContext)
+        return Result.success()
+    }
+}
+
+object WidgetDayRollover {
+    private const val WORK_NAME = "widget_day_rollover"
+
+    /** Daily job anchored to 00:00:30; KEEP so calling it on every app start is harmless. */
+    fun schedule(context: Context) {
+        val now = LocalDateTime.now()
+        val next = now.toLocalDate().plusDays(1).atStartOfDay().plusSeconds(30)
+        val request = PeriodicWorkRequestBuilder<WidgetDayRolloverWorker>(1, TimeUnit.DAYS)
+            .setInitialDelay(Duration.between(now, next).seconds, TimeUnit.SECONDS)
+            .build()
+        WorkManager.getInstance(context)
+            .enqueueUniquePeriodicWork(WORK_NAME, ExistingPeriodicWorkPolicy.KEEP, request)
+    }
 }
