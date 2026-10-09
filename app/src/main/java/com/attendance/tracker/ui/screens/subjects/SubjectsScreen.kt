@@ -328,7 +328,7 @@ private fun SubjectListItem(
         AlertDialog(
             onDismissRequest = { showDeleteConfirmation = false },
             title = { Text("Delete Subject") },
-            text = { Text("Are you sure you want to delete '${subject.name}'? This action cannot be undone.") },
+            text = { Text("Delete '${subject.name}'? Its attendance history and timetable slots are deleted too. This action cannot be undone.") },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -397,7 +397,7 @@ private fun AddSubjectDialog(
                     Spacer(modifier = Modifier.height(16.dp))
                     OutlinedTextField(
                         value = requiredAttendance,
-                        onValueChange = { requiredAttendance = it.filter { c -> c.isDigit() } },
+                        onValueChange = { requiredAttendance = it.filter { c -> c.isDigit() }.take(3) },
                         label = { Text("Required Attendance (%)") },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         singleLine = true,
@@ -458,7 +458,7 @@ private fun EditSubjectDialog(
                     Spacer(modifier = Modifier.height(12.dp))
                     OutlinedTextField(
                         value = requiredAttendance,
-                        onValueChange = { requiredAttendance = it.filter { c -> c.isDigit() } },
+                        onValueChange = { requiredAttendance = it.filter { c -> c.isDigit() }.take(3) },
                         label = { Text("Required Attendance (%)") },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         singleLine = true,
@@ -471,7 +471,7 @@ private fun EditSubjectDialog(
                     ) {
                         OutlinedTextField(
                             value = presentLectures,
-                            onValueChange = { presentLectures = it.filter { c -> c.isDigit() } },
+                            onValueChange = { presentLectures = it.filter { c -> c.isDigit() }.take(5) },
                             label = { Text("Present") },
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                             singleLine = true,
@@ -479,7 +479,7 @@ private fun EditSubjectDialog(
                         )
                         OutlinedTextField(
                             value = absentLectures,
-                            onValueChange = { absentLectures = it.filter { c -> c.isDigit() } },
+                            onValueChange = { absentLectures = it.filter { c -> c.isDigit() }.take(5) },
                             label = { Text("Absent") },
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                             singleLine = true,
