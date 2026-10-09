@@ -1,6 +1,8 @@
 package com.attendance.tracker.data.model
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class SubjectTest {
@@ -54,5 +56,18 @@ class SubjectTest {
     fun `getDisplayName falls back to the plain name when no folder is found`() {
         val subSubject = Subject(id = 2, name = "Lecture", parentSubjectId = 99)
         assertEquals("Lecture", subSubject.getDisplayName(listOf(subSubject)))
+    }
+
+    @Test
+    fun `exact threshold counts as meeting it despite float rounding`() {
+        // 53/100 as float is 52.999996f, which a float comparison treats as below 53%
+        val subject = Subject(name = "Physics", requiredAttendance = 53, totalLectures = 100, presentLectures = 53, absentLectures = 47)
+        assertTrue(subject.isAboveRequired)
+        assertEquals(0, subject.classesToAttend)
+    }
+
+    @Test
+    fun `subject with no lectures is not above a positive requirement`() {
+        assertFalse(Subject(name = "Physics", requiredAttendance = 75).isAboveRequired)
     }
 }

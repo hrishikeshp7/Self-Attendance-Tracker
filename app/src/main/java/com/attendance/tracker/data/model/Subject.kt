@@ -23,8 +23,11 @@ data class Subject(
     val currentAttendancePercentage: Float
         get() = if (totalLectures > 0) (presentLectures.toFloat() / totalLectures) * 100 else 0f
     
+    // Integer math: the float percentage can land just under an exact threshold
+    // (e.g. 53/100 -> 52.999996f < 53), wrongly flagging a subject as below required.
     val isAboveRequired: Boolean
-        get() = currentAttendancePercentage >= requiredAttendance
+        get() = if (totalLectures > 0) presentLectures * 100L >= requiredAttendance.toLong() * totalLectures
+                else requiredAttendance <= 0
     
     /**
      * Calculate how many classes need to be attended to meet the required attendance
