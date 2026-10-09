@@ -25,6 +25,7 @@ object NotificationHelper {
 
     const val PREF_NAME = "notification_prefs"
     const val PREF_NOTIFICATIONS_ENABLED = "notifications_enabled"
+    const val PREF_PERMISSION_ASKED = "permission_asked"
     const val PREF_REMINDER_HOUR = "reminder_hour"
     const val PREF_REMINDER_MINUTE = "reminder_minute"
 
@@ -146,6 +147,14 @@ object NotificationHelper {
         } else {
             true
         }
+    }
+
+    /** The system permission prompt is shown once; after that Settings explains how to fix it. */
+    fun wasPermissionRequested(context: Context): Boolean =
+        context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE).getBoolean(PREF_PERMISSION_ASKED, false)
+
+    fun markPermissionRequested(context: Context) {
+        context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE).edit().putBoolean(PREF_PERMISSION_ASKED, true).apply()
     }
 
     fun areNotificationsEnabled(context: Context): Boolean {

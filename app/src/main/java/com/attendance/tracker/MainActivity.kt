@@ -36,6 +36,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         NotificationHelper.createNotificationChannels(this)
+        com.attendance.tracker.widget.WidgetDayRollover.schedule(this)
         setupNotifications()
 
         setContent {
@@ -67,7 +68,10 @@ class MainActivity : ComponentActivity() {
                 ) == PackageManager.PERMISSION_GRANTED -> {
                     ReminderScheduler.scheduleDailyReminder(this)
                 }
-                else -> {
+                // Ask once only; asking on every launch is nagging, and Settings explains
+                // how to turn notifications back on if the user said no.
+                !NotificationHelper.wasPermissionRequested(this) -> {
+                    NotificationHelper.markPermissionRequested(this)
                     requestPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
                 }
             }

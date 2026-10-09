@@ -1,12 +1,17 @@
 package com.attendance.tracker.ui.screens.settings
 
 import android.content.Context
+import android.content.Intent
+import android.provider.Settings
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.compose.ui.unit.dp
 import com.attendance.tracker.notification.NotificationHelper
 import com.attendance.tracker.notification.ReminderScheduler
@@ -29,6 +34,17 @@ fun SettingsScreen(
     var reminderHour by remember { mutableIntStateOf(savedHour) }
     var reminderMinute by remember { mutableIntStateOf(savedMinute) }
     var showTimePicker by remember { mutableStateOf(false) }
+
+    // The user can change this in system settings and come back, so re-check on every resume
+    var hasPermission by remember { mutableStateOf(NotificationHelper.hasNotificationPermission(context)) }
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) hasPermission = NotificationHelper.hasNotificationPermission(context)
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
 
     if (showTimePicker) {
         ReminderTimePickerDialog(
@@ -202,6 +218,29 @@ fun SettingsScreen(
                                 }
                             }
                         )
+                    }
+
+                    // The switch can be on while Android blocks the app's notifications
+                    if (notificationsEnabled && !hasPermission) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Notifications are blocked for this app, so no reminder will appear.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.weight(1f)
+                            )
+                            TextButton(onClick = {
+                                context.startActivity(
+                                    Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                                        .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+                                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                )
+                            }) { Text("Open settings") }
+                        }
                     }
 
                     // Reminder time picker
