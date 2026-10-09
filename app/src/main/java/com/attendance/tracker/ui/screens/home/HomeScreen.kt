@@ -1,6 +1,8 @@
 package com.attendance.tracker.ui.screens.home
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -276,7 +278,7 @@ private fun NoClassesTodayState(
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.padding(40.dp)
+            modifier = Modifier.verticalScroll(rememberScrollState()).padding(40.dp)  // scrolls when short (landscape)
         ) {
             Text(
                 text = "🎉",
@@ -322,7 +324,7 @@ private fun EmptySubjectsState(modifier: Modifier = Modifier) {
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.padding(40.dp)
+            modifier = Modifier.verticalScroll(rememberScrollState()).padding(40.dp)  // scrolls when short (landscape)
         ) {
             Text(
                 text = "📚",

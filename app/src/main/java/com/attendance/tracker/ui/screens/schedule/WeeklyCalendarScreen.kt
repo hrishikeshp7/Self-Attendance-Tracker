@@ -230,7 +230,7 @@ private fun EmptyTimetableState(modifier: Modifier = Modifier) {
     Box(modifier = modifier, contentAlignment = Alignment.Center) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.padding(40.dp)
+            modifier = Modifier.verticalScroll(rememberScrollState()).padding(40.dp)  // scrolls when short (landscape)
         ) {
             Text(text = "📅", fontSize = 64.sp)
             Spacer(modifier = Modifier.height(20.dp))
