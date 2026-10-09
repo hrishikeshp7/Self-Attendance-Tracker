@@ -25,7 +25,7 @@ import java.time.LocalTime
  */
 object BackupManager {
 
-    private const val BACKUP_VERSION = 2
+    private const val BACKUP_VERSION = 3
 
     // -----------------------------------------------------------------------
     // JSON export
@@ -64,6 +64,7 @@ object BackupManager {
             obj.put("date", r.date.toString())
             obj.put("status", r.status.name)
             obj.put("count", r.count)
+            obj.put("otherCount", r.otherCount)
             recordsArray.put(obj)
         }
         root.put("attendanceRecords", recordsArray)
@@ -95,11 +96,13 @@ object BackupManager {
     )
 
     /**
-     * Parses a JSON backup string.  Returns null if the string is not valid backup JSON.
+     * Parses a JSON backup string.  Returns null if the string is not valid backup JSON or comes from a newer app version.
      */
     fun parseJson(json: String): BackupData? {
         return try {
             val root = JSONObject(json)
+            // A newer app's file may carry data this version would silently drop on restore
+            if (root.optInt("version", 1) > BACKUP_VERSION) return null
 
             // --- subjects ---
             val subjectsArray = root.getJSONArray("subjects")
@@ -126,7 +129,8 @@ object BackupManager {
                     subjectId = obj.getLong("subjectId"),
                     date = LocalDate.parse(obj.getString("date")),
                     status = AttendanceStatus.valueOf(obj.getString("status")),
-                    count = obj.optInt("count", 1)
+                    count = obj.optInt("count", 1),
+                    otherCount = obj.optInt("otherCount", 0)
                 )
             }
 
@@ -166,6 +170,10 @@ object BackupManager {
             .forEach { r ->
                 val name = subjectMap[r.subjectId]?.name ?: r.subjectId.toString()
                 sb.appendLine("${csvEscape(name)},${r.date},${r.status.name},${r.count}")
+                if (r.otherCount > 0) {
+                    val other = if (r.status == AttendanceStatus.PRESENT) AttendanceStatus.ABSENT else AttendanceStatus.PRESENT
+                    sb.appendLine("${csvEscape(name)},${r.date},${other.name},${r.otherCount}")
+                }
             }
         return sb.toString()
     }

@@ -3,6 +3,7 @@ package com.attendance.tracker.ui
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.room.withTransaction
 import com.attendance.tracker.backup.BackupManager
 import com.attendance.tracker.data.database.AttendanceDatabase
 import com.attendance.tracker.data.model.AttendanceRecord
@@ -10,9 +11,12 @@ import com.attendance.tracker.data.model.AttendanceStatus
 import com.attendance.tracker.data.model.ScheduleEntry
 import com.attendance.tracker.data.model.Subject
 import com.attendance.tracker.data.repository.AttendanceRepository
+import com.attendance.tracker.widget.refreshAllWidgets
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.LocalTime
@@ -28,15 +32,6 @@ class AttendanceViewModel(application: Application) : AndroidViewModel(applicati
     private val themeRepository = com.attendance.tracker.data.repository.ThemePreferenceRepository(
         database.themePreferenceDao()
     )
-
-    // Undo/Redo Manager
-    private val undoRedoManager = UndoRedoManager()
-    
-    private val _canUndo = MutableStateFlow(false)
-    val canUndo: StateFlow<Boolean> = _canUndo.asStateFlow()
-    
-    private val _canRedo = MutableStateFlow(false)
-    val canRedo: StateFlow<Boolean> = _canRedo.asStateFlow()
 
     // UI State
     val subjects: StateFlow<List<Subject>> = repository.actualSubjects
@@ -76,6 +71,14 @@ class AttendanceViewModel(application: Application) : AndroidViewModel(applicati
     // count of 2 after a single intended tap.
     private val pendingAttendanceOps = mutableSetOf<String>()
 
+    // Serialises every attendance read-modify-write (mark/clear/edit). They suspend
+    // between reading a subject's counts and writing them back, so without this two edits
+    // racing a mark on the same subject could lose one of the two updates.
+    private val attendanceMutex = Mutex()
+
+    // Date todayAttendance is currently bound to; see refreshToday().
+    private var todayAttendanceDate: LocalDate? = null
+
     // Theme preferences
     val themePreference = themeRepository.themePreference
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
@@ -87,9 +90,31 @@ class AttendanceViewModel(application: Application) : AndroidViewModel(applicati
         viewModelScope.launch {
             themeRepository.initializeDefaultIfNeeded()
         }
+        // Home-screen widgets read the database but are never told it changed; re-render
+        // them whenever subject totals, the timetable or today's marks change.
+        viewModelScope.launch {
+            combine(repository.allSubjects, repository.allScheduleEntries, _todayAttendance) { _, _, _ -> }
+                .drop(1)
+                .collectLatest {
+                    try {
+                        refreshAllWidgets(getApplication<Application>())
+                    } catch (e: Exception) {
+                        // A widget host failure must not take the app down with it
+                    }
+                }
+        }
     }
 
-    fun loadAttendanceForDate(date: LocalDate) {
+    /** Re-binds todayAttendance to the current date if the day has rolled over since it was loaded. */
+    fun refreshToday() {
+        val today = LocalDate.now()
+        if (todayAttendanceDate != today) loadAttendanceForDate(today)
+    }
+
+    // todayAttendance always tracks one date (today, for the Home screen). The Room flow
+    // re-emits on every write, so callers never need to reload it after marking.
+    private fun loadAttendanceForDate(date: LocalDate) {
+        todayAttendanceDate = date
         todayAttendanceJob?.cancel()
         todayAttendanceJob = viewModelScope.launch {
             repository.getAttendanceForDate(date).collect { records ->
@@ -110,8 +135,9 @@ class AttendanceViewModel(application: Application) : AndroidViewModel(applicati
     }
 
     fun setSelectedDate(date: LocalDate) {
+        // Only the calendar's selection: todayAttendance must stay on today for Home,
+        // which always marks LocalDate.now().
         _selectedDate.value = date
-        loadAttendanceForDate(date)
     }
 
     fun setSelectedMonth(yearMonth: YearMonth) {
@@ -172,40 +198,42 @@ class AttendanceViewModel(application: Application) : AndroidViewModel(applicati
         if (!pendingAttendanceOps.add(opKey)) return
         viewModelScope.launch {
             try {
-                // Get current state before marking
-                val subject = repository.getSubjectById(subjectId)
-                val oldRecord = repository.getAttendanceRecord(subjectId, date)
+                attendanceMutex.withLock { markAttendanceLocked(subjectId, status, date) }
+            } finally {
+                pendingAttendanceOps.remove(opKey)
+            }
+        }
+    }
 
-                // Re-tapping the current status is a no-op: nothing to mark or undo
-                if (subject != null && oldRecord?.status != status) {
-                    // Mark the new status first to get the new count
-                    when (status) {
-                        AttendanceStatus.PRESENT -> repository.markPresent(subjectId, date)
-                        AttendanceStatus.ABSENT -> repository.markAbsent(subjectId, date)
-                        AttendanceStatus.NO_CLASS -> repository.markNoClass(subjectId, date)
+    private suspend fun markAttendanceLocked(subjectId: Long, status: AttendanceStatus, date: LocalDate) {
+        // Re-tapping the current status is a no-op (the repository ignores it too)
+        if (repository.getSubjectById(subjectId) == null) return
+        when (status) {
+            AttendanceStatus.PRESENT -> repository.markPresent(subjectId, date)
+            AttendanceStatus.ABSENT -> repository.markAbsent(subjectId, date)
+            AttendanceStatus.NO_CLASS -> repository.markNoClass(subjectId, date)
+        }
+    }
+
+    /**
+     * Records an extra lecture on [date] with [status], on top of whatever the day already
+     * holds: a day can have both present and absent lectures (e.g. attended one, missed
+     * another). On a day with no mark yet it behaves like a normal mark.
+     */
+    fun addExtraClass(subjectId: Long, status: AttendanceStatus, date: LocalDate = LocalDate.now()) {
+        if (status == AttendanceStatus.NO_CLASS) {
+            markAttendance(subjectId, status, date)
+            return
+        }
+        val opKey = "$subjectId|$date"
+        if (!pendingAttendanceOps.add(opKey)) return
+        viewModelScope.launch {
+            try {
+                attendanceMutex.withLock {
+                    // addExtraLecture marks the day normally when it has no lectures yet
+                    if (repository.getSubjectById(subjectId) != null) {
+                        repository.addExtraLecture(subjectId, date, status)
                     }
-
-                    // Get the updated record to capture the new count
-                    val newRecord = repository.getAttendanceRecord(subjectId, date)
-                    val updatedSubject = repository.getSubjectById(subjectId)
-
-                    if (newRecord != null && updatedSubject != null) {
-                        // Record action for undo/redo
-                        val action = AttendanceAction(
-                            subjectId = subjectId,
-                            date = date,
-                            oldStatus = oldRecord?.status,
-                            oldCount = oldRecord?.count ?: 0,
-                            newStatus = newRecord.status,
-                            newCount = newRecord.count,
-                            oldPresentCount = subject.presentLectures,
-                            oldAbsentCount = subject.absentLectures
-                        )
-                        undoRedoManager.recordAction(action)
-                        updateUndoRedoState()
-                    }
-
-                    loadAttendanceForDate(date)
                 }
             } finally {
                 pendingAttendanceOps.remove(opKey)
@@ -213,43 +241,15 @@ class AttendanceViewModel(application: Application) : AndroidViewModel(applicati
         }
     }
 
-    /**
-     * Records an extra lecture on [date]. If the day already has the same status the lecture
-     * count goes up by one; otherwise it behaves like a normal mark.
-     */
-    fun addExtraClass(subjectId: Long, status: AttendanceStatus, date: LocalDate = LocalDate.now()) {
+    /** Per-lecture editor: sets exactly [present] present and [absent] absent lectures on [date]. */
+    fun setDayCounts(subjectId: Long, date: LocalDate, present: Int, absent: Int) {
         val opKey = "$subjectId|$date"
-        if (status == AttendanceStatus.NO_CLASS || !pendingAttendanceOps.add(opKey)) {
-            if (status == AttendanceStatus.NO_CLASS) markAttendance(subjectId, status, date)
-            return
-        }
+        if (!pendingAttendanceOps.add(opKey)) return
         viewModelScope.launch {
             try {
-                val subject = repository.getSubjectById(subjectId)
-                val oldRecord = repository.getAttendanceRecord(subjectId, date)
-                if (subject == null || oldRecord?.status != status) {
-                    pendingAttendanceOps.remove(opKey)
-                    markAttendance(subjectId, status, date)
-                    return@launch
+                attendanceMutex.withLock {
+                    repository.setDayCounts(subjectId, date, present.coerceAtLeast(0), absent.coerceAtLeast(0))
                 }
-                repository.addExtraLecture(subjectId, date)
-                val newRecord = repository.getAttendanceRecord(subjectId, date)
-                if (newRecord != null) {
-                    undoRedoManager.recordAction(
-                        AttendanceAction(
-                            subjectId = subjectId,
-                            date = date,
-                            oldStatus = oldRecord.status,
-                            oldCount = oldRecord.count,
-                            newStatus = newRecord.status,
-                            newCount = newRecord.count,
-                            oldPresentCount = subject.presentLectures,
-                            oldAbsentCount = subject.absentLectures
-                        )
-                    )
-                    updateUndoRedoState()
-                }
-                loadAttendanceForDate(date)
             } finally {
                 pendingAttendanceOps.remove(opKey)
             }
@@ -262,139 +262,14 @@ class AttendanceViewModel(application: Application) : AndroidViewModel(applicati
         if (!pendingAttendanceOps.add(opKey)) return
         viewModelScope.launch {
             try {
-                val record = repository.getAttendanceRecord(subjectId, date)
-                val subject = repository.getSubjectById(subjectId)
-
-                if (record != null && subject != null) {
-                    // Adjust counts based on the status we're removing
-                    when (record.status) {
-                        AttendanceStatus.PRESENT -> {
-                            repository.updateAttendanceCounts(
-                                subjectId,
-                                subject.presentLectures - record.count,
-                                subject.absentLectures
-                            )
-                        }
-                        AttendanceStatus.ABSENT -> {
-                            repository.updateAttendanceCounts(
-                                subjectId,
-                                subject.presentLectures,
-                                subject.absentLectures - record.count
-                            )
-                        }
-                        AttendanceStatus.NO_CLASS -> {
-                            // NO_CLASS does not affect present/absent counts
-                        }
-                    }
-
-                    // Record the clear action for undo
-                    val action = AttendanceAction(
-                        subjectId = subjectId,
-                        date = date,
-                        oldStatus = record.status,
-                        oldCount = record.count,
-                        newStatus = AttendanceStatus.PRESENT, // arbitrary, won't be used since newCount is 0 conceptually
-                        newCount = 0,
-                        oldPresentCount = subject.presentLectures,
-                        oldAbsentCount = subject.absentLectures
-                    )
-                    undoRedoManager.recordAction(action)
-                    updateUndoRedoState()
-
-                    // Delete the record
-                    repository.deleteAttendanceRecord(subjectId, date)
-
-                    loadAttendanceForDate(date)
-                }
+                attendanceMutex.withLock { repository.clearDay(subjectId, date) }
             } finally {
                 pendingAttendanceOps.remove(opKey)
             }
         }
     }
-    
-    fun undo() {
-        viewModelScope.launch {
-            val action = undoRedoManager.undo()
-            if (action != null) {
-                // Restore the old state
-                val subject = repository.getSubjectById(action.subjectId)
-                if (subject != null) {
-                    // Restore attendance counts first
-                    repository.updateAttendanceCounts(
-                        action.subjectId,
-                        action.oldPresentCount,
-                        action.oldAbsentCount
-                    )
-                    
-                    // Restore or delete the attendance record
-                    if (action.oldStatus != null && action.oldCount > 0) {
-                        // There was a previous status, restore it with the count
-                        repository.setAttendanceStatus(action.subjectId, action.date, action.oldStatus, action.oldCount)
-                    } else {
-                        // No previous status, delete the record
-                        repository.deleteAttendanceRecord(action.subjectId, action.date)
-                    }
-                    
-                    loadAttendanceForDate(action.date)
-                    updateUndoRedoState()
-                }
-            }
-        }
-    }
-    
-    fun redo() {
-        viewModelScope.launch {
-            val action = undoRedoManager.redo()
-            if (action != null) {
-                // Get current subject to calculate new counts
-                val subject = repository.getSubjectById(action.subjectId)
-                if (subject != null) {
-                    // Calculate what the counts should be after redo. Using the count
-                    // contributed by each status (rather than a same-status/different-status
-                    // branch) also correctly handles redoing a repeated same-status mark
-                    // (e.g. PRESENT count 1 -> PRESENT count 2).
-                    val presentDiff = (if (action.newStatus == AttendanceStatus.PRESENT) action.newCount else 0) -
-                        (if (action.oldStatus == AttendanceStatus.PRESENT) action.oldCount else 0)
-                    val absentDiff = (if (action.newStatus == AttendanceStatus.ABSENT) action.newCount else 0) -
-                        (if (action.oldStatus == AttendanceStatus.ABSENT) action.oldCount else 0)
-
-                    // Update subject counts
-                    repository.updateAttendanceCounts(
-                        action.subjectId,
-                        subject.presentLectures + presentDiff,
-                        subject.absentLectures + absentDiff
-                    )
-
-                    // Set the attendance record with the new status and count, or delete it
-                    // if the action being redone was a clear (newCount == 0) — otherwise a
-                    // bogus zero-count record would be left behind.
-                    if (action.newCount > 0) {
-                        repository.setAttendanceStatus(action.subjectId, action.date, action.newStatus, action.newCount)
-                    } else {
-                        repository.deleteAttendanceRecord(action.subjectId, action.date)
-                    }
-
-                    loadAttendanceForDate(action.date)
-                    updateUndoRedoState()
-                }
-            }
-        }
-    }
-    
-    private fun updateUndoRedoState() {
-        _canUndo.value = undoRedoManager.canUndo
-        _canRedo.value = undoRedoManager.canRedo
-    }
 
     // Schedule operations
-    fun addScheduleEntry(subjectId: Long, dayOfWeek: DayOfWeek) {
-        viewModelScope.launch {
-            repository.insertScheduleEntry(
-                ScheduleEntry(subjectId = subjectId, dayOfWeek = dayOfWeek)
-            )
-        }
-    }
-
     fun removeScheduleEntry(entry: ScheduleEntry) {
         viewModelScope.launch {
             repository.deleteScheduleEntry(entry)
@@ -450,12 +325,6 @@ class AttendanceViewModel(application: Application) : AndroidViewModel(applicati
         }
     }
 
-    fun updateCustomColors(primaryColor: Long?, secondaryColor: Long?) {
-        viewModelScope.launch {
-            themeRepository.updateCustomColors(primaryColor, secondaryColor)
-        }
-    }
-
     // -----------------------------------------------------------------------
     // Backup / Restore
     // -----------------------------------------------------------------------
@@ -494,8 +363,11 @@ class AttendanceViewModel(application: Application) : AndroidViewModel(applicati
                 return@launch
             }
             try {
-                repository.restoreData(data.subjects, data.attendanceRecords, data.scheduleEntries)
-                loadAttendanceForDate(LocalDate.now())
+                // One transaction: if any insert fails (e.g. a record pointing at a subject
+                // missing from the file) the wipe is rolled back instead of losing all data.
+                database.withTransaction {
+                    repository.restoreData(data.subjects, data.attendanceRecords, data.scheduleEntries)
+                }
                 _backupRestoreStatus.value = BackupRestoreStatus.SUCCESS
                 _backupRestoreMessage.value =
                     "Restore complete: ${data.subjects.size} subjects, " +
@@ -517,7 +389,7 @@ class AttendanceViewModel(application: Application) : AndroidViewModel(applicati
         viewModelScope.launch {
             _backupRestoreStatus.value = BackupRestoreStatus.IN_PROGRESS
             try {
-                val r = repository.importCsv(data)
+                val r = database.withTransaction { repository.importCsv(data) }
                 _backupRestoreStatus.value = BackupRestoreStatus.SUCCESS
                 _backupRestoreMessage.value =
                     "Import complete: ${r.subjectsAdded} subjects added" +

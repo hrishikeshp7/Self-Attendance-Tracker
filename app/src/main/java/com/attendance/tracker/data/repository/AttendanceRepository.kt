@@ -40,207 +40,96 @@ class AttendanceRepository(
         subjectDao.deleteSubject(subject)
     }
 
-    suspend fun markPresent(subjectId: Long, date: LocalDate) {
-        // Check if there's already a record for this subject on this date
-        val existingRecord = attendanceDao.getAttendanceRecord(subjectId, date)
-        
-        if (existingRecord != null && existingRecord.status == AttendanceStatus.PRESENT) {
-            // Already marked with this status: repeated taps must not add another lecture
-            return
-        } else if (existingRecord != null) {
-            // Different status exists, replace it
-            // First, adjust subject counts based on previous status
-            when (existingRecord.status) {
-                AttendanceStatus.ABSENT -> {
-                    // Was absent, now present: decrease absent, increase present
-                    val subject = getSubjectById(subjectId)
-                    subject?.let {
-                        subjectDao.updateAttendanceCounts(
-                            subjectId,
-                            it.presentLectures + existingRecord.count,
-                            it.absentLectures - existingRecord.count
-                        )
-                    }
-                }
-                AttendanceStatus.NO_CLASS -> {
-                    // Was no class, now present: increase present and total
-                    val subject = getSubjectById(subjectId)
-                    subject?.let {
-                        subjectDao.updateAttendanceCounts(
-                            subjectId,
-                            it.presentLectures + existingRecord.count,
-                            it.absentLectures
-                        )
-                    }
-                }
-                else -> {}
-            }
-            // Insert new present record, carrying over the previous count so the
-            // per-day record stays consistent with the aggregate adjustment above
-            attendanceDao.insertAttendance(
-                AttendanceRecord(
-                    subjectId = subjectId,
-                    date = date,
-                    status = AttendanceStatus.PRESENT,
-                    count = existingRecord.count
-                )
-            )
-        } else {
-            // No existing record, create new one
-            subjectDao.markPresent(subjectId)
-            attendanceDao.insertAttendance(
-                AttendanceRecord(
-                    subjectId = subjectId,
-                    date = date,
-                    status = AttendanceStatus.PRESENT,
-                    count = 1
-                )
-            )
-        }
-    }
+    suspend fun markPresent(subjectId: Long, date: LocalDate) = setDayStatus(subjectId, date, AttendanceStatus.PRESENT)
 
-    /** Adds one more lecture on [date] with the same status (PRESENT/ABSENT) already recorded. */
-    suspend fun addExtraLecture(subjectId: Long, date: LocalDate) {
-        val record = attendanceDao.getAttendanceRecord(subjectId, date) ?: return
-        when (record.status) {
-            AttendanceStatus.PRESENT -> subjectDao.markPresent(subjectId)
-            AttendanceStatus.ABSENT -> subjectDao.markAbsent(subjectId)
-            AttendanceStatus.NO_CLASS -> return
-        }
-        attendanceDao.insertAttendance(record.copy(count = record.count + 1))
-    }
+    suspend fun markAbsent(subjectId: Long, date: LocalDate) = setDayStatus(subjectId, date, AttendanceStatus.ABSENT)
 
-    suspend fun markAbsent(subjectId: Long, date: LocalDate) {
-        // Check if there's already a record for this subject on this date
-        val existingRecord = attendanceDao.getAttendanceRecord(subjectId, date)
-        
-        if (existingRecord != null && existingRecord.status == AttendanceStatus.ABSENT) {
-            // Already marked with this status: repeated taps must not add another lecture
-            return
-        } else if (existingRecord != null) {
-            // Different status exists, replace it
-            // First, adjust subject counts based on previous status
-            when (existingRecord.status) {
-                AttendanceStatus.PRESENT -> {
-                    // Was present, now absent: decrease present, increase absent
-                    val subject = getSubjectById(subjectId)
-                    subject?.let {
-                        subjectDao.updateAttendanceCounts(
-                            subjectId,
-                            it.presentLectures - existingRecord.count,
-                            it.absentLectures + existingRecord.count
-                        )
-                    }
-                }
-                AttendanceStatus.NO_CLASS -> {
-                    // Was no class, now absent: increase absent and total
-                    val subject = getSubjectById(subjectId)
-                    subject?.let {
-                        subjectDao.updateAttendanceCounts(
-                            subjectId,
-                            it.presentLectures,
-                            it.absentLectures + existingRecord.count
-                        )
-                    }
-                }
-                else -> {}
-            }
-            // Insert new absent record, carrying over the previous count so the
-            // per-day record stays consistent with the aggregate adjustment above
-            attendanceDao.insertAttendance(
-                AttendanceRecord(
-                    subjectId = subjectId,
-                    date = date,
-                    status = AttendanceStatus.ABSENT,
-                    count = existingRecord.count
-                )
-            )
-        } else {
-            // No existing record, create new one
-            subjectDao.markAbsent(subjectId)
-            attendanceDao.insertAttendance(
-                AttendanceRecord(
-                    subjectId = subjectId,
-                    date = date,
-                    status = AttendanceStatus.ABSENT,
-                    count = 1
-                )
-            )
-        }
-    }
+    suspend fun markNoClass(subjectId: Long, date: LocalDate) = setDayStatus(subjectId, date, AttendanceStatus.NO_CLASS)
 
-    suspend fun markNoClass(subjectId: Long, date: LocalDate) {
-        // Check if there's already a record for this subject on this date
-        val existingRecord = attendanceDao.getAttendanceRecord(subjectId, date)
-        
-        if (existingRecord != null && existingRecord.status == AttendanceStatus.NO_CLASS) {
-            // Already marked with this status: repeated taps must not add another lecture
-            return
-        } else if (existingRecord != null) {
-            // Different status exists, replace it
-            // Adjust subject counts based on previous status
-            when (existingRecord.status) {
-                AttendanceStatus.PRESENT -> {
-                    // Was present, now no class: decrease present and total
-                    val subject = getSubjectById(subjectId)
-                    subject?.let {
-                        subjectDao.updateAttendanceCounts(
-                            subjectId,
-                            it.presentLectures - existingRecord.count,
-                            it.absentLectures
-                        )
-                    }
-                }
-                AttendanceStatus.ABSENT -> {
-                    // Was absent, now no class: decrease absent and total
-                    val subject = getSubjectById(subjectId)
-                    subject?.let {
-                        subjectDao.updateAttendanceCounts(
-                            subjectId,
-                            it.presentLectures,
-                            it.absentLectures - existingRecord.count
-                        )
-                    }
-                }
-                else -> {}
+    /**
+     * Sets the whole day to [status]. A day that already holds lectures (including a mixed
+     * present+absent day) keeps its total lecture count, all switched to [status]; marking
+     * a day with the status it already has is a no-op so repeated taps never add a lecture.
+     * Subject totals are adjusted by the difference.
+     */
+    private suspend fun setDayStatus(subjectId: Long, date: LocalDate, status: AttendanceStatus) {
+        val existing = attendanceDao.getAttendanceRecord(subjectId, date)
+        if (existing?.status == status) return
+        val total = if (existing == null) 1 else existing.count + existing.otherCount
+        val newPresent = if (status == AttendanceStatus.PRESENT) total else 0
+        val newAbsent = if (status == AttendanceStatus.ABSENT) total else 0
+        if (existing == null) {
+            when (status) {
+                AttendanceStatus.PRESENT -> subjectDao.markPresent(subjectId)
+                AttendanceStatus.ABSENT -> subjectDao.markAbsent(subjectId)
+                AttendanceStatus.NO_CLASS -> {}
             }
-            // Insert new no class record, carrying over the previous count so the
-            // per-day record stays consistent with the aggregate adjustment above
-            attendanceDao.insertAttendance(
-                AttendanceRecord(
-                    subjectId = subjectId,
-                    date = date,
-                    status = AttendanceStatus.NO_CLASS,
-                    count = existingRecord.count
-                )
-            )
         } else {
-            // No existing record, create new one
-            attendanceDao.insertAttendance(
-                AttendanceRecord(
-                    subjectId = subjectId,
-                    date = date,
-                    status = AttendanceStatus.NO_CLASS,
-                    count = 1
+            getSubjectById(subjectId)?.let {
+                subjectDao.updateAttendanceCounts(
+                    subjectId,
+                    it.presentLectures + newPresent - existing.presentCount,
+                    it.absentLectures + newAbsent - existing.absentCount
                 )
-            )
+            }
         }
-    }
-    
-    suspend fun setAttendanceStatus(subjectId: Long, date: LocalDate, status: AttendanceStatus, count: Int = 1) {
-        // Insert/update attendance record without modifying subject counts
         attendanceDao.insertAttendance(
-            AttendanceRecord(
-                subjectId = subjectId,
-                date = date,
-                status = status,
-                count = count
-            )
+            AttendanceRecord(subjectId = subjectId, date = date, status = status, count = total)
         )
     }
 
-    suspend fun updateAttendanceCounts(subjectId: Long, present: Int, absent: Int) {
-        subjectDao.updateAttendanceCounts(subjectId, present, absent)
+    /** Removes the day's record (any status, including No Class); subject totals move by what it held. */
+    suspend fun clearDay(subjectId: Long, date: LocalDate) {
+        val existing = attendanceDao.getAttendanceRecord(subjectId, date) ?: return
+        getSubjectById(subjectId)?.let {
+            subjectDao.updateAttendanceCounts(subjectId, it.presentLectures - existing.presentCount, it.absentLectures - existing.absentCount)
+        }
+        attendanceDao.deleteAttendanceForSubjectOnDate(subjectId, date)
+    }
+
+    /**
+     * Sets the exact number of present and absent lectures on [date] (the per-lecture editor).
+     * Both zero removes the day's record. Subject totals move by the difference.
+     */
+    suspend fun setDayCounts(subjectId: Long, date: LocalDate, present: Int, absent: Int) {
+        val existing = attendanceDao.getAttendanceRecord(subjectId, date)
+        val oldPresent = existing?.presentCount ?: 0
+        val oldAbsent = existing?.absentCount ?: 0
+        if (present == oldPresent && absent == oldAbsent) return
+        getSubjectById(subjectId)?.let {
+            subjectDao.updateAttendanceCounts(subjectId, it.presentLectures + present - oldPresent, it.absentLectures + absent - oldAbsent)
+        }
+        when {
+            present + absent == 0 -> attendanceDao.deleteAttendanceForSubjectOnDate(subjectId, date)
+            present >= absent -> attendanceDao.insertAttendance(
+                AttendanceRecord(subjectId = subjectId, date = date, status = AttendanceStatus.PRESENT, count = present, otherCount = absent)
+            )
+            else -> attendanceDao.insertAttendance(
+                AttendanceRecord(subjectId = subjectId, date = date, status = AttendanceStatus.ABSENT, count = absent, otherCount = present)
+            )
+        }
+    }
+
+    /**
+     * Adds one more lecture on [date] with [status] (PRESENT or ABSENT), alongside whatever the
+     * day already holds: present and absent lectures can coexist on the same date. A day with
+     * no record, or marked No Class, just gets marked [status].
+     */
+    suspend fun addExtraLecture(subjectId: Long, date: LocalDate, status: AttendanceStatus) {
+        if (status == AttendanceStatus.NO_CLASS) return
+        val record = attendanceDao.getAttendanceRecord(subjectId, date)
+        if (record == null || record.status == AttendanceStatus.NO_CLASS) {
+            setDayStatus(subjectId, date, status)
+            return
+        }
+        when (status) {
+            AttendanceStatus.PRESENT -> subjectDao.markPresent(subjectId)
+            else -> subjectDao.markAbsent(subjectId)
+        }
+        attendanceDao.insertAttendance(
+            if (record.status == status) record.copy(count = record.count + 1)
+            else record.copy(otherCount = record.otherCount + 1)
+        )
     }
 
     // Attendance operations

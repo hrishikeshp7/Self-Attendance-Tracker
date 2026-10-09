@@ -222,4 +222,74 @@ class AttendanceRepositoryTest {
         assertNull(lecture.parentSubjectId)
         assertNull(practical.parentSubjectId)
     }
+
+    /** Stored counts must equal what the per-day records add up to. */
+    private suspend fun assertCountsMatchRecords(subjectId: Long) {
+        val subject = repository.getSubjectById(subjectId)!!
+        val records = attendanceDao.records.values.filter { it.subjectId == subjectId }
+        val present = records.sumOf { it.presentCount }
+        val absent = records.sumOf { it.absentCount }
+        assertEquals("present", present, subject.presentLectures)
+        assertEquals("absent", absent, subject.absentLectures)
+        assertEquals("total", present + absent, subject.totalLectures)
+    }
+
+    @Test
+    fun `random mark sequences keep stored counts equal to the records`() = runBlocking {
+        val rnd = java.util.Random(42)
+        val dates = (0 until 4).map { date.plusDays(it.toLong()) }
+        val ids = listOf(1L, 2L)
+        ids.forEach { addSubject(it) }
+        repeat(500) {
+            val id = ids[rnd.nextInt(ids.size)]
+            val d = dates[rnd.nextInt(dates.size)]
+            when (rnd.nextInt(6)) {
+                0 -> repository.markPresent(id, d)
+                1 -> repository.markAbsent(id, d)
+                2 -> repository.markNoClass(id, d)
+                3 -> repository.addExtraLecture(
+                    id, d,
+                    if (rnd.nextBoolean()) AttendanceStatus.PRESENT else AttendanceStatus.ABSENT
+                )
+                4 -> repository.setDayCounts(id, d, rnd.nextInt(4), rnd.nextInt(4))
+                else -> repository.clearDay(id, d)
+            }
+            ids.forEach { assertCountsMatchRecords(it) }
+        }
+    }
+
+    @Test
+    fun `extra lecture of the opposite status keeps both on the same day`() = runBlocking {
+        addSubject()
+        repository.markPresent(1L, date)
+        repository.addExtraLecture(1L, date, AttendanceStatus.ABSENT)
+        val record = repository.getAttendanceRecord(1L, date)!!
+        assertEquals(1, record.presentCount)
+        assertEquals(1, record.absentCount)
+        val s = repository.getSubjectById(1L)!!
+        assertEquals(1, s.presentLectures)
+        assertEquals(1, s.absentLectures)
+        assertEquals(2, s.totalLectures)
+        // A plain mark on a mixed day switches every lecture of the day to that status
+        repository.markAbsent(1L, date)
+        assertEquals(2, repository.getSubjectById(1L)!!.absentLectures)
+        assertCountsMatchRecords(1L)
+    }
+
+    @Test
+    fun `editing a mixed day lecture by lecture keeps totals in step`() = runBlocking {
+        addSubject()
+        repository.markPresent(1L, date)
+        repository.addExtraLecture(1L, date, AttendanceStatus.PRESENT)
+        repository.setDayCounts(1L, date, present = 1, absent = 1)
+        var r = repository.getAttendanceRecord(1L, date)!!
+        assertEquals(1, r.presentCount); assertEquals(1, r.absentCount)
+        repository.setDayCounts(1L, date, present = 0, absent = 2)
+        r = repository.getAttendanceRecord(1L, date)!!
+        assertEquals(AttendanceStatus.ABSENT, r.status); assertEquals(2, r.absentCount)
+        assertCountsMatchRecords(1L)
+        repository.setDayCounts(1L, date, present = 0, absent = 0)
+        assertNull(repository.getAttendanceRecord(1L, date))
+        assertCountsMatchRecords(1L)
+    }
 }
