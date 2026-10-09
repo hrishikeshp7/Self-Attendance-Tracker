@@ -11,10 +11,16 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Subject
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.material3.*
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -29,7 +35,6 @@ import com.attendance.tracker.ui.screens.about.AboutScreen
 import com.attendance.tracker.ui.screens.backup.BackupRestoreScreen
 import com.attendance.tracker.ui.screens.calendar.SubjectCalendarScreen
 import com.attendance.tracker.ui.screens.home.HomeScreen
-import com.attendance.tracker.ui.screens.schedule.ScheduleScreen
 import com.attendance.tracker.ui.screens.schedule.WeeklyCalendarScreen
 import com.attendance.tracker.ui.screens.settings.CalendarSyncScreen
 import com.attendance.tracker.ui.screens.settings.SettingsScreen
@@ -48,6 +53,7 @@ val bottomNavItems = listOf(
     BottomNavItem(Screen.Settings, Icons.Default.Settings, "Settings")
 )
 
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 fun AttendanceApp(
     viewModel: AttendanceViewModel = viewModel()
@@ -70,6 +76,9 @@ fun AttendanceApp(
     var subjectToEdit by remember { mutableStateOf<com.attendance.tracker.data.model.Subject?>(null) }
 
     Scaffold(
+        // Each screen's own Scaffold/TopAppBar applies the status-bar inset; applying it here
+        // too stacked two insets and left a big empty band at the top.
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         bottomBar = {
             NavigationBar {
                 val navBackStackEntry by navController.currentBackStackEntryAsState()
@@ -78,7 +87,9 @@ fun AttendanceApp(
                 bottomNavItems.forEach { item ->
                     NavigationBarItem(
                         icon = { Icon(item.icon, contentDescription = item.label) },
-                        label = { Text(item.label) },
+                        // At large font scales the labels wrap mid-word, so show only the selected one
+                        alwaysShowLabel = LocalDensity.current.fontScale <= 1.3f,
+                        label = { Text(item.label, maxLines = 1, softWrap = false) },
                         selected = currentDestination?.hierarchy?.any { it.route == item.screen.route } == true,
                         onClick = {
                             // From a sub-screen (e.g. calendar, about) with this tab already in the
@@ -104,7 +115,7 @@ fun AttendanceApp(
         NavHost(
             navController = navController,
             startDestination = Screen.Home.route,
-            modifier = Modifier.padding(innerPadding),
+            modifier = Modifier.padding(innerPadding).consumeWindowInsets(innerPadding),
             // No animation for bottom-tab switches — instant response
             enterTransition = { EnterTransition.None },
             exitTransition = { ExitTransition.None },
@@ -112,6 +123,16 @@ fun AttendanceApp(
             popExitTransition = { ExitTransition.None }
         ) {
             composable(Screen.Home.route) {
+                // Home marks LocalDate.now(); make sure the cards show that same day even if
+                // the app was left open past midnight.
+                val lifecycleOwner = LocalLifecycleOwner.current
+                DisposableEffect(lifecycleOwner) {
+                    val observer = LifecycleEventObserver { _, event ->
+                        if (event == Lifecycle.Event.ON_RESUME) viewModel.refreshToday()
+                    }
+                    lifecycleOwner.lifecycle.addObserver(observer)
+                    onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+                }
                 HomeScreen(
                     subjects = subjects,
                     allSubjects = subjectsMap,
@@ -122,9 +143,6 @@ fun AttendanceApp(
                     },
                     onAddExtraClass = { subjectId, status ->
                         viewModel.addExtraClass(subjectId, status)
-                    },
-                    onClearAttendance = { subjectId ->
-                        viewModel.clearAttendance(subjectId)
                     },
                     onAddSubject = {
                         showAddSubjectOnSubjectsScreen = true
@@ -182,6 +200,12 @@ fun AttendanceApp(
                     onAddExtraClass = { status, date ->
                         viewModel.addExtraClass(subjectId, status, date)
                     },
+                    onClearAttendance = { date ->
+                        viewModel.clearAttendance(subjectId, date)
+                    },
+                    onSetDayCounts = { date, present, absent ->
+                        viewModel.setDayCounts(subjectId, date, present, absent)
+                    },
                     onNavigateBack = {
                         navController.popBackStack()
                     }
@@ -207,6 +231,12 @@ fun AttendanceApp(
                     },
                     onDeleteSubject = { subject ->
                         viewModel.deleteSubject(subject)
+                    },
+                    initialEditSubject = subjectToEdit,
+                    openAddDialog = showAddSubjectOnSubjectsScreen,
+                    onInitialActionConsumed = {
+                        subjectToEdit = null
+                        showAddSubjectOnSubjectsScreen = false
                     }
                 )
             }
@@ -228,27 +258,6 @@ fun AttendanceApp(
                 )
             }
 
-            composable(
-                Screen.ClassicSchedule.route,
-                enterTransition = { slideInHorizontally(initialOffsetX = { it }, animationSpec = tween(200)) },
-                popExitTransition = { slideOutHorizontally(targetOffsetX = { it }, animationSpec = tween(200)) }
-            ) {
-                ScheduleScreen(
-                    subjects = subjects,
-                    allSubjects = subjectsMap,
-                    scheduleEntries = scheduleEntries,
-                    onAddScheduleEntry = { subjectId, day ->
-                        viewModel.addScheduleEntry(subjectId, day)
-                    },
-                    onRemoveScheduleEntry = { entry ->
-                        viewModel.removeScheduleEntry(entry)
-                    },
-                    onNavigateBack = {
-                        navController.popBackStack()
-                    }
-                )
-            }
-
             composable(Screen.Settings.route) {
                 SettingsScreen(
                     onNavigateToAbout = {
@@ -259,9 +268,6 @@ fun AttendanceApp(
                     },
                     onNavigateToBackupRestore = {
                         navController.navigate(Screen.BackupRestore.route)
-                    },
-                    onNavigateToClassicSchedule = {
-                        navController.navigate(Screen.ClassicSchedule.route)
                     },
                     onNavigateToCalendarSync = {
                         navController.navigate(Screen.CalendarSync.route)
@@ -288,22 +294,10 @@ fun AttendanceApp(
                 enterTransition = { slideInHorizontally(initialOffsetX = { it }, animationSpec = tween(200)) },
                 popExitTransition = { slideOutHorizontally(targetOffsetX = { it }, animationSpec = tween(200)) }
             ) {
-                val currentPrimary = themePreference?.customPrimaryColor?.let { 
-                    androidx.compose.ui.graphics.Color(it.toInt()) 
-                }
-                val currentSecondary = themePreference?.customSecondaryColor?.let { 
-                    androidx.compose.ui.graphics.Color(it.toInt()) 
-                }
-                
                 com.attendance.tracker.ui.screens.customizations.CustomizationsScreen(
                     currentThemeMode = themePreference?.themeMode ?: com.attendance.tracker.data.model.ThemeMode.SYSTEM,
-                    currentPrimaryColor = currentPrimary,
-                    currentSecondaryColor = currentSecondary,
                     onThemeModeChange = { mode ->
                         viewModel.updateThemeMode(mode)
-                    },
-                    onCustomColorsChange = { primary, secondary ->
-                        viewModel.updateCustomColors(primary, secondary)
                     },
                     onNavigateBack = {
                         navController.popBackStack()

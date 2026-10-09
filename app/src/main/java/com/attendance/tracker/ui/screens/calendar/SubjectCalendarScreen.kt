@@ -1,6 +1,8 @@
 package com.attendance.tracker.ui.screens.calendar
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -12,6 +14,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.attendance.tracker.data.model.AttendanceRecord
@@ -22,7 +25,6 @@ import com.attendance.tracker.ui.components.CalendarView
 import com.attendance.tracker.ui.theme.AbsentRed
 import com.attendance.tracker.ui.theme.NoClassGray
 import com.attendance.tracker.ui.theme.PresentGreen
-import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
@@ -39,12 +41,12 @@ fun SubjectCalendarScreen(
     onMonthChanged: (YearMonth) -> Unit,
     onMarkAttendance: (AttendanceStatus, LocalDate) -> Unit,
     onAddExtraClass: (AttendanceStatus, LocalDate) -> Unit,
+    onClearAttendance: (LocalDate) -> Unit,
+    onSetDayCounts: (LocalDate, Int, Int) -> Unit,
     onNavigateBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val dateFormatter = DateTimeFormatter.ofPattern("EEEE, MMMM d")
-    val snackbarHostState = remember { SnackbarHostState() }
-    val scope = rememberCoroutineScope()
     
     // Filter attendance records for this subject only
     val subjectRecords = remember(attendanceRecords, subject.id) {
@@ -88,19 +90,51 @@ fun SubjectCalendarScreen(
     // Effective single date for mark-attendance (falls back to ViewModel value before first tap)
     val effectiveSingleDate = rangeStart ?: selectedDate
     
-    // Helper function to show snackbar with attendance status
-    val showAttendanceSnackbar: (AttendanceStatus) -> Unit = { status ->
-        scope.launch {
-            val statusText = when (status) {
-                AttendanceStatus.PRESENT -> "Marked Present"
-                AttendanceStatus.ABSENT -> "Marked Absent"
-                AttendanceStatus.NO_CLASS -> "Marked No Class"
+    var showExtraClassDialog by remember { mutableStateOf(false) }
+    var showEditLecturesDialog by remember { mutableStateOf(false) }
+    if (showEditLecturesDialog) {
+        val rec = subjectRecords.find { it.date == effectiveSingleDate }
+        val present = rec?.presentCount ?: 0
+        val absent = rec?.absentCount ?: 0
+        AlertDialog(
+            onDismissRequest = { showEditLecturesDialog = false },
+            title = { Text("Lectures on ${effectiveSingleDate.format(DateTimeFormatter.ofPattern("MMM d"))}") },
+            text = {
+                Column {
+                    CountStepper("Present", PresentGreen, present) { onSetDayCounts(effectiveSingleDate, it, absent) }
+                    CountStepper("Absent", AbsentRed, absent) { onSetDayCounts(effectiveSingleDate, present, it) }
+                }
+            },
+            confirmButton = { TextButton(onClick = { showEditLecturesDialog = false }) { Text("Done") } },
+            dismissButton = {
+                TextButton(onClick = {
+                    onClearAttendance(effectiveSingleDate)
+                    showEditLecturesDialog = false
+                }) { Text("Clear day", color = MaterialTheme.colorScheme.error) }
             }
-            snackbarHostState.showSnackbar(
-                message = "$statusText",
-                duration = SnackbarDuration.Short
-            )
-        }
+        )
+    }
+    if (showExtraClassDialog) {
+        AlertDialog(
+            onDismissRequest = { showExtraClassDialog = false },
+            title = { Text("Extra class on ${effectiveSingleDate.format(java.time.format.DateTimeFormatter.ofPattern("MMM d"))}") },
+            text = { Text("Were you present or absent for it?") },
+            confirmButton = {
+                TextButton(onClick = {
+                    onAddExtraClass(AttendanceStatus.PRESENT, effectiveSingleDate)
+                    showExtraClassDialog = false
+                }) { Text("Present", color = PresentGreen) }
+            },
+            dismissButton = {
+                Row {
+                    TextButton(onClick = { showExtraClassDialog = false }) { Text("Cancel") }
+                    TextButton(onClick = {
+                        onAddExtraClass(AttendanceStatus.ABSENT, effectiveSingleDate)
+                        showExtraClassDialog = false
+                    }) { Text("Absent", color = AbsentRed) }
+                }
+            }
+        )
     }
 
     Scaffold(
@@ -119,7 +153,6 @@ fun SubjectCalendarScreen(
                 )
             )
         },
-        snackbarHost = { SnackbarHost(snackbarHostState) },
         modifier = modifier
     ) { paddingValues ->
         Column(
@@ -158,8 +191,8 @@ fun SubjectCalendarScreen(
                 // Sum each day's lecture count rather than counting matching days, so a
                 // multi-lecture day (e.g. count = 2) contributes 2 — consistent with how
                 // the subject's own presentLectures/absentLectures aggregate is computed.
-                val rangePresentCount = rangeRecords.filter { it.status == AttendanceStatus.PRESENT }.sumOf { it.count }
-                val rangeAbsentCount  = rangeRecords.filter { it.status == AttendanceStatus.ABSENT }.sumOf { it.count }
+                val rangePresentCount = rangeRecords.sumOf { it.presentCount }
+                val rangeAbsentCount  = rangeRecords.sumOf { it.absentCount }
                 val rangeTotal        = rangePresentCount + rangeAbsentCount
                 val rangePercentage   = if (rangeTotal > 0) rangePresentCount * 100f / rangeTotal else 0f
 
@@ -241,11 +274,29 @@ fun SubjectCalendarScreen(
                                 .fillMaxWidth()
                                 .padding(16.dp)
                         ) {
-                            Text(
-                                text = "Mark Attendance",
-                                style = MaterialTheme.typography.titleMedium,
-                                modifier = Modifier.padding(bottom = 12.dp)
-                            )
+                            val dayRecord = selectedDateRecord
+                            val dayCount = (dayRecord?.presentCount ?: 0) + (dayRecord?.absentCount ?: 0)
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "Mark Attendance",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                if (dayCount > 1) {
+                                    Text(
+                                        text = "${dayRecord!!.presentCount} present · ${dayRecord.absentCount} absent",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+
+                            // With more than one lecture on the day, the main buttons would flip or
+                            // wipe all of them at once, so they give way to the per-lecture editor below.
+                            val multi = ((selectedDateRecord?.presentCount ?: 0) + (selectedDateRecord?.absentCount ?: 0)) > 1
 
                             // Attendance Action Buttons.
                             // Each button gets an equal share of the width via `weight(1f)`
@@ -258,62 +309,53 @@ fun SubjectCalendarScreen(
                                 horizontalArrangement = Arrangement.spacedBy(10.dp)
                             ) {
                                 SubjectCalendarAttendanceButton(
+                                    enabled = !multi,
                                     text = "Present",
-                                    isSelected = selectedDateRecord?.status == AttendanceStatus.PRESENT,
+                                    isSelected = (selectedDateRecord?.presentCount ?: 0) > 0,
                                     color = PresentGreen,
                                     onClick = {
                                         onMarkAttendance(AttendanceStatus.PRESENT, effectiveSingleDate)
-                                        showAttendanceSnackbar(AttendanceStatus.PRESENT)
                                     },
                                     modifier = Modifier.weight(1f)
                                 )
                                 SubjectCalendarAttendanceButton(
+                                    enabled = !multi,
                                     text = "Absent",
-                                    isSelected = selectedDateRecord?.status == AttendanceStatus.ABSENT,
+                                    isSelected = (selectedDateRecord?.absentCount ?: 0) > 0,
                                     color = AbsentRed,
                                     onClick = {
                                         onMarkAttendance(AttendanceStatus.ABSENT, effectiveSingleDate)
-                                        showAttendanceSnackbar(AttendanceStatus.ABSENT)
                                     },
                                     modifier = Modifier.weight(1f)
                                 )
                                 SubjectCalendarAttendanceButton(
+                                    enabled = !multi,
                                     text = "No Class",
                                     isSelected = selectedDateRecord?.status == AttendanceStatus.NO_CLASS,
                                     color = NoClassGray,
                                     onClick = {
                                         onMarkAttendance(AttendanceStatus.NO_CLASS, effectiveSingleDate)
-                                        showAttendanceSnackbar(AttendanceStatus.NO_CLASS)
                                     },
                                     modifier = Modifier.weight(1f)
                                 )
                             }
 
-                            // Extra lecture on a day that already has Present/Absent marked.
-                            // Re-tapping the status button is intentionally a no-op, so this
-                            // is the explicit way to count another lecture on the same date.
+                            // Extra classes are rare, so this is one quiet row rather than more
+                            // buttons: "Extra class?" asks present/absent in a dialog, and works for
+                            // any past date. A day can hold both (attended one, missed another).
                             val recorded = selectedDateRecord
-                            if (recorded != null && recorded.status != AttendanceStatus.NO_CLASS) {
-                                val label = if (recorded.status == AttendanceStatus.PRESENT) "present" else "absent"
-                                Text(
-                                    text = "${recorded.count} lecture${if (recorded.count != 1) "s" else ""} marked $label on this date",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.padding(top = 12.dp)
-                                )
-                                OutlinedButton(
-                                    onClick = {
-                                        onAddExtraClass(recorded.status, effectiveSingleDate)
-                                        scope.launch {
-                                            snackbarHostState.showSnackbar(
-                                                message = "Extra class added ($label)",
-                                                duration = SnackbarDuration.Short
-                                            )
-                                        }
-                                    },
-                                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp)
-                                ) {
-                                    Text("+ Add extra class ($label)")
+                            val dayLectures = (recorded?.presentCount ?: 0) + (recorded?.absentCount ?: 0)
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                TextButton(onClick = { showExtraClassDialog = true }) { Text("Extra class?") }
+                                if (dayLectures > 1) {
+                                    TextButton(onClick = { showEditLecturesDialog = true }) { Text("Edit lectures") }
+                                } else if (recorded != null) {
+                                    TextButton(onClick = { onClearAttendance(effectiveSingleDate) }) {
+                                        Text("Clear day", color = MaterialTheme.colorScheme.error)
+                                    }
                                 }
                             }
                         }
@@ -401,15 +443,56 @@ private fun RangeStatsSection(
 }
 
 @Composable
+private fun CountStepper(label: String, color: Color, value: Int, onChange: (Int) -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(label, color = color, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+        // One slim tinted pill: "−  2  +". Whole 36dp halves are the tap targets, no outlines.
+        Surface(shape = RoundedCornerShape(50), color = color.copy(alpha = 0.14f)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier.size(width = 40.dp, height = 36.dp)
+                        .clickable(enabled = value > 0, role = Role.Button) { onChange(value - 1) },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        "−",
+                        color = color.copy(alpha = if (value > 0) 1f else 0.3f),
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                }
+                Text(
+                    text = value.toString(),
+                    style = MaterialTheme.typography.titleSmall,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.widthIn(min = 24.dp)
+                )
+                Box(
+                    modifier = Modifier.size(width = 40.dp, height = 36.dp)
+                        .clickable(role = Role.Button) { onChange(value + 1) },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("+", color = color, style = MaterialTheme.typography.titleMedium)
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun SubjectCalendarAttendanceButton(
     text: String,
     isSelected: Boolean,
     color: Color,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true
 ) {
     Button(
         onClick = onClick,
+        enabled = enabled,
         colors = ButtonDefaults.buttonColors(
             containerColor = if (isSelected) color else color.copy(alpha = 0.3f),
             contentColor = if (isSelected) MaterialTheme.colorScheme.onPrimary else color

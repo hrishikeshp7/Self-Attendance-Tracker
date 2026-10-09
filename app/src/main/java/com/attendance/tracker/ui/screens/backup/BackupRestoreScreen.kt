@@ -26,7 +26,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.attendance.tracker.backup.CsvImporter
 import com.attendance.tracker.ui.AttendanceViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.time.LocalDate
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -54,8 +56,7 @@ fun BackupRestoreScreen(
     ) { uri ->
         if (uri != null) {
             scope.launch {
-                val json = viewModel.createJsonBackup()
-                writeToUri(context, uri, json)
+                writeToUri(context, uri) { viewModel.createJsonBackup() }
             }
         }
     }
@@ -66,8 +67,7 @@ fun BackupRestoreScreen(
     ) { uri ->
         if (uri != null) {
             scope.launch {
-                val csv = viewModel.createCsvBackup()
-                writeToUri(context, uri, csv)
+                writeToUri(context, uri) { viewModel.createCsvBackup() }
             }
         }
     }
@@ -89,7 +89,7 @@ fun BackupRestoreScreen(
     val csvTemplateLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("text/csv")
     ) { uri ->
-        if (uri != null) scope.launch { writeToUri(context, uri, CsvImporter.TEMPLATE) }
+        if (uri != null) scope.launch { writeToUri(context, uri) { CsvImporter.TEMPLATE } }
     }
 
     // Google Drive Backup – opens the SAF file-picker pre-navigated to Google Drive.
@@ -121,8 +121,7 @@ fun BackupRestoreScreen(
     ) { uri ->
         if (uri != null) {
             scope.launch {
-                val json = viewModel.createJsonBackup()
-                writeToUri(context, uri, json)
+                writeToUri(context, uri) { viewModel.createJsonBackup() }
             }
         }
     }
@@ -156,9 +155,11 @@ fun BackupRestoreScreen(
                         showRestoreConfirmDialog = false
                         val uri = pendingRestoreUri ?: return@TextButton
                         scope.launch {
-                            val json = readFromUri(context, uri)
+                            val json = withContext(Dispatchers.IO) { readFromUri(context, uri) }
                             if (json != null) {
                                 viewModel.restoreFromJson(json)
+                            } else {
+                                android.widget.Toast.makeText(context, "Couldn't read that file.", android.widget.Toast.LENGTH_LONG).show()
                             }
                         }
                     }
@@ -405,10 +406,27 @@ private fun BackupActionCard(
 // I/O helpers
 // ---------------------------------------------------------------------------
 
-private fun writeToUri(context: Context, uri: Uri, content: String) {
-    context.contentResolver.openOutputStream(uri)?.use { stream ->
-        stream.write(content.toByteArray(Charsets.UTF_8))
+/**
+ * Builds [content] and writes it off the main thread (the target may be a network-backed
+ * provider like Google Drive), reporting the outcome. Failures used to escape the launched
+ * coroutine uncaught and crash the app — or, when no stream opened, fail silently.
+ */
+private suspend fun writeToUri(context: Context, uri: Uri, content: suspend () -> String) {
+    val saved = try {
+        val text = content()
+        withContext(Dispatchers.IO) {
+            context.contentResolver.openOutputStream(uri)?.use { stream ->
+                stream.write(text.toByteArray(Charsets.UTF_8))
+            } != null
+        }
+    } catch (e: Exception) {
+        false
     }
+    android.widget.Toast.makeText(
+        context,
+        if (saved) "File saved." else "Couldn't save the file.",
+        android.widget.Toast.LENGTH_SHORT
+    ).show()
 }
 
 private fun readFromUri(context: Context, uri: Uri): String? {

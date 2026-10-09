@@ -36,7 +36,6 @@ fun SubjectCard(
     onMarkPresent: () -> Unit,
     onMarkAbsent: () -> Unit,
     onMarkNoClass: () -> Unit,
-    onClearAttendance: () -> Unit,
     onEditClick: () -> Unit,
     onCardClick: () -> Unit,
     modifier: Modifier = Modifier
@@ -88,7 +87,7 @@ fun SubjectCard(
                             subject.isAboveRequired ->
                                 "At minimum threshold"
                             else ->
-                                "Need ${subject.classesToAttend} more classes"
+                                "Need ${subject.classesToAttend} more class${if (subject.classesToAttend != 1) "es" else ""}"
                         }
                         Text(
                             text = insightText,
@@ -109,6 +108,7 @@ fun SubjectCard(
                 AttendancePieChart(
                     percentage = subject.currentAttendancePercentage,
                     requiredPercentage = subject.requiredAttendance,
+                    isAboveRequired = subject.isAboveRequired,
                     size = 64.dp,
                     strokeWidth = 7.dp
                 )
@@ -170,6 +170,11 @@ fun SubjectCard(
 
             Spacer(modifier = Modifier.height(12.dp))
 
+            // A day with extra lectures (or both statuses) is edited in the calendar page, so a
+            // stray tap here can't flip or wipe several lectures at once.
+            val dayLectures = (currentRecord?.presentCount ?: 0) + (currentRecord?.absentCount ?: 0)
+            val locked = dayLectures > 1
+
             // ── Action buttons ─────────────────────────────────────────────────
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -177,51 +182,48 @@ fun SubjectCard(
             ) {
                 AttendanceButton(
                     text = "Present",
-                    count = if (currentRecord?.status == AttendanceStatus.PRESENT) currentRecord.count else null,
-                    isSelected = currentRecord?.status == AttendanceStatus.PRESENT,
+                    isSelected = (currentRecord?.presentCount ?: 0) > 0,
                     color = PresentGreen,
                     onClick = {
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        if (currentRecord?.status == AttendanceStatus.PRESENT) {
-                            onClearAttendance()
-                        } else {
-                            onMarkPresent()
-                        }
+                        if ((currentRecord?.presentCount ?: 0) == 0) onMarkPresent()
                     },
-                    enabled = true,
+                    enabled = !locked,
                     modifier = Modifier.weight(1f)
                 )
                 AttendanceButton(
                     text = "Absent",
-                    count = if (currentRecord?.status == AttendanceStatus.ABSENT) currentRecord.count else null,
-                    isSelected = currentRecord?.status == AttendanceStatus.ABSENT,
+                    isSelected = (currentRecord?.absentCount ?: 0) > 0,
                     color = AbsentRed,
                     onClick = {
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        if (currentRecord?.status == AttendanceStatus.ABSENT) {
-                            onClearAttendance()
-                        } else {
-                            onMarkAbsent()
-                        }
+                        if ((currentRecord?.absentCount ?: 0) == 0) onMarkAbsent()
                     },
-                    enabled = true,
+                    enabled = !locked,
                     modifier = Modifier.weight(1f)
                 )
                 AttendanceButton(
                     text = "No Class",
-                    count = if (currentRecord?.status == AttendanceStatus.NO_CLASS) currentRecord.count else null,
                     isSelected = currentRecord?.status == AttendanceStatus.NO_CLASS,
                     color = NoClassGray,
                     onClick = {
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        if (currentRecord?.status == AttendanceStatus.NO_CLASS) {
-                            onClearAttendance()
-                        } else {
-                            onMarkNoClass()
-                        }
+                        if (currentRecord?.status != AttendanceStatus.NO_CLASS) onMarkNoClass()
                     },
-                    enabled = true,
+                    enabled = !locked,
                     modifier = Modifier.weight(1f)
+                )
+            }
+            if (locked && currentRecord != null) {
+                val parts = listOfNotNull(
+                    currentRecord.presentCount.takeIf { it > 0 }?.let { "$it present" },
+                    currentRecord.absentCount.takeIf { it > 0 }?.let { "$it absent" }
+                ).joinToString(", ")
+                Text(
+                    text = "$dayLectures lectures today: $parts · edit in calendar",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 8.dp)
                 )
             }
         }
@@ -255,14 +257,13 @@ private fun AttendanceStatItem(
 @Composable
 private fun AttendanceButton(
     text: String,
-    count: Int?,
     isSelected: Boolean,
     color: Color,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true
 ) {
-    val buttonText = if (count != null && count > 1) "$text ($count)" else text
+    val buttonText = if (isSelected) "✓ $text" else text
     Button(
         onClick = onClick,
         enabled = enabled,
@@ -272,7 +273,7 @@ private fun AttendanceButton(
             disabledContainerColor = if (isSelected) color.copy(alpha = 0.6f) else color.copy(alpha = 0.08f),
             disabledContentColor = if (isSelected) Color.White.copy(alpha = 0.7f) else color.copy(alpha = 0.4f)
         ),
-        modifier = modifier.height(36.dp),
+        modifier = modifier.heightIn(min = 36.dp),
         contentPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp),
         shape = RoundedCornerShape(10.dp),
         elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp)
@@ -280,7 +281,7 @@ private fun AttendanceButton(
         Text(
             text = buttonText,
             style = MaterialTheme.typography.labelSmall,
-            maxLines = 1,
+            maxLines = 2,
             textAlign = TextAlign.Center
         )
     }

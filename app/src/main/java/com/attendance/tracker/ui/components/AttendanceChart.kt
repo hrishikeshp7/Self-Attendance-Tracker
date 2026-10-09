@@ -14,6 +14,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.attendance.tracker.ui.theme.AbsentRed
@@ -31,9 +32,11 @@ fun AttendancePieChart(
     modifier: Modifier = Modifier,
     size: Dp = 80.dp,
     strokeWidth: Dp = 8.dp,
-    showPercentageText: Boolean = true
+    showPercentageText: Boolean = true,
+    // Callers with a Subject pass Subject.isAboveRequired (exact integer check); the float
+    // comparison can disagree at exact thresholds like 53/100.
+    isAboveRequired: Boolean = percentage >= requiredPercentage
 ) {
-    val isAboveRequired = percentage >= requiredPercentage
     val progressColor = if (isAboveRequired) PresentGreen else AbsentRed
     val backgroundColor = NoClassGray.copy(alpha = 0.3f)
     
@@ -101,6 +104,11 @@ fun AttendancePieChart(
             Text(
                 text = "${percentage.toInt()}%",
                 style = MaterialTheme.typography.labelMedium,
+                // Sized from the ring, not the system font scale: toSp() cancels the scale, so
+                // "100%" stays inside the ring at 200% font size.
+                fontSize = with(LocalDensity.current) { (size * 0.2f).toSp() },
+                maxLines = 1,
+                softWrap = false,
                 fontWeight = FontWeight.Bold,
                 color = progressColor,
                 textAlign = TextAlign.Center

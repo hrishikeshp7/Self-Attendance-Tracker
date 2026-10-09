@@ -356,8 +356,8 @@ private fun CalendarDay(
     val isDark = isSystemInDarkTheme()
 
     // Determine attendance statuses for the day (can have multiple)
-    val hasPresent = attendanceRecords.any { it.status == AttendanceStatus.PRESENT }
-    val hasAbsent = attendanceRecords.any { it.status == AttendanceStatus.ABSENT }
+    val hasPresent = attendanceRecords.any { it.presentCount > 0 }
+    val hasAbsent = attendanceRecords.any { it.absentCount > 0 }
     val hasNoClass = attendanceRecords.any { it.status == AttendanceStatus.NO_CLASS }
     val statusCount = listOf(hasPresent, hasAbsent, hasNoClass).count { it }
     val isMixedStatus = statusCount > 1

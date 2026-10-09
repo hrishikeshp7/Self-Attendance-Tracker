@@ -6,8 +6,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Redo
-import androidx.compose.material.icons.filled.Undo
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -28,7 +26,6 @@ import com.attendance.tracker.ui.components.SubjectCard
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
-import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -39,7 +36,6 @@ fun HomeScreen(
     scheduleEntries: List<ScheduleEntry>,
     onMarkAttendance: (Long, AttendanceStatus) -> Unit,
     onAddExtraClass: (Long, AttendanceStatus) -> Unit,
-    onClearAttendance: (Long) -> Unit,
     onAddSubject: () -> Unit,
     onEditSubject: (Subject) -> Unit,
     onSubjectClick: (Subject) -> Unit,
@@ -49,15 +45,10 @@ fun HomeScreen(
     val dayFormatter = DateTimeFormatter.ofPattern("EEEE")
     val dateFormatter = DateTimeFormatter.ofPattern("MMMM d, yyyy")
 
-    val weeklyClassCount: Map<Long, Int> = remember(scheduleEntries) {
-        scheduleEntries.groupBy { it.subjectId }.mapValues { it.value.size }
-    }
-
-    val atRiskSubjects: List<Pair<Subject, String>> = remember(subjects, scheduleEntries) {
-        subjects.mapNotNull { subject ->
-            val alert = computeAttendanceAlert(subject, weeklyClassCount[subject.id] ?: 0)
-            if (alert != null) Pair(subject, alert) else null
-        }
+    // Only subjects actually below their target: "close to the limit" nudges just repeated
+    // what each card already says and ate half the screen.
+    val belowTarget: List<Subject> = remember(subjects) {
+        subjects.filter { it.totalLectures > 0 && !it.isAboveRequired }
     }
 
     // Determine today's scheduled subjects
@@ -67,8 +58,10 @@ fun HomeScreen(
     }
     // If the user has not set up any schedule at all, fall back to showing all subjects
     val hasAnySchedule = scheduleEntries.isNotEmpty()
-    val todaysSubjects: List<Subject> = remember(subjects, todaysScheduledIds, hasAnySchedule) {
-        if (!hasAnySchedule) subjects else subjects.filter { it.id in todaysScheduledIds }
+    // Also keep subjects already marked today (e.g. an extra class) so that mark stays
+    // visible and can be changed or cleared from here.
+    val todaysSubjects: List<Subject> = remember(subjects, todaysScheduledIds, hasAnySchedule, todayAttendance) {
+        if (!hasAnySchedule) subjects else subjects.filter { it.id in todaysScheduledIds || it.id in todayAttendance }
     }
 
     // Extra-class dialog state
@@ -132,17 +125,8 @@ fun HomeScreen(
                     .padding(paddingValues),
                 contentPadding = PaddingValues(bottom = 88.dp)
             ) {
-                // Alert banners
-                if (atRiskSubjects.isNotEmpty()) {
-                    item {
-                        atRiskSubjects.forEach { (subject, message) ->
-                            AttendanceAlertBanner(
-                                subjectName = subject.name,
-                                message = message,
-                                isBelow = !subject.isAboveRequired
-                            )
-                        }
-                    }
+                if (belowTarget.isNotEmpty()) {
+                    item { BelowTargetBanner(belowTarget, allSubjects) }
                 }
 
                 // Subject Cards – only today's scheduled subjects, single-mark mode
@@ -159,9 +143,6 @@ fun HomeScreen(
                         },
                         onMarkNoClass = {
                             onMarkAttendance(subject.id, AttendanceStatus.NO_CLASS)
-                        },
-                        onClearAttendance = {
-                            onClearAttendance(subject.id)
                         },
                         onEditClick = { onEditSubject(subject) },
                         onCardClick = { onSubjectClick(subject) }
@@ -366,80 +347,54 @@ private fun EmptySubjectsState(modifier: Modifier = Modifier) {
     }
 }
 
-/**
- * Computes an alert message for a subject based on attendance risk.
- * Returns null if no alert is needed.
- */
-private fun computeAttendanceAlert(subject: Subject, classesPerWeek: Int): String? {
-    if (subject.totalLectures == 0) return null
-
-    return if (!subject.isAboveRequired) {
-        val needed = subject.classesToAttend
-        if (needed >= 999) {
-            "Cannot recover attendance for ${subject.name} (100% required with absences)"
-        } else {
-            "${subject.name}: Attend $needed more class${if (needed != 1) "es" else ""} to reach ${subject.requiredAttendance}%"
-        }
-    } else if (subject.classesCanBunk in 0..2) {
-        if (classesPerWeek > 0) {
-            val daysUntilBelow = ((subject.classesCanBunk.toFloat() / classesPerWeek) * 7).roundToInt()
-            if (daysUntilBelow <= 14) {
-                "${subject.name}: Likely to fall below ${subject.requiredAttendance}% in ~$daysUntilBelow day${if (daysUntilBelow != 1) "s" else ""} if absent"
-            } else {
-                null
-            }
-        } else {
-            "${subject.name}: Can only miss ${subject.classesCanBunk} more class${if (subject.classesCanBunk != 1) "es" else ""}"
-        }
-    } else {
-        null
-    }
-}
-
+/** One collapsed line ("2 subjects below target"); tap to list them. */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun AttendanceAlertBanner(
-    subjectName: String,
-    message: String,
-    isBelow: Boolean
-) {
-    val containerColor = if (isBelow) {
-        MaterialTheme.colorScheme.errorContainer
-    } else {
-        MaterialTheme.colorScheme.tertiaryContainer
-    }
-    val contentColor = if (isBelow) {
-        MaterialTheme.colorScheme.onErrorContainer
-    } else {
-        MaterialTheme.colorScheme.onTertiaryContainer
-    }
-
+private fun BelowTargetBanner(subjects: List<Subject>, allSubjects: Map<Long, Subject>) {
+    var expanded by remember { mutableStateOf(false) }
     Card(
+        onClick = { expanded = !expanded },
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 4.dp),
-        colors = CardDefaults.cardColors(containerColor = containerColor),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
         shape = RoundedCornerShape(12.dp)
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Icon(
-                imageVector = Icons.Default.Warning,
-                contentDescription = "Alert",
-                tint = contentColor,
-                modifier = Modifier.size(18.dp)
-            )
-            Text(
-                text = message,
-                style = MaterialTheme.typography.bodySmall,
-                color = contentColor,
-                modifier = Modifier.weight(1f)
-            )
+        Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Warning,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onErrorContainer,
+                    modifier = Modifier.size(16.dp)
+                )
+                Text(
+                    text = "${subjects.size} subject${if (subjects.size != 1) "s" else ""} below target",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onErrorContainer,
+                    modifier = Modifier.weight(1f)
+                )
+                Text(
+                    text = if (expanded) "Hide" else "Details",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onErrorContainer
+                )
+            }
+            if (expanded) {
+                subjects.forEach { subject ->
+                    val needed = subject.classesToAttend
+                    Text(
+                        text = "${subject.getDisplayName(allSubjects)} · ${"%.0f".format(subject.currentAttendancePercentage)}% of ${subject.requiredAttendance}% · " +
+                            if (needed >= 999) "can't reach target" else "attend $needed more",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onErrorContainer,
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
+                }
+            }
         }
     }
 }
-

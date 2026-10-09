@@ -6,7 +6,6 @@
     <!-- Lets the in-app updater hand the downloaded GitHub release APK to the installer. -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.VIBRATE" />
     <!-- Used only for the opt-in "Sync to Calendar" feature, which writes the weekly
          timetable into a calendar the user picks on-device (e.g. their Google account
@@ -16,6 +15,7 @@
 
     <application
         android:allowBackup="true"
+        android:enableOnBackInvokedCallback="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
         android:icon="@mipmap/ic_launcher"
@@ -53,38 +53,15 @@
             </intent-filter>
         </receiver>
 
-        <!-- Widget Receivers -->
         <receiver
-            android:name=".widget.AttendanceWidgetReceiver"
+            android:name=".widget.TodayWidgetReceiver"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>
             <meta-data
                 android:name="android.appwidget.provider"
-                android:resource="@xml/attendance_widget_info" />
-        </receiver>
-        
-        <receiver
-            android:name=".widget.CompactWidgetReceiver"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/compact_widget_info" />
-        </receiver>
-        
-        <receiver
-            android:name=".widget.LargeWidgetReceiver"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/large_widget_info" />
+                android:resource="@xml/today_widget_info" />
         </receiver>
     </application>
 

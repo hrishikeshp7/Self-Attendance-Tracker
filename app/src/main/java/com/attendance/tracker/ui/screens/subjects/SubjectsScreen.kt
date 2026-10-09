@@ -31,12 +31,25 @@ fun SubjectsScreen(
     onAddFolder: (String) -> Unit,
     onUpdateSubject: (Subject) -> Unit,
     onDeleteSubject: (Subject) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    // Set when another screen (Home's edit button / + FAB) navigates here to do one of these
+    initialEditSubject: Subject? = null,
+    openAddDialog: Boolean = false,
+    onInitialActionConsumed: () -> Unit = {}
 ) {
     var showAddDialog by remember { mutableStateOf(false) }
     var showEditDialog by remember { mutableStateOf(false) }
     var selectedSubject by remember { mutableStateOf<Subject?>(null) }
     var currentFolder by remember { mutableStateOf<Subject?>(null) }
+
+    LaunchedEffect(initialEditSubject, openAddDialog) {
+        if (initialEditSubject != null) {
+            selectedSubject = initialEditSubject
+            showEditDialog = true
+        }
+        if (openAddDialog) showAddDialog = true
+        if (initialEditSubject != null || openAddDialog) onInitialActionConsumed()
+    }
     
     // Filter subjects based on current view
     val displaySubjects = if (currentFolder == null) {
@@ -115,6 +128,7 @@ fun SubjectsScreen(
                         if (subject.isFolder) {
                             FolderListItem(
                                 folder = subject,
+                                children = subjects.filter { it.parentSubjectId == subject.id && !it.isFolder },
                                 onFolderClick = { currentFolder = it },
                                 onEditClick = {
                                     selectedSubject = subject
@@ -174,6 +188,7 @@ fun SubjectsScreen(
 @Composable
 private fun FolderListItem(
     folder: Subject,
+    children: List<Subject>,
     onFolderClick: (Subject) -> Unit,
     onEditClick: () -> Unit,
     onDeleteClick: () -> Unit
@@ -212,8 +227,12 @@ private fun FolderListItem(
                         style = MaterialTheme.typography.titleMedium
                     )
                     Spacer(modifier = Modifier.height(4.dp))
+                    // Informational only: no target, never flagged as at-risk
+                    val total = children.sumOf { it.totalLectures }
                     Text(
-                        text = "Folder",
+                        text = if (total > 0) {
+                            "Folder · Combined ${"%.0f".format(children.sumOf { it.presentLectures } * 100.0 / total)}%"
+                        } else "Folder",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.primary
                     )
