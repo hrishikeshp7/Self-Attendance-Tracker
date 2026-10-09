@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
@@ -261,6 +262,17 @@ class TodayWidgetReceiver : GlanceAppWidgetReceiver() {
         super.onEnabled(context)
         WidgetDayRollover.schedule(context)
     }
+
+    /** Clock or time zone changed: the midnight job is now anchored wrongly, so re-anchor it and redraw. */
+    override fun onReceive(context: Context, intent: Intent) {
+        super.onReceive(context, intent)
+        when (intent.action) {
+            Intent.ACTION_TIME_CHANGED, Intent.ACTION_TIMEZONE_CHANGED, Intent.ACTION_DATE_CHANGED -> {
+                WidgetDayRollover.schedule(context, replace = true)
+                WidgetDayRolloverWorker.runNow(context)
+            }
+        }
+    }
 }
 
 /**
@@ -272,19 +284,25 @@ class WidgetDayRolloverWorker(context: Context, params: WorkerParameters) : Coro
         refreshAllWidgets(applicationContext)
         return Result.success()
     }
+
+    companion object {
+        fun runNow(context: Context) {
+            WorkManager.getInstance(context).enqueue(OneTimeWorkRequestBuilder<WidgetDayRolloverWorker>().build())
+        }
+    }
 }
 
 object WidgetDayRollover {
     private const val WORK_NAME = "widget_day_rollover"
 
     /** Daily job anchored to 00:00:30; KEEP so calling it on every app start is harmless. */
-    fun schedule(context: Context) {
+    fun schedule(context: Context, replace: Boolean = false) {
         val now = LocalDateTime.now()
         val next = now.toLocalDate().plusDays(1).atStartOfDay().plusSeconds(30)
         val request = PeriodicWorkRequestBuilder<WidgetDayRolloverWorker>(1, TimeUnit.DAYS)
             .setInitialDelay(Duration.between(now, next).seconds, TimeUnit.SECONDS)
             .build()
         WorkManager.getInstance(context)
-            .enqueueUniquePeriodicWork(WORK_NAME, ExistingPeriodicWorkPolicy.KEEP, request)
+            .enqueueUniquePeriodicWork(WORK_NAME, if (replace) ExistingPeriodicWorkPolicy.UPDATE else ExistingPeriodicWorkPolicy.KEEP, request)
     }
 }
