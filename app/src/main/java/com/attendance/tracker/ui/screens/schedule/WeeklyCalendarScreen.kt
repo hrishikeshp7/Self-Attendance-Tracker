@@ -40,7 +40,6 @@ import java.util.Locale
 
 private val HOUR_HEIGHT = 64.dp
 private val GRID_TOP_PADDING = 8.dp
-private val HALF_HOUR_HEIGHT = HOUR_HEIGHT / 2
 private val DAY_COLUMN_WIDTH = 108.dp
 private val TIME_AXIS_WIDTH = 64.dp
 private const val DEFAULT_GRID_START_HOUR = 7
@@ -54,9 +53,6 @@ private val timeSheetFormatter = DateTimeFormatter.ofPattern("h:mm a")
  * day columns across the top, a time axis down the side, and lecture blocks positioned
  * by their start/end time. Tapping an empty slot creates a lecture there; tapping an
  * existing block edits or deletes it.
- *
- * This is the default Schedule experience; the older day-list/toggle screen
- * ([ScheduleScreen]) is still reachable from Settings for anyone who prefers it.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -324,14 +320,12 @@ private fun WeekGrid(
                 // Each label's Box starts exactly at its hour boundary (y=0 for gridStartHour),
                 // matching the background cells below and the lecture blocks' own offsets —
                 // they all share the same origin so a tap and a block line up with the label.
-                // The hour/half-hour lines continue through the axis so each time reads as
+                // The hour lines continue through the axis so each time reads as
                 // part of the same row as the grid lines beside it.
                 val hourLine = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.9f)
-                val halfLine = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)
                 for (hour in gridStartHour until gridEndHour) {
                     Box(modifier = Modifier.height(HOUR_HEIGHT).fillMaxWidth()) {
                         Divider(color = hourLine)
-                        Divider(color = halfLine, modifier = Modifier.offset(y = HALF_HOUR_HEIGHT))
                         Text(
                             text = LocalTime.of(hour, 0).format(timeLabelFormatter),
                             style = MaterialTheme.typography.labelLarge,
@@ -352,7 +346,7 @@ private fun WeekGrid(
                     .horizontalScroll(hScroll)
                     .padding(top = GRID_TOP_PADDING)
             ) {
-                // Background grid: one column per day, split into tappable half-hour cells.
+                // Background grid: one column per day, split into tappable one-hour cells.
                 Row {
                     DayOfWeek.entries.forEach { day ->
                         DayColumnCells(
@@ -438,7 +432,7 @@ private fun DayColumnCells(
     val slotMinutes = remember(gridStartHour, gridEndHour) {
         val start = gridStartHour * 60
         val end = gridEndHour * 60
-        generateSequence(start) { it + 30 }.takeWhile { it < end }.toList()
+        generateSequence(start) { it + 60 }.takeWhile { it < end }.toList()
     }
     val dayDividerColor = MaterialTheme.colorScheme.outlineVariant
     Column(
@@ -459,21 +453,17 @@ private fun DayColumnCells(
             }
     ) {
         slotMinutes.forEach { minuteOfDay ->
-            val isHourMark = minuteOfDay % 60 == 0
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(HALF_HOUR_HEIGHT)
+                    .height(HOUR_HEIGHT)
                     .clickable {
                         onCellTap(day, LocalTime.of(minuteOfDay / 60, minuteOfDay % 60))
                     }
             ) {
                 // Box defaults to top-start content alignment, so this 1dp divider sits
-                // right on the hour boundary rather than centered in the half-hour cell.
-                // Hour lines are solid; half-hour lines are fainter so time reads at a glance.
-                Divider(
-                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = if (isHourMark) 0.9f else 0.35f)
-                )
+                // right on the hour boundary. Finer times are set from the add/edit dialog.
+                Divider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.9f))
             }
         }
     }
@@ -586,6 +576,9 @@ private fun LectureEditorSheet(
     var subjectMenuExpanded by remember { mutableStateOf(false) }
     var showStartPicker by remember { mutableStateOf(false) }
     var showEndPicker by remember { mutableStateOf(false) }
+    // Save/Delete stay tappable while the sheet animates away; without this a double tap
+    // inserted the same lecture twice.
+    var submitted by remember { mutableStateOf(false) }
 
     val isEditing = state.existingEntry != null
     val isTimeValid = endTime.isAfter(startTime)
@@ -728,9 +721,11 @@ private fun LectureEditorSheet(
                 if (onDelete != null) {
                     OutlinedButton(
                         onClick = {
+                            submitted = true
                             onDelete()
                             dismissAfterHide()
                         },
+                        enabled = !submitted,
                         colors = ButtonDefaults.outlinedButtonColors(
                             contentColor = MaterialTheme.colorScheme.error
                         )
@@ -745,10 +740,11 @@ private fun LectureEditorSheet(
                 }
                 Button(
                     onClick = {
+                        submitted = true
                         onSave(subjectId, dayOfWeek, startTime, endTime)
                         dismissAfterHide()
                     },
-                    enabled = isTimeValid && selectedSubject != null
+                    enabled = !submitted && isTimeValid && selectedSubject != null
                 ) {
                     Text("Save")
                 }

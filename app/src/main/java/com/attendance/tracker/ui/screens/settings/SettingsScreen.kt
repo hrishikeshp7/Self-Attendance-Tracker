@@ -17,7 +17,6 @@ fun SettingsScreen(
     onNavigateToAbout: () -> Unit,
     onNavigateToCustomizations: () -> Unit,
     onNavigateToBackupRestore: () -> Unit,
-    onNavigateToClassicSchedule: () -> Unit,
     onNavigateToCalendarSync: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -40,7 +39,7 @@ fun SettingsScreen(
                 reminderMinute = minute
                 NotificationHelper.setReminderTime(context, hour, minute)
                 if (notificationsEnabled) {
-                    ReminderScheduler.scheduleDailyReminder(context)
+                    ReminderScheduler.scheduleDailyReminder(context, reschedule = true)
                 }
                 showTimePicker = false
             },
@@ -86,7 +85,7 @@ fun SettingsScreen(
                             style = MaterialTheme.typography.titleMedium
                         )
                         Text(
-                            text = "Themes and color settings",
+                            text = "Light, dark or AMOLED theme",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -149,37 +148,6 @@ fun SettingsScreen(
                         )
                         Text(
                             text = "Get your timetable into Google Calendar, Notion Calendar, or export as .ics",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    Text(
-                        text = "→",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                }
-            }
-
-            // Classic Schedule View Option
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                onClick = onNavigateToClassicSchedule
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column {
-                        Text(
-                            text = "Classic Schedule View",
-                            style = MaterialTheme.typography.titleMedium
-                        )
-                        Text(
-                            text = "Prefer the simple day-list toggle over the new timetable grid? Open it here.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )

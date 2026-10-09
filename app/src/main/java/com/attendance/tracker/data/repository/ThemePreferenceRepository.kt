@@ -13,19 +13,11 @@ class ThemePreferenceRepository(private val themePreferenceDao: ThemePreferenceD
         return themePreferenceDao.getThemePreferenceOnce() ?: ThemePreference()
     }
     
+    // Writes use insert (REPLACE), not @Update: an update silently does nothing if the
+    // single row hasn't been created yet, dropping the user's choice.
     suspend fun updateThemeMode(themeMode: ThemeMode) {
         val current = getThemePreferenceOnce()
-        themePreferenceDao.updateThemePreference(current.copy(themeMode = themeMode))
-    }
-    
-    suspend fun updateCustomColors(primaryColor: Long?, secondaryColor: Long?) {
-        val current = getThemePreferenceOnce()
-        themePreferenceDao.updateThemePreference(
-            current.copy(
-                customPrimaryColor = primaryColor,
-                customSecondaryColor = secondaryColor
-            )
-        )
+        themePreferenceDao.insertThemePreference(current.copy(themeMode = themeMode))
     }
     
     suspend fun initializeDefaultIfNeeded() {

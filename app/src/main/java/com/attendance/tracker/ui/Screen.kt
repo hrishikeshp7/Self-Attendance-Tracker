@@ -7,7 +7,6 @@ sealed class Screen(val route: String) {
     }
     data object Subjects : Screen("subjects")
     data object Schedule : Screen("schedule")
-    data object ClassicSchedule : Screen("classic_schedule")
     data object CalendarSync : Screen("calendar_sync")
     data object Settings : Screen("settings")
     data object Customizations : Screen("customizations")

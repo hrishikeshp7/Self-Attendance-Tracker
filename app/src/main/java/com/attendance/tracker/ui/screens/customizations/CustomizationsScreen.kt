@@ -26,16 +26,10 @@ import com.attendance.tracker.data.model.ThemeMode
 @Composable
 fun CustomizationsScreen(
     currentThemeMode: ThemeMode,
-    currentPrimaryColor: Color?,
-    currentSecondaryColor: Color?,
     onThemeModeChange: (ThemeMode) -> Unit,
-    onCustomColorsChange: (Long?, Long?) -> Unit,
     onNavigateBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var showColorPicker by remember { mutableStateOf(false) }
-    var colorPickerTarget by remember { mutableStateOf<ColorTarget?>(null) }
-    
     Scaffold(
         topBar = {
             TopAppBar(
@@ -110,123 +104,6 @@ fun CustomizationsScreen(
                 }
             }
 
-            // Color Customization Section
-            item {
-                Text(
-                    text = "Color Customization",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(top = 8.dp)
-                )
-            }
-
-            item {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-                ) {
-                    Column(
-                        modifier = Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        // Primary Color
-                        ColorCustomizationRow(
-                            label = "Primary Color",
-                            currentColor = currentPrimaryColor ?: MaterialTheme.colorScheme.primary,
-                            onClick = {
-                                colorPickerTarget = ColorTarget.PRIMARY
-                                showColorPicker = true
-                            },
-                            onReset = {
-                                onCustomColorsChange(null, currentSecondaryColor?.toArgb()?.toLong())
-                            }
-                        )
-
-                        Divider()
-
-                        // Secondary Color
-                        ColorCustomizationRow(
-                            label = "Secondary Color",
-                            currentColor = currentSecondaryColor ?: MaterialTheme.colorScheme.secondary,
-                            onClick = {
-                                colorPickerTarget = ColorTarget.SECONDARY
-                                showColorPicker = true
-                            },
-                            onReset = {
-                                onCustomColorsChange(currentPrimaryColor?.toArgb()?.toLong(), null)
-                            }
-                        )
-                    }
-                }
-            }
-
-            // Pre-built Color Schemes
-            item {
-                Text(
-                    text = "Pre-built Color Schemes",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(top = 8.dp)
-                )
-            }
-
-            item {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-                ) {
-                    Column(
-                        modifier = Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        PrebuiltSchemeOption(
-                            title = "Ocean Blue",
-                            primaryColor = Color(0xFF0277BD),
-                            secondaryColor = Color(0xFF00ACC1),
-                            onClick = {
-                                onCustomColorsChange(0xFF0277BD, 0xFF00ACC1)
-                            }
-                        )
-                        Divider()
-                        PrebuiltSchemeOption(
-                            title = "Forest Green",
-                            primaryColor = Color(0xFF388E3C),
-                            secondaryColor = Color(0xFF66BB6A),
-                            onClick = {
-                                onCustomColorsChange(0xFF388E3C, 0xFF66BB6A)
-                            }
-                        )
-                        Divider()
-                        PrebuiltSchemeOption(
-                            title = "Purple Dream",
-                            primaryColor = Color(0xFF7B1FA2),
-                            secondaryColor = Color(0xFFAB47BC),
-                            onClick = {
-                                onCustomColorsChange(0xFF7B1FA2, 0xFFAB47BC)
-                            }
-                        )
-                        Divider()
-                        PrebuiltSchemeOption(
-                            title = "Sunset Orange",
-                            primaryColor = Color(0xFFE64A19),
-                            secondaryColor = Color(0xFFFF6F00),
-                            onClick = {
-                                onCustomColorsChange(0xFFE64A19, 0xFFFF6F00)
-                            }
-                        )
-                        Divider()
-                        PrebuiltSchemeOption(
-                            title = "Default",
-                            primaryColor = Color(0xFF1976D2),
-                            secondaryColor = Color(0xFF03DAC6),
-                            onClick = {
-                                onCustomColorsChange(null, null)
-                            }
-                        )
-                    }
-                }
-            }
-
             // Info Section
             item {
                 Card(
@@ -245,7 +122,7 @@ fun CustomizationsScreen(
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = "AMOLED theme uses pure black backgrounds to save battery on OLED/AMOLED displays. Custom colors work with all themes including AMOLED mode.",
+                            text = "AMOLED theme uses pure black backgrounds to save battery on OLED/AMOLED displays.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onPrimaryContainer
                         )
@@ -253,32 +130,6 @@ fun CustomizationsScreen(
                 }
             }
         }
-    }
-
-    // Color Picker Dialog (simplified)
-    if (showColorPicker && colorPickerTarget != null) {
-        SimpleColorPickerDialog(
-            currentColor = when (colorPickerTarget) {
-                ColorTarget.PRIMARY -> currentPrimaryColor ?: MaterialTheme.colorScheme.primary
-                ColorTarget.SECONDARY -> currentSecondaryColor ?: MaterialTheme.colorScheme.secondary
-                else -> MaterialTheme.colorScheme.primary
-            },
-            onColorSelected = { color ->
-                when (colorPickerTarget) {
-                    ColorTarget.PRIMARY -> {
-                        onCustomColorsChange(color.toArgb().toLong(), currentSecondaryColor?.toArgb()?.toLong())
-                    }
-                    ColorTarget.SECONDARY -> {
-                        onCustomColorsChange(currentPrimaryColor?.toArgb()?.toLong(), color.toArgb().toLong())
-                    }
-                    else -> {}
-                }
-                showColorPicker = false
-            },
-            onDismiss = {
-                showColorPicker = false
-            }
-        )
     }
 }
 
@@ -320,134 +171,4 @@ private fun ThemeModeOption(
             )
         }
     }
-}
-
-@Composable
-private fun ColorCustomizationRow(
-    label: String,
-    currentColor: Color,
-    onClick: () -> Unit,
-    onReset: () -> Unit
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.titleSmall
-        )
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            TextButton(onClick = onReset) {
-                Text("Reset")
-            }
-            Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(CircleShape)
-                    .background(currentColor)
-                    .border(2.dp, MaterialTheme.colorScheme.outline, CircleShape)
-                    .clickable(onClick = onClick)
-            )
-        }
-    }
-}
-
-@Composable
-private fun PrebuiltSchemeOption(
-    title: String,
-    primaryColor: Color,
-    secondaryColor: Color,
-    onClick: () -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(vertical = 8.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.titleSmall
-        )
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(32.dp)
-                    .clip(CircleShape)
-                    .background(primaryColor)
-                    .border(1.dp, MaterialTheme.colorScheme.outline, CircleShape)
-            )
-            Box(
-                modifier = Modifier
-                    .size(32.dp)
-                    .clip(CircleShape)
-                    .background(secondaryColor)
-                    .border(1.dp, MaterialTheme.colorScheme.outline, CircleShape)
-            )
-        }
-    }
-}
-
-@Composable
-private fun SimpleColorPickerDialog(
-    currentColor: Color,
-    onColorSelected: (Color) -> Unit,
-    onDismiss: () -> Unit
-) {
-    val colors = listOf(
-        Color(0xFFE53935), Color(0xFFD81B60), Color(0xFF8E24AA), Color(0xFF5E35B1),
-        Color(0xFF3949AB), Color(0xFF1E88E5), Color(0xFF039BE5), Color(0xFF00ACC1),
-        Color(0xFF00897B), Color(0xFF43A047), Color(0xFF7CB342), Color(0xFFC0CA33),
-        Color(0xFFFDD835), Color(0xFFFFB300), Color(0xFFFB8C00), Color(0xFFF4511E),
-        Color(0xFF6D4C41), Color(0xFF757575), Color(0xFF546E7A), Color(0xFF37474F)
-    )
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Select Color") },
-        text = {
-            Column {
-                colors.chunked(5).forEach { rowColors ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceEvenly
-                    ) {
-                        rowColors.forEach { color ->
-                            Box(
-                                modifier = Modifier
-                                    .size(48.dp)
-                                    .padding(4.dp)
-                                    .clip(CircleShape)
-                                    .background(color)
-                                    .border(
-                                        width = if (color == currentColor) 3.dp else 0.dp,
-                                        color = MaterialTheme.colorScheme.primary,
-                                        shape = CircleShape
-                                    )
-                                    .clickable { onColorSelected(color) }
-                            )
-                        }
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel")
-            }
-        }
-    )
-}
-
-private enum class ColorTarget {
-    PRIMARY, SECONDARY
 }

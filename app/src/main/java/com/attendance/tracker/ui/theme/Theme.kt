@@ -64,8 +64,6 @@ fun AttendanceTrackerTheme(
     themeMode: ThemeMode = ThemeMode.SYSTEM,
     darkTheme: Boolean = isSystemInDarkTheme(),
     dynamicColor: Boolean = true,
-    customPrimaryColor: Color? = null,
-    customSecondaryColor: Color? = null,
     content: @Composable () -> Unit
 ) {
     val useDarkTheme = when (themeMode) {
@@ -75,46 +73,17 @@ fun AttendanceTrackerTheme(
         ThemeMode.SYSTEM -> darkTheme
     }
 
-    val colorScheme = when {
-        themeMode == ThemeMode.AMOLED -> {
-            // Apply custom colors if provided
-            if (customPrimaryColor != null || customSecondaryColor != null) {
-                AmoledColorScheme.copy(
-                    primary = customPrimaryColor ?: AmoledColorScheme.primary,
-                    secondary = customSecondaryColor ?: AmoledColorScheme.secondary
-                )
-            } else {
-                AmoledColorScheme
-            }
-        }
+    val baseScheme = when {
+        themeMode == ThemeMode.AMOLED -> AmoledColorScheme
         dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
             val context = LocalContext.current
             if (useDarkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
         }
-        useDarkTheme -> {
-            // Apply custom colors if provided
-            if (customPrimaryColor != null || customSecondaryColor != null) {
-                DarkColorScheme.copy(
-                    primary = customPrimaryColor ?: DarkColorScheme.primary,
-                    secondary = customSecondaryColor ?: DarkColorScheme.secondary
-                )
-            } else {
-                DarkColorScheme
-            }
-        }
-        else -> {
-            // Apply custom colors if provided
-            if (customPrimaryColor != null || customSecondaryColor != null) {
-                LightColorScheme.copy(
-                    primary = customPrimaryColor ?: LightColorScheme.primary,
-                    secondary = customSecondaryColor ?: LightColorScheme.secondary
-                )
-            } else {
-                LightColorScheme
-            }
-        }
+        useDarkTheme -> DarkColorScheme
+        else -> LightColorScheme
     }
-    
+    val colorScheme = baseScheme
+
     val view = LocalView.current
     if (!view.isInEditMode) {
         SideEffect {
