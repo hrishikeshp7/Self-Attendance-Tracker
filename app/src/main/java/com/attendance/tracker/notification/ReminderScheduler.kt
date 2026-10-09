@@ -14,7 +14,13 @@ object ReminderScheduler {
 
     private const val WORK_NAME = "attendance_daily_reminder"
 
-    fun scheduleDailyReminder(context: Context) {
+    /**
+     * @param reschedule true when the reminder time changed: cancel-and-reenqueue restarts
+     * the daily period from the new initial delay (UPDATE keeps the old enqueue time, so a
+     * new time didn't reliably apply). App launches use KEEP so merely opening the app
+     * never shifts an already-scheduled reminder.
+     */
+    fun scheduleDailyReminder(context: Context, reschedule: Boolean = false) {
         val (hour, minute) = NotificationHelper.getReminderTime(context)
 
         // Calculate initial delay until the next reminder time
@@ -34,7 +40,7 @@ object ReminderScheduler {
 
         WorkManager.getInstance(context).enqueueUniquePeriodicWork(
             WORK_NAME,
-            ExistingPeriodicWorkPolicy.UPDATE,
+            if (reschedule) ExistingPeriodicWorkPolicy.CANCEL_AND_REENQUEUE else ExistingPeriodicWorkPolicy.KEEP,
             workRequest
         )
     }

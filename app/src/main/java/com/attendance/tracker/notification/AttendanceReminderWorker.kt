@@ -41,15 +41,13 @@ class AttendanceReminderWorker(
         val markedSubjectIds = todayAttendanceRecords.map { it.subjectId }.toSet()
         val subjectsMap = subjectDao.getSubjectsByIdsOnce(subjectIds).associateBy { it.id }
 
-        val unmarkedSubjectNames = mutableListOf<String>()
-        for (entry in todayScheduledEntries) {
-            if (entry.subjectId !in markedSubjectIds) {
-                val subject = subjectsMap[entry.subjectId]
-                if (subject != null && !subject.isFolder) {
-                    unmarkedSubjectNames.add(subject.name)
-                }
-            }
-        }
+        // Per subject, not per slot: a subject with two lectures today (e.g. lecture + lab)
+        // must be listed once, not twice with an inflated count.
+        val unmarkedSubjectNames = subjectIds
+            .filter { it !in markedSubjectIds }
+            .mapNotNull { subjectsMap[it] }
+            .filter { !it.isFolder }
+            .map { it.name }
 
         if (unmarkedSubjectNames.isNotEmpty()) {
             // Send missed-mark notification

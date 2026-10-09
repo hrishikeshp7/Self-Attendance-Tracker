@@ -39,3 +39,6 @@ Thumbs.db
 
 # CodeGraph index
 .codegraph/
+
+# Local bug log (not committed)
+BUG_HISTORY.md

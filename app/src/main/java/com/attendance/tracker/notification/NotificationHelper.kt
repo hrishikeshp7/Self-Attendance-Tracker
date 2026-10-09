@@ -63,7 +63,7 @@ object NotificationHelper {
         )
 
         val notification = NotificationCompat.Builder(context, CHANNEL_ID_REMINDER)
-            .setSmallIcon(R.mipmap.ic_launcher)
+            .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle("Mark Today's Attendance")
             .setContentText("Don't forget to mark attendance for today's classes.")
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
@@ -91,7 +91,7 @@ object NotificationHelper {
         }
 
         val notification = NotificationCompat.Builder(context, CHANNEL_ID_ALERT)
-            .setSmallIcon(R.mipmap.ic_launcher)
+            .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle("Attendance Not Marked")
             .setContentText(bodyText)
             .setStyle(
@@ -123,7 +123,7 @@ object NotificationHelper {
         }
 
         val notification = NotificationCompat.Builder(context, CHANNEL_ID_ALERT)
-            .setSmallIcon(R.mipmap.ic_launcher)
+            .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle("Attendance At Risk")
             .setContentText(bodyText)
             .setStyle(
