@@ -116,13 +116,13 @@ object CsvImporter {
         return Result(subjects.values.toList(), slots, errors)
     }
 
-    private fun parseDay(raw: String): DayOfWeek? {
+    internal fun parseDay(raw: String): DayOfWeek? {
         val s = raw.trim().lowercase(Locale.ENGLISH)
         if (s.length < 3) return null
         return DayOfWeek.entries.firstOrNull { it.name.lowercase(Locale.ENGLISH).startsWith(s) }
     }
 
-    private fun parseTime(raw: String): LocalTime? {
+    internal fun parseTime(raw: String): LocalTime? {
         val s = raw.trim().uppercase(Locale.ENGLISH).replace(Regex("(?<=\\d)(AM|PM)"), " $1")
         if (s.isEmpty()) return null
         for (f in timeFormats) {

@@ -253,7 +253,7 @@ private fun FolderListItem(
         AlertDialog(
             onDismissRequest = { showDeleteConfirmation = false },
             title = { Text("Delete Folder") },
-            text = { Text("Delete '${folder.name}'? Subjects inside will be moved out of the folder, not deleted — their attendance history is kept. This action cannot be undone.") },
+            text = { Text("Delete '${folder.name}'? Subjects inside are moved out of the folder and renamed '${folder.name} / …', not deleted — their attendance history is kept. This action cannot be undone.") },
             confirmButton = {
                 TextButton(
                     onClick = {

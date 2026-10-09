@@ -21,9 +21,12 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.attendance.tracker.backup.AiImport
 import com.attendance.tracker.backup.CsvImporter
 import com.attendance.tracker.ui.AttendanceViewModel
 import kotlinx.coroutines.Dispatchers
@@ -45,6 +48,11 @@ fun BackupRestoreScreen(
     var showRestoreConfirmDialog by remember { mutableStateOf(false) }
     var pendingRestoreUri by remember { mutableStateOf<Uri?>(null) }
     var csvPreview by remember { mutableStateOf<CsvImporter.Result?>(null) }
+    var showAiPaste by remember { mutableStateOf(false) }
+    var aiText by remember { mutableStateOf("") }
+    var replaceExisting by remember { mutableStateOf(false) }
+    val clipboard = LocalClipboardManager.current
+    val subjects by viewModel.allSubjectsIncludingFolders.collectAsState()
 
     // ---------------------------------------------------------------
     // SAF launchers
@@ -171,8 +179,36 @@ fun BackupRestoreScreen(
         )
     }
 
+    if (showAiPaste) {
+        AlertDialog(
+            onDismissRequest = { showAiPaste = false },
+            title = { Text("Paste the chatbot's reply") },
+            text = {
+                OutlinedTextField(
+                    value = aiText,
+                    onValueChange = { aiText = it },
+                    placeholder = { Text("Paste here") },
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 120.dp, max = 240.dp)
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = aiText.isNotBlank(),
+                    onClick = {
+                        csvPreview = viewModel.previewAiImport(aiText)
+                        replaceExisting = false
+                        showAiPaste = false
+                    }
+                ) { Text("Check") }
+            },
+            dismissButton = { TextButton(onClick = { showAiPaste = false }) { Text("Cancel") } }
+        )
+    }
+
     csvPreview?.let { preview ->
         val ok = preview.errors.isEmpty() && preview.subjects.isNotEmpty()
+        val existingNames = subjects.filter { it.parentSubjectId == null && !it.isFolder }.map { it.name.lowercase() }.toSet()
+        val duplicates = preview.subjects.filter { it.name.lowercase() in existingNames }
         AlertDialog(
             onDismissRequest = { csvPreview = null },
             title = { Text(if (ok) "Ready to import" else "Can't import yet") },
@@ -182,8 +218,29 @@ fun BackupRestoreScreen(
                     verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     if (ok) {
-                        Text("${preview.subjects.size} subjects and ${preview.slots.size} timetable slots found. " +
-                            "Subjects you already have are left unchanged.")
+                        Text("${preview.subjects.size} subjects and ${preview.slots.size} timetable slots found.")
+                        preview.subjects.forEach { row ->
+                            val slots = preview.slots.filter { it.subjectName == row.name }
+                            Text(
+                                "• ${row.name}" + (if (row.name.lowercase() in existingNames) " (already exists)" else "") +
+                                    (if (slots.isEmpty()) "" else "\n   " + slots.joinToString("\n   ") {
+                                        "${it.day.name.take(3)} ${it.start}–${it.end}"
+                                    }),
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                        if (duplicates.isNotEmpty()) {
+                            Text("${duplicates.size} already in the app. What should happen to them?", style = MaterialTheme.typography.titleSmall)
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                RadioButton(selected = !replaceExisting, onClick = { replaceExisting = false })
+                                Text("Keep the original")
+                            }
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                RadioButton(selected = replaceExisting, onClick = { replaceExisting = true })
+                                Text("Use the new timetable and target")
+                            }
+                            Text("Attendance counts are never changed.", style = MaterialTheme.typography.bodySmall)
+                        }
                     } else {
                         Text("Nothing was imported. Fix these in your file and try again:")
                         preview.errors.take(30).forEach {
@@ -195,7 +252,7 @@ fun BackupRestoreScreen(
                 }
             },
             confirmButton = {
-                if (ok) TextButton(onClick = { viewModel.importCsv(preview); csvPreview = null }) { Text("Import") }
+                if (ok) TextButton(onClick = { viewModel.importCsv(preview, replaceExisting && duplicates.isNotEmpty()); csvPreview = null }) { Text("Import") }
                 else TextButton(onClick = { csvPreview = null }) { Text("OK") }
             },
             dismissButton = if (ok) { { TextButton(onClick = { csvPreview = null }) { Text("Cancel") } } } else null
@@ -339,17 +396,41 @@ fun BackupRestoreScreen(
 
             // ---- Import section ----
             Divider()
+            Text("Import with AI", style = MaterialTheme.typography.titleMedium)
+
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = "1. Copy the prompt.\n" +
+                            "2. Paste it into Claude, Gemini or any chatbot and attach your timetable (PDF or photo).\n" +
+                            "3. Copy its reply and paste it here. You'll see a preview before anything is saved.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Row(modifier = Modifier.align(Alignment.End), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(onClick = {
+                            clipboard.setText(AnnotatedString(AiImport.PROMPT))
+                            android.widget.Toast.makeText(context, "Prompt copied.", android.widget.Toast.LENGTH_SHORT).show()
+                        }) { Text("Copy prompt") }
+                        Button(onClick = { showAiPaste = true }) { Text("Paste reply") }
+                    }
+                }
+            }
+
             Text("Import from CSV", style = MaterialTheme.typography.titleMedium)
 
             BackupActionCard(
                 title = "Import subjects & timetable from CSV",
                 description = "Bulk-add subjects (target %, attended, total) and weekly lectures " +
                     "from a spreadsheet. Columns: subject, target_percentage, attended, total, " +
-                    "day, start, end. The file is checked first and nothing is saved until you confirm. " +
-                    "Existing subjects are never overwritten.",
+                    "day, start, end. The file is checked first and nothing is saved until you confirm.",
                 icon = { Icon(Icons.Default.FileUpload, contentDescription = null) },
                 buttonLabel = "Choose CSV File"
             ) {
+                replaceExisting = false
                 csvImportLauncher.launch(arrayOf("text/*", "application/vnd.ms-excel"))
             }
             TextButton(onClick = { csvTemplateLauncher.launch("attendance_import_template.csv") }) {

@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import com.attendance.tracker.backup.AiImport
 import org.junit.Before
 import org.junit.Test
 import java.time.DayOfWeek
@@ -161,6 +162,7 @@ class AttendanceRepositoryTest {
 
     private lateinit var subjectDao: FakeSubjectDao
     private lateinit var attendanceDao: FakeAttendanceDao
+    private lateinit var scheduleDao: FakeScheduleDao
     private lateinit var repository: AttendanceRepository
     private val date = LocalDate.of(2024, 1, 15)
 
@@ -168,7 +170,8 @@ class AttendanceRepositoryTest {
     fun setUp() {
         subjectDao = FakeSubjectDao()
         attendanceDao = FakeAttendanceDao()
-        repository = AttendanceRepository(subjectDao, attendanceDao, FakeScheduleDao())
+        scheduleDao = FakeScheduleDao()
+        repository = AttendanceRepository(subjectDao, attendanceDao, scheduleDao)
     }
 
     private suspend fun addSubject(id: Long = 1L) {
@@ -220,6 +223,7 @@ class AttendanceRepositoryTest {
         // with their parentSubjectId still pointing at the deleted folder, they'd be
         // invisible both at top-level and inside the (now-nonexistent) folder.
         assertNull(lecture.parentSubjectId)
+        assertEquals("Pathology / Lecture", lecture.name)
         assertNull(practical.parentSubjectId)
     }
 
@@ -291,5 +295,22 @@ class AttendanceRepositoryTest {
         repository.setDayCounts(1L, date, present = 0, absent = 0)
         assertNull(repository.getAttendanceRecord(1L, date))
         assertCountsMatchRecords(1L)
+    }
+
+    @Test
+    fun `import keeps or replaces an existing subject but never its attendance`() = runBlocking {
+        subjectDao.insertSubject(Subject(id = 1L, name = "Physics", requiredAttendance = 75, totalLectures = 10, presentLectures = 8, absentLectures = 2))
+        scheduleDao.insertScheduleEntry(ScheduleEntry(subjectId = 1L, dayOfWeek = DayOfWeek.MONDAY))
+        val file = AiImport.parse("""{"subjects":[{"name":"physics","target":80,"slots":[{"day":"TUE","start":"11:00","end":"12:00"}]}]}""")
+
+        repository.importCsv(file)
+        assertEquals(75, repository.getSubjectById(1L)!!.requiredAttendance)
+        assertEquals(DayOfWeek.MONDAY, scheduleDao.entries.single().dayOfWeek)
+
+        repository.importCsv(file, replaceExisting = true)
+        val s = repository.getSubjectById(1L)!!
+        assertEquals(80, s.requiredAttendance)
+        assertEquals(8, s.presentLectures)
+        assertEquals(DayOfWeek.TUESDAY, scheduleDao.entries.single().dayOfWeek)
     }
 }

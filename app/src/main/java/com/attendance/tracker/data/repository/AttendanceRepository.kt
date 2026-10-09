@@ -35,6 +35,11 @@ class AttendanceRepository(
             // Promote any sub-subjects to top-level rather than orphaning them under a
             // now-deleted folder id — preserves their attendance history and keeps them
             // reachable from the Subjects screen instead of vanishing permanently.
+            // The folder name is folded into each child's name ("PSM / Lectures") so they
+            // stay distinguishable once the folder is gone.
+            subjectDao.getAllSubjectsOnce().filter { it.parentSubjectId == subject.id }.forEach {
+                subjectDao.updateSubject(it.copy(name = "${subject.name} / ${it.name}"))
+            }
             subjectDao.clearParentForSubjects(subject.id)
         }
         subjectDao.deleteSubject(subject)
@@ -212,18 +217,31 @@ class AttendanceRepository(
 
     /**
      * Adds the parsed CSV rows. Subjects are matched by name (case-insensitive, top-level
-     * only): an existing subject keeps its target and counts and only gains timetable
-     * slots it doesn't already have, so importing the same file twice changes nothing.
+     * only): an existing subject is left completely untouched, so importing the same file
+     * twice changes nothing.
+     * With [replaceExisting] an existing subject instead takes the file's target (if given)
+     * and its timetable slots (if the file has any); attendance is never touched.
      */
-    suspend fun importCsv(data: com.attendance.tracker.backup.CsvImporter.Result): CsvImportSummary {
-        val idByName = subjectDao.getAllSubjectsOnce()
+    suspend fun importCsv(
+        data: com.attendance.tracker.backup.CsvImporter.Result,
+        replaceExisting: Boolean = false
+    ): CsvImportSummary {
+        val current = subjectDao.getAllSubjectsOnce()
             .filter { it.parentSubjectId == null && !it.isFolder }
-            .associate { it.name.lowercase() to it.id }
-            .toMutableMap()
+            .associateBy { it.name.lowercase() }
+        val idByName = current.mapValues { it.value.id }.toMutableMap()
         var added = 0
         var existing = 0
         for (row in data.subjects) {
-            if (row.name.lowercase() in idByName) { existing++; continue }
+            val old = current[row.name.lowercase()]
+            if (old != null) {
+                existing++
+                if (replaceExisting) {
+                    row.requiredAttendance?.let { subjectDao.updateSubject(old.copy(requiredAttendance = it)) }
+                    if (data.slots.any { it.subjectName.equals(row.name, ignoreCase = true) }) scheduleDao.deleteScheduleForSubject(old.id)
+                }
+                continue
+            }
             val total = row.total ?: 0
             val present = row.attended ?: 0
             idByName[row.name.lowercase()] = subjectDao.insertSubject(
@@ -240,6 +258,7 @@ class AttendanceRepository(
         val known = scheduleDao.getAllScheduleEntriesOnce().toMutableList()
         var slotsAdded = 0
         for (slot in data.slots) {
+            if (!replaceExisting && slot.subjectName.lowercase() in current) continue
             val subjectId = idByName[slot.subjectName.lowercase()] ?: continue
             if (known.any { it.subjectId == subjectId && it.dayOfWeek == slot.day && it.startTime == slot.start && it.endTime == slot.end }) continue
             val entry = ScheduleEntry(subjectId = subjectId, dayOfWeek = slot.day, startTime = slot.start, endTime = slot.end)

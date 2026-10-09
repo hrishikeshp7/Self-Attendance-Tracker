@@ -380,20 +380,24 @@ class AttendanceViewModel(application: Application) : AndroidViewModel(applicati
         }
     }
 
+    /** Parses an AI chatbot reply for the import preview; writes nothing. */
+    fun previewAiImport(text: String): com.attendance.tracker.backup.CsvImporter.Result =
+        com.attendance.tracker.backup.AiImport.parse(text)
+
     /** Parses a CSV for the import preview; writes nothing. */
     fun previewCsvImport(text: String): com.attendance.tracker.backup.CsvImporter.Result =
         com.attendance.tracker.backup.CsvImporter.parse(text)
 
     /** Writes a previously previewed (error-free) CSV import. */
-    fun importCsv(data: com.attendance.tracker.backup.CsvImporter.Result) {
+    fun importCsv(data: com.attendance.tracker.backup.CsvImporter.Result, replaceExisting: Boolean = false) {
         viewModelScope.launch {
             _backupRestoreStatus.value = BackupRestoreStatus.IN_PROGRESS
             try {
-                val r = database.withTransaction { repository.importCsv(data) }
+                val r = database.withTransaction { repository.importCsv(data, replaceExisting) }
                 _backupRestoreStatus.value = BackupRestoreStatus.SUCCESS
                 _backupRestoreMessage.value =
                     "Import complete: ${r.subjectsAdded} subjects added" +
-                    (if (r.subjectsExisting > 0) " (${r.subjectsExisting} already existed, left unchanged)" else "") +
+                    (if (r.subjectsExisting > 0) " (${r.subjectsExisting} already existed, ${if (replaceExisting) "updated" else "kept as they were"})" else "") +
                     ", ${r.slotsAdded} timetable slots added."
             } catch (e: Exception) {
                 _backupRestoreStatus.value = BackupRestoreStatus.ERROR
