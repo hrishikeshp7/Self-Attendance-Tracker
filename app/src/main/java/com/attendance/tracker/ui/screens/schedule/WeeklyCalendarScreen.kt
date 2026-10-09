@@ -315,7 +315,7 @@ private fun WeekGrid(
                 modifier = Modifier
                     .width(TIME_AXIS_WIDTH)
                     .verticalScroll(vScroll)
-                    .padding(top = GRID_TOP_PADDING)
+                    .padding(top = GRID_TOP_PADDING, bottom = 88.dp) // room to scroll the last hour clear of the + button
             ) {
                 // Each label's Box starts exactly at its hour boundary (y=0 for gridStartHour),
                 // matching the background cells below and the lecture blocks' own offsets —
@@ -344,7 +344,7 @@ private fun WeekGrid(
                     .weight(1f)
                     .verticalScroll(vScroll)
                     .horizontalScroll(hScroll)
-                    .padding(top = GRID_TOP_PADDING)
+                    .padding(top = GRID_TOP_PADDING, bottom = 88.dp) // room to scroll the last hour clear of the + button
             ) {
                 // Background grid: one column per day, split into tappable one-hour cells.
                 Row {
@@ -543,7 +543,8 @@ private fun LectureBlock(
                 overflow = TextOverflow.Ellipsis
             )
             Text(
-                text = entry.startTime.format(timeLabelFormatter),
+                // Whole hours read "9 AM", anything else keeps its minutes ("5:30 AM")
+                text = entry.startTime.format(if (entry.startTime.minute == 0) timeLabelFormatter else timeSheetFormatter),
                 style = MaterialTheme.typography.labelSmall,
                 color = Color.White.copy(alpha = 0.85f),
                 maxLines = 1,
