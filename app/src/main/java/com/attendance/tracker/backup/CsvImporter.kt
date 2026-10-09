@@ -109,7 +109,7 @@ object CsvImporter {
                     start == null -> errors += "Row $line: start time \"$startRaw\" is not valid (use e.g. 09:00)."
                     end == null -> errors += "Row $line: end time \"$endRaw\" is not valid (use e.g. 10:00)."
                     !end.isAfter(start) -> errors += "Row $line: end time must be after start time."
-                    else -> slots += SlotRow(subjects[key]!!.name, day, start, end)
+                    else -> SlotRow(subjects[key]!!.name, day, start, end).let { if (it !in slots) slots += it }  // a repeated row is one slot
                 }
             }
         }

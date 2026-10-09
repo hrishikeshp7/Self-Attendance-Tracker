@@ -38,4 +38,10 @@ class CsvImporterTest {
             ",75,1,2,,,\nA,150,1,2,,,\nB,75,5,2,,,\nC,75,1,2,Funday,09:00,10:00\nD,,,,Monday,10:00,09:00\n")
         assertEquals(5, r.errors.size)
     }
+
+    @Test
+    fun `a repeated row is counted as one timetable slot`() {
+        val r = CsvImporter.parse("subject,day,start,end\nBio,Tue,11:00,12:30\nBio,Tue,11:00,12:30\n")
+        assertEquals(1, r.slots.size)
+    }
 }
