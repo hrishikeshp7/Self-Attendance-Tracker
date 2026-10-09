@@ -21,6 +21,7 @@ import com.attendance.tracker.data.model.AttendanceRecord
 import com.attendance.tracker.data.model.AttendanceStatus
 import com.attendance.tracker.data.model.Subject
 import com.attendance.tracker.data.model.getDisplayName
+import com.attendance.tracker.data.model.insight
 import com.attendance.tracker.ui.theme.AbsentRed
 import com.attendance.tracker.ui.theme.NoClassGray
 import com.attendance.tracker.ui.theme.PresentGreen
@@ -80,27 +81,11 @@ fun SubjectCard(
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     // Compact attendance insight
-                    if (subject.totalLectures > 0) {
-                        val insightText = when {
-                            subject.isAboveRequired && subject.classesCanBunk > 0 ->
-                                "Can skip ${subject.classesCanBunk} more"
-                            subject.isAboveRequired ->
-                                "At minimum threshold"
-                            else ->
-                                "Need ${subject.classesToAttend} more class${if (subject.classesToAttend != 1) "es" else ""}"
-                        }
-                        Text(
-                            text = insightText,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = attendanceColor
-                        )
-                    } else {
-                        Text(
-                            text = "No classes recorded yet",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
+                    Text(
+                        text = subject.insight,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = if (subject.totalLectures > 0) attendanceColor else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
 
                 Spacer(modifier = Modifier.width(8.dp))

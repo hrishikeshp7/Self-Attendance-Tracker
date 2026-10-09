@@ -82,6 +82,20 @@ data class Subject(
 }
 
 /**
+ * One-line standing for the subject card. classesToAttend/classesCanBunk use 999 as an
+ * "impossible"/"unlimited" marker, which must never reach the screen as a number.
+ */
+val Subject.insight: String
+    get() = when {
+        totalLectures == 0 -> "No classes recorded yet"
+        isAboveRequired && requiredAttendance <= 0 -> "No minimum required"
+        isAboveRequired && classesCanBunk > 0 -> "Can skip $classesCanBunk more"
+        isAboveRequired -> "At minimum threshold"
+        classesToAttend >= 999 -> "Can't reach $requiredAttendance%"
+        else -> "Need $classesToAttend more class${if (classesToAttend != 1) "es" else ""}"
+    }
+
+/**
  * Get the display name for a subject, including folder name if applicable
  */
 fun Subject.getDisplayName(allSubjects: List<Subject>): String {

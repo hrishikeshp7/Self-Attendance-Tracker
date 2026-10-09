@@ -70,4 +70,14 @@ class SubjectTest {
     fun `subject with no lectures is not above a positive requirement`() {
         assertFalse(Subject(name = "Physics", requiredAttendance = 75).isAboveRequired)
     }
+
+    @Test
+    fun `insight never shows the 999 markers`() {
+        // 100% required with a miss: unreachable
+        assertEquals("Can't reach 100%", Subject(name = "a", requiredAttendance = 100, totalLectures = 3, presentLectures = 2, absentLectures = 1).insight)
+        // 0% required: nothing to track
+        assertEquals("No minimum required", Subject(name = "a", requiredAttendance = 0, totalLectures = 7, presentLectures = 4, absentLectures = 3).insight)
+        assertEquals("No classes recorded yet", Subject(name = "a").insight)
+        assertEquals("Need 1 more class", Subject(name = "a", requiredAttendance = 75, totalLectures = 3, presentLectures = 2, absentLectures = 1).insight)
+    }
 }
