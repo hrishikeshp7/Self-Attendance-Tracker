@@ -6,6 +6,7 @@ import com.attendance.tracker.data.database.SubjectDao
 import com.attendance.tracker.data.model.AttendanceRecord
 import com.attendance.tracker.data.model.AttendanceStatus
 import com.attendance.tracker.data.model.ScheduleEntry
+import com.attendance.tracker.data.model.datesOverlap
 import com.attendance.tracker.data.model.Subject
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -219,8 +220,11 @@ class AttendanceRepository(
      * Adds the parsed CSV rows. Subjects are matched by name (case-insensitive, top-level
      * only): an existing subject is left completely untouched, so importing the same file
      * twice changes nothing.
+     * Timetable slots may carry a date range: an existing subject keeps its slots for any
+     * period they already cover, but gains slots for periods it has none for (e.g. next
+     * semester's timetable).
      * With [replaceExisting] an existing subject instead takes the file's target (if given)
-     * and its timetable slots (if the file has any); attendance is never touched.
+     * and replaces its slots that overlap the file's dates; attendance is never touched.
      */
     suspend fun importCsv(
         data: com.attendance.tracker.backup.CsvImporter.Result,
@@ -238,7 +242,6 @@ class AttendanceRepository(
                 existing++
                 if (replaceExisting) {
                     row.requiredAttendance?.let { subjectDao.updateSubject(old.copy(requiredAttendance = it)) }
-                    if (data.slots.any { it.subjectName.equals(row.name, ignoreCase = true) }) scheduleDao.deleteScheduleForSubject(old.id)
                 }
                 continue
             }
@@ -255,15 +258,24 @@ class AttendanceRepository(
             )
             added++
         }
-        val known = scheduleDao.getAllScheduleEntriesOnce().toMutableList()
+        val before = scheduleDao.getAllScheduleEntriesOnce()
         var slotsAdded = 0
         for (slot in data.slots) {
-            if (!replaceExisting && slot.subjectName.lowercase() in current) continue
             val subjectId = idByName[slot.subjectName.lowercase()] ?: continue
-            if (known.any { it.subjectId == subjectId && it.dayOfWeek == slot.day && it.startTime == slot.start && it.endTime == slot.end }) continue
-            val entry = ScheduleEntry(subjectId = subjectId, dayOfWeek = slot.day, startTime = slot.start, endTime = slot.end)
-            scheduleDao.insertScheduleEntry(entry)
-            known += entry.copy(id = -1)
+            if (slot.subjectName.lowercase() in current) {
+                // Timetable slots of the same subject whose dates overlap this one
+                val clashing = before.filter {
+                    it.subjectId == subjectId && datesOverlap(it.startDate, it.endDate, slot.startDate, slot.endDate)
+                }
+                if (!replaceExisting) { if (clashing.isNotEmpty()) continue }  // that period is already covered
+                else clashing.forEach { scheduleDao.deleteScheduleEntry(it) }
+            }
+            scheduleDao.insertScheduleEntry(
+                ScheduleEntry(
+                    subjectId = subjectId, dayOfWeek = slot.day, startTime = slot.start, endTime = slot.end,
+                    startDate = slot.startDate, endDate = slot.endDate
+                )
+            )
             slotsAdded++
         }
         return CsvImportSummary(added, existing, slotsAdded)

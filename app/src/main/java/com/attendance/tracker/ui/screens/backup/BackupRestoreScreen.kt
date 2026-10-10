@@ -224,7 +224,11 @@ fun BackupRestoreScreen(
                             Text(
                                 "• ${row.name}" + (if (row.name.lowercase() in existingNames) " (already exists)" else "") +
                                     (if (slots.isEmpty()) "" else "\n   " + slots.joinToString("\n   ") {
-                                        "${it.day.name.take(3)} ${it.start}–${it.end}"
+                                        "${it.day.name.take(3)} ${it.start}–${it.end}" + when {
+                                            it.startDate != null && it.startDate == it.endDate -> "  on ${it.startDate}"
+                                            it.startDate != null || it.endDate != null -> "  (${it.startDate ?: "…"} to ${it.endDate ?: "…"})"
+                                            else -> "  (every week)"
+                                        }
                                     }),
                                 style = MaterialTheme.typography.bodySmall
                             )

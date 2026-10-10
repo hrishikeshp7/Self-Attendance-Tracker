@@ -45,4 +45,24 @@ class AiImportTest {
         val slot = """{"day":"MON","start":"09:00","end":"10:00"}"""
         assertEquals(1, AiImport.parse("""{"subjects":[{"name":"A","slots":[$slot,$slot]}]}""").slots.size)
     }
+
+    @Test
+    fun `period and one-off dates are carried onto the slots`() {
+        val r = AiImport.parse("""{"from":"2026-08-03","until":"2026-12-18","subjects":[{"name":"A","slots":[
+            {"day":"MON","start":"09:00","end":"10:00"},{"date":"2026-09-15","start":"11:00","end":"12:00"}]}]}""")
+        assertTrue(r.errors.toString(), r.errors.isEmpty())
+        assertEquals(java.time.LocalDate.of(2026, 8, 3), r.slots[0].startDate)
+        assertEquals(java.time.LocalDate.of(2026, 12, 18), r.slots[0].endDate)
+        // a dated slot needs no day: it is worked out from the date (15 Sep 2026 is a Tuesday)
+        assertEquals(DayOfWeek.TUESDAY, r.slots[1].day)
+        assertEquals(java.time.LocalDate.of(2026, 9, 15), r.slots[1].startDate)
+        assertEquals(r.slots[1].startDate, r.slots[1].endDate)
+    }
+
+    @Test
+    fun `bad dates are reported`() {
+        assertEquals(2, AiImport.parse("""{"from":"3rd Aug","until":"2026-13-40","subjects":[{"name":"A"}]}""").errors.size)
+        assertTrue(AiImport.parse("""{"from":"2026-12-01","until":"2026-08-01","subjects":[{"name":"A"}]}""").errors.single().contains("before"))
+        assertTrue(AiImport.parse("""{"subjects":[{"name":"A","slots":[{"day":"MON","date":"2026-09-15","start":"09:00","end":"10:00"}]}]}""").errors.single().contains("not MON"))
+    }
 }

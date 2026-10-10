@@ -1,6 +1,7 @@
 package com.attendance.tracker.backup
 
 import java.time.DayOfWeek
+import java.time.LocalDate
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import java.time.format.DateTimeParseException
@@ -25,7 +26,14 @@ object CsvImporter {
         val total: Int?
     )
 
-    data class SlotRow(val subjectName: String, val day: DayOfWeek, val start: LocalTime, val end: LocalTime)
+    data class SlotRow(
+        val subjectName: String,
+        val day: DayOfWeek,
+        val start: LocalTime,
+        val end: LocalTime,
+        val startDate: LocalDate? = null,
+        val endDate: LocalDate? = null
+    )
 
     data class Result(
         val subjects: List<SubjectRow>,

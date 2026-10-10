@@ -313,4 +313,20 @@ class AttendanceRepositoryTest {
         assertEquals(8, s.presentLectures)
         assertEquals(DayOfWeek.TUESDAY, scheduleDao.entries.single().dayOfWeek)
     }
+
+    @Test
+    fun `importing a new period adds slots to an existing subject but never duplicates a covered one`() = runBlocking {
+        subjectDao.insertSubject(Subject(id = 1L, name = "Physics"))
+        val term1 = AiImport.parse("""{"from":"2026-01-05","until":"2026-05-29","subjects":[{"name":"Physics","slots":[{"day":"MON","start":"09:00","end":"10:00"}]}]}""")
+        val term2 = AiImport.parse("""{"from":"2026-08-03","until":"2026-12-18","subjects":[{"name":"Physics","slots":[{"day":"MON","start":"09:00","end":"10:00"}]}]}""")
+
+        repository.importCsv(term1)           // subject has no slots yet: added
+        repository.importCsv(term1)           // same period again: nothing new
+        assertEquals(1, scheduleDao.entries.size)
+        repository.importCsv(term2)           // different period, kept original: still added
+        assertEquals(2, scheduleDao.entries.size)
+        repository.importCsv(term2, replaceExisting = true)  // replaces only the overlapping term
+        assertEquals(2, scheduleDao.entries.size)
+        assertEquals(java.time.LocalDate.of(2026, 1, 5), scheduleDao.entries.minOf { it.startDate!! })
+    }
 }
