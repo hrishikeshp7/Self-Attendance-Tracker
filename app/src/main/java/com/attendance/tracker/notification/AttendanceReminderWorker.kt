@@ -21,14 +21,13 @@ class AttendanceReminderWorker(
 
         val database = AttendanceDatabase.getDatabase(applicationContext)
         val today = LocalDate.now()
-        val todayDayOfWeek = today.dayOfWeek
 
         // Get all schedule entries for today
         val scheduleDao = database.scheduleDao()
         val attendanceDao = database.attendanceDao()
         val subjectDao = database.subjectDao()
 
-        val todayScheduledEntries = scheduleDao.getScheduleForDayOnce(todayDayOfWeek)
+        val todayScheduledEntries = scheduleDao.getScheduleForDayOnce(today.dayOfWeek).filter { it.occursOn(today) }
         if (todayScheduledEntries.isEmpty()) {
             // No classes scheduled today – fall back to an at-risk check, then a general reminder
             notifyAtRiskOrDefault(subjectDao)

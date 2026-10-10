@@ -13,7 +13,7 @@ import com.attendance.tracker.data.model.Subject
 
 @Database(
     entities = [Subject::class, AttendanceRecord::class, ScheduleEntry::class, com.attendance.tracker.data.model.ThemePreference::class],
-    version = 6,
+    version = 7,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -85,6 +85,14 @@ abstract class AttendanceDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // Optional date range per lecture slot (stored as ISO text, like Converters.fromLocalDate)
+                db.execSQL("ALTER TABLE schedule_entries ADD COLUMN startDate TEXT")
+                db.execSQL("ALTER TABLE schedule_entries ADD COLUMN endDate TEXT")
+            }
+        }
+
         fun getDatabase(context: Context): AttendanceDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -92,7 +100,7 @@ abstract class AttendanceDatabase : RoomDatabase() {
                     AttendanceDatabase::class.java,
                     "attendance_database"
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
                     .build()
                 INSTANCE = instance
                 instance

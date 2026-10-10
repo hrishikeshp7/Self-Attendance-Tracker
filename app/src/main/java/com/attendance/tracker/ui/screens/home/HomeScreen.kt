@@ -54,9 +54,8 @@ fun HomeScreen(
     }
 
     // Determine today's scheduled subjects
-    val todayDayOfWeek = today.dayOfWeek
-    val todaysScheduledIds: Set<Long> = remember(scheduleEntries, todayDayOfWeek) {
-        scheduleEntries.filter { it.dayOfWeek == todayDayOfWeek }.map { it.subjectId }.toSet()
+    val todaysScheduledIds: Set<Long> = remember(scheduleEntries, today) {
+        scheduleEntries.filter { it.occursOn(today) }.map { it.subjectId }.toSet()
     }
     // If the user has not set up any schedule at all, fall back to showing all subjects
     val hasAnySchedule = scheduleEntries.isNotEmpty()

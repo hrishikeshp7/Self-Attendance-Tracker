@@ -25,7 +25,7 @@ import java.time.LocalTime
  */
 object BackupManager {
 
-    private const val BACKUP_VERSION = 3
+    private const val BACKUP_VERSION = 4
 
     // -----------------------------------------------------------------------
     // JSON export
@@ -78,6 +78,8 @@ object BackupManager {
             obj.put("startTime", e.startTime.toString())
             obj.put("endTime", e.endTime.toString())
             obj.put("isScheduled", e.isScheduled)
+            e.startDate?.let { obj.put("startDate", it.toString()) }
+            e.endDate?.let { obj.put("endDate", it.toString()) }
             scheduleArray.put(obj)
         }
         root.put("scheduleEntries", scheduleArray)
@@ -145,7 +147,10 @@ object BackupManager {
                     // fresh migration, rather than failing to restore the whole backup.
                     startTime = obj.optString("startTime", "09:00").let { LocalTime.parse(it) },
                     endTime = obj.optString("endTime", "10:00").let { LocalTime.parse(it) },
-                    isScheduled = obj.optBoolean("isScheduled", true)
+                    isScheduled = obj.optBoolean("isScheduled", true),
+                    // Absent in older backups, and when the slot has no date limit
+                    startDate = obj.optString("startDate").takeIf { it.isNotBlank() }?.let { LocalDate.parse(it) },
+                    endDate = obj.optString("endDate").takeIf { it.isNotBlank() }?.let { LocalDate.parse(it) }
                 )
             }
 

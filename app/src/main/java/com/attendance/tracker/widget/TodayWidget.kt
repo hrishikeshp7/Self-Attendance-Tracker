@@ -119,7 +119,7 @@ class TodayWidget : GlanceAppWidget() {
     ): TodayData {
         val byId = all.associateBy { it.id }
         val subjects = all.filter { !it.isFolder }
-        val scheduledIds = schedule.filter { it.dayOfWeek == today.dayOfWeek }.map { it.subjectId }.toSet()
+        val scheduledIds = schedule.filter { it.occursOn(today) }.map { it.subjectId }.toSet()
         val shown = if (schedule.isEmpty()) subjects else subjects.filter { it.id in scheduledIds }
         val marks = records.associateBy { it.subjectId }
         return TodayData(today, shown.map { TodayRow(it, marks[it.id], it.getDisplayName(byId)) }, schedule.isNotEmpty())

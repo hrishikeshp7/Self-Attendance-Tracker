@@ -136,8 +136,10 @@ object CalendarSyncManager {
                 val subject = subjectsById[entry.subjectId] ?: continue
                 if (subject.isFolder) continue
 
-                var date = nextOrSameDate(today, entry.dayOfWeek)
-                while (!date.isAfter(endDate)) {
+                // Only the slot's own date range (e.g. one semester), and never the past
+                var date = nextOrSameDate(maxOf(today, entry.startDate ?: today), entry.dayOfWeek)
+                val last = minOf(endDate, entry.endDate ?: endDate)
+                while (!date.isAfter(last)) {
                     val values = ContentValues().apply {
                         put(CalendarContract.Events.CALENDAR_ID, calendarId)
                         put(CalendarContract.Events.TITLE, subject.getDisplayName(subjectsById))
@@ -222,7 +224,6 @@ object CalendarSyncManager {
         val zoneId = ZoneId.systemDefault()
         val dtStamp = Instant.now().atZone(ZoneOffset.UTC).format(icsUtcFormatter)
         val today = LocalDate.now()
-        val until = endDate.atTime(23, 59, 59).atZone(zoneId).withZoneSameInstant(ZoneOffset.UTC).format(icsUtcFormatter)
 
         val sb = StringBuilder()
         sb.append("BEGIN:VCALENDAR\r\n")
@@ -234,8 +235,10 @@ object CalendarSyncManager {
             val subject = subjectsById[entry.subjectId] ?: continue
             if (subject.isFolder) continue
 
-            val anchorDate = nextOrSameDate(today, entry.dayOfWeek)
-            if (anchorDate.isAfter(endDate)) continue
+            val last = minOf(endDate, entry.endDate ?: endDate)
+            val anchorDate = nextOrSameDate(maxOf(today, entry.startDate ?: today), entry.dayOfWeek)
+            if (anchorDate.isAfter(last)) continue
+            val until = last.atTime(23, 59, 59).atZone(zoneId).withZoneSameInstant(ZoneOffset.UTC).format(icsUtcFormatter)
             val dtStart = anchorDate.atTime(entry.startTime)
             val dtEnd = anchorDate.atTime(entry.endTime)
 

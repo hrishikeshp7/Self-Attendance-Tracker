@@ -15,7 +15,8 @@ import java.time.LocalTime
 class BackupManagerTest {
     private val subjects = listOf(Subject(id = 1, name = "Physics", totalLectures = 3, presentLectures = 2, absentLectures = 1))
     private val records = listOf(AttendanceRecord(subjectId = 1, date = LocalDate.of(2024, 1, 15), status = AttendanceStatus.PRESENT, count = 2, otherCount = 1))
-    private val schedule = listOf(ScheduleEntry(subjectId = 1, dayOfWeek = DayOfWeek.MONDAY, startTime = LocalTime.of(9, 0), endTime = LocalTime.of(10, 0)))
+    private val schedule = listOf(ScheduleEntry(subjectId = 1, dayOfWeek = DayOfWeek.MONDAY, startTime = LocalTime.of(9, 0), endTime = LocalTime.of(10, 0)),
+        ScheduleEntry(subjectId = 1, dayOfWeek = DayOfWeek.TUESDAY, startDate = LocalDate.of(2026, 8, 3), endDate = LocalDate.of(2026, 12, 18)))
 
     @Test
     fun `json export parses back to the same data`() {
@@ -28,7 +29,7 @@ class BackupManagerTest {
 
     @Test
     fun `backup from a newer app version is rejected`() {
-        val json = BackupManager.exportToJson(subjects, records, schedule).replace("\"version\": 3", "\"version\": 99")
+        val json = BackupManager.exportToJson(subjects, records, schedule).replace("\"version\": 4", "\"version\": 99")
         assertNull(BackupManager.parseJson(json))
     }
 
