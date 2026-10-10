@@ -42,3 +42,6 @@ Thumbs.db
 
 # Local bug log (not committed)
 BUG_HISTORY.md
+
+# Local edge-case sweep notes
+SWEEP_REPORT.md
