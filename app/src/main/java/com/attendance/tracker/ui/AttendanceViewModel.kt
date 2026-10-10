@@ -277,14 +277,19 @@ class AttendanceViewModel(application: Application) : AndroidViewModel(applicati
     }
 
     /** Creates a new timed lecture slot (used by the weekly calendar view). */
-    fun addLectureSlot(subjectId: Long, dayOfWeek: DayOfWeek, startTime: LocalTime, endTime: LocalTime) {
+    fun addLectureSlot(
+        subjectId: Long, dayOfWeek: DayOfWeek, startTime: LocalTime, endTime: LocalTime,
+        startDate: LocalDate? = null, endDate: LocalDate? = null
+    ) {
         viewModelScope.launch {
             repository.insertScheduleEntry(
                 ScheduleEntry(
                     subjectId = subjectId,
                     dayOfWeek = dayOfWeek,
                     startTime = startTime,
-                    endTime = endTime
+                    endTime = endTime,
+                    startDate = startDate,
+                    endDate = endDate
                 )
             )
         }
@@ -296,7 +301,9 @@ class AttendanceViewModel(application: Application) : AndroidViewModel(applicati
         subjectId: Long,
         dayOfWeek: DayOfWeek,
         startTime: LocalTime,
-        endTime: LocalTime
+        endTime: LocalTime,
+        startDate: LocalDate?,
+        endDate: LocalDate?
     ) {
         viewModelScope.launch {
             repository.updateScheduleEntry(
@@ -304,7 +311,9 @@ class AttendanceViewModel(application: Application) : AndroidViewModel(applicati
                     subjectId = subjectId,
                     dayOfWeek = dayOfWeek,
                     startTime = startTime,
-                    endTime = endTime
+                    endTime = endTime,
+                    startDate = startDate,
+                    endDate = endDate
                 )
             )
         }

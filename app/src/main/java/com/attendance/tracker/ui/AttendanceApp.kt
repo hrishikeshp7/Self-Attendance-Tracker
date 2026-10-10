@@ -246,11 +246,11 @@ fun AttendanceApp(
                     subjects = subjects,
                     allSubjects = subjectsMap,
                     scheduleEntries = scheduleEntries,
-                    onAddLecture = { subjectId, day, start, end ->
-                        viewModel.addLectureSlot(subjectId, day, start, end)
+                    onAddLecture = { subjectId, day, start, end, from, until ->
+                        viewModel.addLectureSlot(subjectId, day, start, end, from, until)
                     },
-                    onUpdateLecture = { entry, subjectId, day, start, end ->
-                        viewModel.updateLectureSlot(entry, subjectId, day, start, end)
+                    onUpdateLecture = { entry, subjectId, day, start, end, from, until ->
+                        viewModel.updateLectureSlot(entry, subjectId, day, start, end, from, until)
                     },
                     onDeleteLecture = { entry ->
                         viewModel.removeScheduleEntry(entry)

@@ -10,9 +10,12 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -60,13 +63,22 @@ fun WeeklyCalendarScreen(
     subjects: List<Subject>,
     allSubjects: Map<Long, Subject>,
     scheduleEntries: List<ScheduleEntry>,
-    onAddLecture: (subjectId: Long, dayOfWeek: DayOfWeek, startTime: LocalTime, endTime: LocalTime) -> Unit,
-    onUpdateLecture: (entry: ScheduleEntry, subjectId: Long, dayOfWeek: DayOfWeek, startTime: LocalTime, endTime: LocalTime) -> Unit,
+    onAddLecture: (subjectId: Long, dayOfWeek: DayOfWeek, startTime: LocalTime, endTime: LocalTime, startDate: LocalDate?, endDate: LocalDate?) -> Unit,
+    onUpdateLecture: (entry: ScheduleEntry, subjectId: Long, dayOfWeek: DayOfWeek, startTime: LocalTime, endTime: LocalTime, startDate: LocalDate?, endDate: LocalDate?) -> Unit,
     onDeleteLecture: (ScheduleEntry) -> Unit,
     modifier: Modifier = Modifier
 ) {
     var editorState by remember { mutableStateOf<LectureEditorState?>(null) }
     var showAddSubjectsHint by remember { mutableStateOf(false) }
+
+    // The week being browsed (its Monday), kept across rotation as an epoch day
+    val thisMonday = remember { LocalDate.now().with(DayOfWeek.MONDAY) }
+    var weekEpoch by rememberSaveable { mutableStateOf(thisMonday.toEpochDay()) }
+    val weekStart = LocalDate.ofEpochDay(weekEpoch)
+    // Only the lectures actually held in that week (a slot can be limited to a date range)
+    val weekEntries = remember(scheduleEntries, weekEpoch) {
+        scheduleEntries.filter { it.occursOn(weekStart.plusDays(it.dayOfWeek.ordinal.toLong())) }
+    }
 
     Scaffold(
         topBar = {
@@ -75,7 +87,8 @@ fun WeeklyCalendarScreen(
                     Column {
                         Text("Timetable")
                         Text(
-                            text = "${scheduleEntries.size} lecture${if (scheduleEntries.size != 1) "s" else ""} scheduled this week",
+                            text = "${weekEntries.size} lecture${if (weekEntries.size != 1) "s" else ""} " +
+                                if (weekStart == thisMonday) "this week" else "in this week",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -99,7 +112,8 @@ fun WeeklyCalendarScreen(
                             subjectId = subjects.first().id,
                             dayOfWeek = LocalDate.now().dayOfWeek,
                             startTime = start,
-                            endTime = defaultEndTime(start)
+                            endTime = defaultEndTime(start),
+                            weekStart = weekStart
                         )
                     }
                 },
@@ -115,31 +129,41 @@ fun WeeklyCalendarScreen(
         if (subjects.isEmpty()) {
             EmptyTimetableState(modifier = Modifier.fillMaxSize().padding(paddingValues))
         } else {
-            WeekGrid(
-                allSubjects = allSubjects,
-                scheduleEntries = scheduleEntries,
-                onCellTap = { day, time ->
-                    editorState = LectureEditorState(
-                        existingEntry = null,
-                        subjectId = subjects.first().id,
-                        dayOfWeek = day,
-                        startTime = time,
-                        endTime = defaultEndTime(time)
-                    )
-                },
-                onBlockTap = { entry ->
-                    editorState = LectureEditorState(
-                        existingEntry = entry,
-                        subjectId = entry.subjectId,
-                        dayOfWeek = entry.dayOfWeek,
-                        startTime = entry.startTime,
-                        endTime = entry.endTime
-                    )
-                },
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(paddingValues)
-            )
+            Column(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
+                WeekNavigator(
+                    weekStart = weekStart,
+                    isCurrentWeek = weekStart == thisMonday,
+                    onPrevious = { weekEpoch -= 7 },
+                    onNext = { weekEpoch += 7 },
+                    onToday = { weekEpoch = thisMonday.toEpochDay() }
+                )
+                WeekGrid(
+                    allSubjects = allSubjects,
+                    scheduleEntries = weekEntries,
+                    weekStart = weekStart,
+                    onCellTap = { day, time ->
+                        editorState = LectureEditorState(
+                            existingEntry = null,
+                            subjectId = subjects.first().id,
+                            dayOfWeek = day,
+                            startTime = time,
+                            endTime = defaultEndTime(time),
+                            weekStart = weekStart
+                        )
+                    },
+                    onBlockTap = { entry ->
+                        editorState = LectureEditorState(
+                            existingEntry = entry,
+                            subjectId = entry.subjectId,
+                            dayOfWeek = entry.dayOfWeek,
+                            startTime = entry.startTime,
+                            endTime = entry.endTime,
+                            weekStart = weekStart
+                        )
+                    },
+                    modifier = Modifier.weight(1f)
+                )
+            }
         }
     }
 
@@ -149,12 +173,12 @@ fun WeeklyCalendarScreen(
             subjects = subjects,
             allSubjects = allSubjects,
             onDismiss = { editorState = null },
-            onSave = { subjectId, day, start, end ->
+            onSave = { subjectId, day, start, end, from, until ->
                 val existing = state.existingEntry
                 if (existing != null) {
-                    onUpdateLecture(existing, subjectId, day, start, end)
+                    onUpdateLecture(existing, subjectId, day, start, end, from, until)
                 } else {
-                    onAddLecture(subjectId, day, start, end)
+                    onAddLecture(subjectId, day, start, end, from, until)
                 }
             },
             onDelete = state.existingEntry?.let { entry -> { onDeleteLecture(entry) } }
@@ -222,7 +246,8 @@ private data class LectureEditorState(
     val subjectId: Long,
     val dayOfWeek: DayOfWeek,
     val startTime: LocalTime,
-    val endTime: LocalTime
+    val endTime: LocalTime,
+    val weekStart: LocalDate
 )
 
 @Composable
@@ -253,6 +278,49 @@ private fun EmptyTimetableState(modifier: Modifier = Modifier) {
 }
 
 // -----------------------------------------------------------------------
+// Week navigation
+// -----------------------------------------------------------------------
+
+private val weekRangeFormatter = DateTimeFormatter.ofPattern("d MMM", Locale.getDefault())
+
+@Composable
+private fun WeekNavigator(
+    weekStart: LocalDate,
+    isCurrentWeek: Boolean,
+    onPrevious: () -> Unit,
+    onNext: () -> Unit,
+    onToday: () -> Unit
+) {
+    val weekEnd = weekStart.plusDays(6)
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        IconButton(onClick = onPrevious) {
+            Icon(Icons.Default.KeyboardArrowLeft, contentDescription = "Previous week")
+        }
+        Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                text = "${weekStart.format(weekRangeFormatter)} – ${weekEnd.format(weekRangeFormatter)} ${weekEnd.year}",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold
+            )
+            // Fixed height so the grid below doesn't jump when the button appears
+            Box(modifier = Modifier.height(32.dp), contentAlignment = Alignment.Center) {
+                if (!isCurrentWeek) {
+                    TextButton(onClick = onToday, contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)) {
+                        Text("Back to this week", style = MaterialTheme.typography.labelMedium)
+                    }
+                }
+            }
+        }
+        IconButton(onClick = onNext) {
+            Icon(Icons.Default.KeyboardArrowRight, contentDescription = "Next week")
+        }
+    }
+}
+
+// -----------------------------------------------------------------------
 // Week grid
 // -----------------------------------------------------------------------
 
@@ -260,11 +328,15 @@ private fun EmptyTimetableState(modifier: Modifier = Modifier) {
 private fun WeekGrid(
     allSubjects: Map<Long, Subject>,
     scheduleEntries: List<ScheduleEntry>,
+    weekStart: LocalDate,
     onCellTap: (DayOfWeek, LocalTime) -> Unit,
     onBlockTap: (ScheduleEntry) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val today = remember { LocalDate.now().dayOfWeek }
+    // The weekday highlighted as today, or null when the viewed week doesn't contain today
+    val today: DayOfWeek? = remember(weekStart) {
+        LocalDate.now().takeIf { it >= weekStart && it <= weekStart.plusDays(6) }?.dayOfWeek
+    }
     val hScroll = rememberScrollState()
     val vScroll = rememberScrollState()
 
@@ -282,7 +354,6 @@ private fun WeekGrid(
     }
 
     val entriesByDay = remember(scheduleEntries) { scheduleEntries.groupBy { it.dayOfWeek } }
-    val countsByDay = remember(scheduleEntries) { scheduleEntries.groupBy { it.dayOfWeek }.mapValues { it.value.size } }
 
     var now by remember { mutableStateOf(LocalTime.now()) }
     LaunchedEffect(Unit) {
@@ -301,7 +372,7 @@ private fun WeekGrid(
                     DayHeaderCell(
                         day = day,
                         isToday = day == today,
-                        count = countsByDay[day] ?: 0,
+                        date = weekStart.plusDays(day.ordinal.toLong()),
                         modifier = Modifier.width(DAY_COLUMN_WIDTH)
                     )
                 }
@@ -377,7 +448,7 @@ private fun WeekGrid(
                 }
 
                 // "Now" indicator across today's column.
-                if (now.hour in gridStartHour until gridEndHour) {
+                if (today != null && now.hour in gridStartHour until gridEndHour) {
                     val dayIndex = DayOfWeek.entries.indexOf(today)
                     val minutesFromStart = (now.hour - gridStartHour) * 60 + now.minute
                     val yOffset = HOUR_HEIGHT * (minutesFromStart / 60f)
@@ -398,7 +469,7 @@ private fun WeekGrid(
 private fun DayHeaderCell(
     day: DayOfWeek,
     isToday: Boolean,
-    count: Int,
+    date: LocalDate,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -411,13 +482,12 @@ private fun DayHeaderCell(
             fontWeight = if (isToday) FontWeight.Bold else FontWeight.Normal,
             color = if (isToday) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
         )
-        if (count > 0) {
-            Text(
-                text = "$count",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
+        Text(
+            text = "${date.dayOfMonth}",
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = if (isToday) FontWeight.Bold else FontWeight.Normal,
+            color = if (isToday) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }
 
@@ -565,7 +635,7 @@ private fun LectureEditorSheet(
     subjects: List<Subject>,
     allSubjects: Map<Long, Subject>,
     onDismiss: () -> Unit,
-    onSave: (subjectId: Long, dayOfWeek: DayOfWeek, startTime: LocalTime, endTime: LocalTime) -> Unit,
+    onSave: (subjectId: Long, dayOfWeek: DayOfWeek, startTime: LocalTime, endTime: LocalTime, startDate: LocalDate?, endDate: LocalDate?) -> Unit,
     onDelete: (() -> Unit)?
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -574,6 +644,14 @@ private fun LectureEditorSheet(
     var dayOfWeek by remember { mutableStateOf(state.dayOfWeek) }
     var startTime by remember { mutableStateOf(state.startTime) }
     var endTime by remember { mutableStateOf(state.endTime) }
+    val existing = state.existingEntry
+    // A slot limited to a range of dates (e.g. one semester) keeps that range; otherwise
+    // the user picks between every week and just one date.
+    val hasRange = existing != null && existing.startDate != null && existing.startDate != existing.endDate
+    var oneOff by remember { mutableStateOf(existing != null && existing.startDate != null && existing.startDate == existing.endDate) }
+    val oneOffDate: LocalDate =
+        if (existing?.startDate != null && existing.startDate == existing.endDate && existing.dayOfWeek == dayOfWeek) existing.startDate
+        else state.weekStart.plusDays(dayOfWeek.ordinal.toLong())
     var subjectMenuExpanded by remember { mutableStateOf(false) }
     var showStartPicker by remember { mutableStateOf(false) }
     var showEndPicker by remember { mutableStateOf(false) }
@@ -660,6 +738,24 @@ private fun LectureEditorSheet(
                 }
             }
 
+            Spacer(modifier = Modifier.height(12.dp))
+            if (hasRange) {
+                Text(
+                    text = "Runs ${existing!!.startDate} to ${existing.endDate ?: "no end"}",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            } else {
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    FilterChip(selected = !oneOff, onClick = { oneOff = false }, label = { Text("Every week") })
+                    FilterChip(
+                        selected = oneOff,
+                        onClick = { oneOff = true },
+                        label = { Text("Only ${oneOffDate.format(weekRangeFormatter)}") }
+                    )
+                }
+            }
+
             Spacer(modifier = Modifier.height(20.dp))
             Text(
                 text = "Time  (tap a box to open the clock)",
@@ -742,7 +838,11 @@ private fun LectureEditorSheet(
                 Button(
                     onClick = {
                         submitted = true
-                        onSave(subjectId, dayOfWeek, startTime, endTime)
+                        when {
+                            hasRange -> onSave(subjectId, dayOfWeek, startTime, endTime, existing!!.startDate, existing.endDate)
+                            oneOff -> onSave(subjectId, dayOfWeek, startTime, endTime, oneOffDate, oneOffDate)
+                            else -> onSave(subjectId, dayOfWeek, startTime, endTime, null, null)
+                        }
                         dismissAfterHide()
                     },
                     enabled = !submitted && isTimeValid && selectedSubject != null
