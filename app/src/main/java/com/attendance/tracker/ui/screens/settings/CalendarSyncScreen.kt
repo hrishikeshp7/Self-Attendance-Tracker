@@ -74,8 +74,10 @@ fun CalendarSyncScreen(
 
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
-    ) { grants ->
-        hasPermission = grants.values.all { it }
+    ) {
+        // Ask the system, not the result map: an interrupted request returns an empty map,
+        // and "all granted" is vacuously true for it.
+        hasPermission = CalendarSyncManager.hasCalendarPermissions(context)
         if (hasPermission) {
             loadCalendarsAndShowPicker()
         } else {
