@@ -14,17 +14,20 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.attendance.tracker.data.SlotAttendanceStore
 import com.attendance.tracker.data.model.AttendanceRecord
 import com.attendance.tracker.data.model.AttendanceStatus
 import com.attendance.tracker.data.model.ScheduleEntry
 import com.attendance.tracker.data.model.Subject
 import com.attendance.tracker.data.model.getDisplayName
 import com.attendance.tracker.ui.components.SubjectCard
+import com.attendance.tracker.widget.refreshAllWidgets
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -36,13 +39,17 @@ fun HomeScreen(
     allSubjects: Map<Long, Subject>,
     todayAttendance: Map<Long, AttendanceRecord>,
     scheduleEntries: List<ScheduleEntry>,
-    onMarkAttendance: (Long, AttendanceStatus) -> Unit,
+    onMarkAttendance: (Long, AttendanceStatus, Int) -> Unit,
     onAddExtraClass: (Long, AttendanceStatus) -> Unit,
+    onSetDayCounts: (Long, Int, Int) -> Unit = { _, _, _ -> },
+    onClearAttendance: (Long) -> Unit = {},
     onAddSubject: () -> Unit,
     onEditSubject: (Subject) -> Unit,
     onSubjectClick: (Subject) -> Unit,
+    onViewAllSubjects: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
     val today = LocalDate.now()
     val dayFormatter = DateTimeFormatter.ofPattern("EEEE")
     val dateFormatter = DateTimeFormatter.ofPattern("MMMM d, yyyy")
@@ -63,6 +70,56 @@ fun HomeScreen(
     // visible and can be changed or cleared from here.
     val todaysSubjects: List<Subject> = remember(subjects, todaysScheduledIds, hasAnySchedule, todayAttendance) {
         if (!hasAnySchedule) subjects else subjects.filter { it.id in todaysScheduledIds || it.id in todayAttendance }
+    }
+
+    val coroutineScope = rememberCoroutineScope()
+    var slotUpdateTrigger by remember { mutableStateOf(0L) }
+
+    val onMarkSlot = { subjectId: Long, slotIndex: Int, totalSlots: Int, status: AttendanceStatus ->
+        SlotAttendanceStore.ensureSlotsInitialized(
+            context, subjectId, today, totalSlots, todayAttendance[subjectId]
+        )
+        val res = SlotAttendanceStore.updateSlotAndCompute(
+            context, subjectId, today, totalSlots, slotIndex, status
+        )
+        slotUpdateTrigger = System.currentTimeMillis()
+        if (res.isAllNoClass) {
+            onMarkAttendance(subjectId, AttendanceStatus.NO_CLASS, 1)
+        } else if (res.presentCount > 0 || res.absentCount > 0) {
+            onSetDayCounts(subjectId, res.presentCount, res.absentCount)
+        } else {
+            onClearAttendance(subjectId)
+        }
+        coroutineScope.launch {
+            try {
+                refreshAllWidgets(context)
+            } catch (_: Exception) {}
+        }
+    }
+
+    val todaySlots: List<TodaySlotItem> = remember(todaysSubjects, scheduleEntries, today, allSubjects) {
+        todaysSubjects.flatMap { subject ->
+            val dayEntries = scheduleEntries.filter { it.occursOn(today) && it.subjectId == subject.id }.sortedBy { it.startTime }
+            if (dayEntries.size > 1) {
+                dayEntries.indices.map { idx ->
+                    TodaySlotItem(
+                        subject = subject,
+                        slotIndex = idx,
+                        totalSlots = dayEntries.size,
+                        title = "${subject.getDisplayName(allSubjects)} - Lecture ${idx + 1}"
+                    )
+                }
+            } else {
+                listOf(
+                    TodaySlotItem(
+                        subject = subject,
+                        slotIndex = 0,
+                        totalSlots = 1,
+                        title = null
+                    )
+                )
+            }
+        }
     }
 
     // Extra-class dialog state
@@ -112,12 +169,13 @@ fun HomeScreen(
                     .fillMaxSize()
                     .padding(paddingValues)
             )
-        } else if (hasAnySchedule && todaysSubjects.isEmpty()) {
+        } else if (hasAnySchedule && todaySlots.isEmpty()) {
             NoClassesTodayState(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(paddingValues),
-                onAddExtraClass = { showExtraClassDialog = true }
+                onAddExtraClass = { showExtraClassDialog = true },
+                onViewAllSubjects = onViewAllSubjects
             )
         } else {
             LazyColumn(
@@ -130,21 +188,34 @@ fun HomeScreen(
                     item { BelowTargetBanner(belowTarget, allSubjects) }
                 }
 
-                // Subject Cards – only today's scheduled subjects, single-mark mode
-                items(todaysSubjects, key = { it.id }) { subject ->
+                // Subject Cards – discrete lecture cards when multiple sessions exist today
+                items(todaySlots, key = { "${it.subject.id}_${it.slotIndex}" }) { slotItem ->
+                    val subject = slotItem.subject
+                    val currentRecord = todayAttendance[subject.id]
+                    val trigger = slotUpdateTrigger
+                    val effStatus = remember(trigger, currentRecord, slotItem) {
+                        SlotAttendanceStore.getEffectiveSlotStatus(
+                            context, subject.id, today, slotItem.slotIndex, slotItem.totalSlots, currentRecord
+                        )
+                    }
                     SubjectCard(
                         subject = subject,
                         allSubjects = allSubjects,
-                        currentRecord = todayAttendance[subject.id],
+                        currentRecord = currentRecord,
+                        titleOverride = slotItem.title,
+                        effectiveStatus = effStatus,
+                        scheduledLectures = slotItem.totalSlots,
                         onMarkPresent = {
-                            onMarkAttendance(subject.id, AttendanceStatus.PRESENT)
+                            onMarkSlot(subject.id, slotItem.slotIndex, slotItem.totalSlots, AttendanceStatus.PRESENT)
                         },
                         onMarkAbsent = {
-                            onMarkAttendance(subject.id, AttendanceStatus.ABSENT)
+                            onMarkSlot(subject.id, slotItem.slotIndex, slotItem.totalSlots, AttendanceStatus.ABSENT)
                         },
                         onMarkNoClass = {
-                            onMarkAttendance(subject.id, AttendanceStatus.NO_CLASS)
+                            onMarkSlot(subject.id, slotItem.slotIndex, slotItem.totalSlots, AttendanceStatus.NO_CLASS)
                         },
+                        onSetDayCounts = { p, a -> onSetDayCounts(subject.id, p, a) },
+                        onClearAttendance = { onClearAttendance(subject.id) },
                         onEditClick = { onEditSubject(subject) },
                         onCardClick = { onSubjectClick(subject) }
                     )
@@ -269,7 +340,8 @@ private fun ExtraClassDialog(
 @Composable
 private fun NoClassesTodayState(
     modifier: Modifier = Modifier,
-    onAddExtraClass: () -> Unit
+    onAddExtraClass: () -> Unit,
+    onViewAllSubjects: (() -> Unit)? = null
 ) {
     Box(
         modifier = modifier,
@@ -310,6 +382,15 @@ private fun NoClassesTodayState(
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text("Add Extra Class")
+            }
+            if (onViewAllSubjects != null) {
+                Spacer(modifier = Modifier.height(12.dp))
+                OutlinedButton(
+                    onClick = onViewAllSubjects,
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text("Manage Subjects & Calendar")
+                }
             }
         }
     }
@@ -399,3 +480,11 @@ private fun BelowTargetBanner(subjects: List<Subject>, allSubjects: Map<Long, Su
         }
     }
 }
+
+private data class TodaySlotItem(
+    val subject: Subject,
+    val slotIndex: Int,
+    val totalSlots: Int,
+    val title: String?
+)
+

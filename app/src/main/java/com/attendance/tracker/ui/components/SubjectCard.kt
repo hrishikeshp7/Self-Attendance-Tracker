@@ -7,6 +7,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -39,9 +43,42 @@ fun SubjectCard(
     onMarkNoClass: () -> Unit,
     onEditClick: () -> Unit,
     onCardClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    titleOverride: String? = null,
+    effectiveStatus: AttendanceStatus? = null,
+    scheduledLectures: Int = 1,
+    onSetDayCounts: ((present: Int, absent: Int) -> Unit)? = null,
+    onClearAttendance: (() -> Unit)? = null
 ) {
     val haptic = LocalHapticFeedback.current
+    var showEditLecturesDialog by remember { mutableStateOf(false) }
+
+    if (showEditLecturesDialog && onSetDayCounts != null) {
+        val present = currentRecord?.presentCount ?: 0
+        val absent = currentRecord?.absentCount ?: 0
+        AlertDialog(
+            onDismissRequest = { showEditLecturesDialog = false },
+            title = { Text("Lectures Today – ${subject.getDisplayName(allSubjects)}") },
+            text = {
+                Column {
+                    CountStepper("Present", PresentGreen, present) { onSetDayCounts(it, absent) }
+                    CountStepper("Absent", AbsentRed, absent) { onSetDayCounts(present, it) }
+                }
+            },
+            confirmButton = { TextButton(onClick = { showEditLecturesDialog = false }) { Text("Done") } },
+            dismissButton = {
+                if (currentRecord != null && onClearAttendance != null) {
+                    TextButton(onClick = {
+                        onClearAttendance()
+                        showEditLecturesDialog = false
+                    }) { Text("Clear day", color = MaterialTheme.colorScheme.error) }
+                } else {
+                    TextButton(onClick = { showEditLecturesDialog = false }) { Text("Cancel") }
+                }
+            }
+        )
+    }
+
     val attendanceColor = when {
         subject.totalLectures == 0 -> NoClassGray
         subject.isAboveRequired -> PresentGreen
@@ -72,7 +109,7 @@ fun SubjectCard(
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = subject.getDisplayName(allSubjects),
+                        text = titleOverride ?: subject.getDisplayName(allSubjects),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurface,
@@ -155,10 +192,31 @@ fun SubjectCard(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // A day with extra lectures (or both statuses) is edited in the calendar page, so a
-            // stray tap here can't flip or wipe several lectures at once.
+            // A day with extra lectures (or both statuses) is edited in the calendar page or inline dialog,
+            // so a stray tap here can't flip or wipe several lectures at once.
             val dayLectures = (currentRecord?.presentCount ?: 0) + (currentRecord?.absentCount ?: 0)
-            val locked = dayLectures > 1
+            val locked = if (titleOverride != null) false else dayLectures > 1
+            val isSelectPresent = if (titleOverride != null) {
+                effectiveStatus == AttendanceStatus.PRESENT
+            } else if (effectiveStatus != null) {
+                effectiveStatus == AttendanceStatus.PRESENT
+            } else {
+                (currentRecord?.presentCount ?: 0) > 0
+            }
+            val isSelectAbsent = if (titleOverride != null) {
+                effectiveStatus == AttendanceStatus.ABSENT
+            } else if (effectiveStatus != null) {
+                effectiveStatus == AttendanceStatus.ABSENT
+            } else {
+                (currentRecord?.absentCount ?: 0) > 0
+            }
+            val isSelectNoClass = if (titleOverride != null) {
+                effectiveStatus == AttendanceStatus.NO_CLASS
+            } else if (effectiveStatus != null) {
+                effectiveStatus == AttendanceStatus.NO_CLASS
+            } else {
+                currentRecord?.status == AttendanceStatus.NO_CLASS
+            }
 
             // ── Action buttons ─────────────────────────────────────────────────
             Row(
@@ -167,49 +225,71 @@ fun SubjectCard(
             ) {
                 AttendanceButton(
                     text = "Present",
-                    isSelected = (currentRecord?.presentCount ?: 0) > 0,
+                    isSelected = isSelectPresent,
                     color = PresentGreen,
                     onClick = {
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        if ((currentRecord?.presentCount ?: 0) == 0) onMarkPresent()
+                        if (!isSelectPresent) onMarkPresent()
                     },
                     enabled = !locked,
                     modifier = Modifier.weight(1f)
                 )
                 AttendanceButton(
                     text = "Absent",
-                    isSelected = (currentRecord?.absentCount ?: 0) > 0,
+                    isSelected = isSelectAbsent,
                     color = AbsentRed,
                     onClick = {
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        if ((currentRecord?.absentCount ?: 0) == 0) onMarkAbsent()
+                        if (!isSelectAbsent) onMarkAbsent()
                     },
                     enabled = !locked,
                     modifier = Modifier.weight(1f)
                 )
                 AttendanceButton(
                     text = "No Class",
-                    isSelected = currentRecord?.status == AttendanceStatus.NO_CLASS,
+                    isSelected = isSelectNoClass,
                     color = NoClassGray,
                     onClick = {
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        if (currentRecord?.status != AttendanceStatus.NO_CLASS) onMarkNoClass()
+                        if (!isSelectNoClass) onMarkNoClass()
                     },
                     enabled = !locked,
                     modifier = Modifier.weight(1f)
                 )
             }
-            if (locked && currentRecord != null) {
-                val parts = listOfNotNull(
-                    currentRecord.presentCount.takeIf { it > 0 }?.let { "$it present" },
-                    currentRecord.absentCount.takeIf { it > 0 }?.let { "$it absent" }
-                ).joinToString(", ")
-                Text(
-                    text = "$dayLectures lectures today: $parts · edit in calendar",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 8.dp)
-                )
+            if (titleOverride == null && (scheduledLectures > 1 || dayLectures > 1)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    val statusText = if (dayLectures > 1 && currentRecord != null) {
+                        val parts = listOfNotNull(
+                            currentRecord.presentCount.takeIf { it > 0 }?.let { "$it present" },
+                            currentRecord.absentCount.takeIf { it > 0 }?.let { "$it absent" }
+                        ).joinToString(", ")
+                        "$dayLectures lectures today: $parts"
+                    } else {
+                        "$scheduledLectures lectures scheduled today"
+                    }
+                    Text(
+                        text = statusText,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    if (onSetDayCounts != null) {
+                        TextButton(
+                            onClick = { showEditLecturesDialog = true },
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                        ) {
+                            Text(
+                                text = if (dayLectures > 1) "Edit counts" else "Split / custom",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+                }
             }
         }
     }

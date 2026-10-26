@@ -46,6 +46,7 @@ import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
 import androidx.glance.unit.ColorProvider
 import com.attendance.tracker.MainActivity
+import com.attendance.tracker.data.SlotAttendanceStore
 import com.attendance.tracker.data.database.AttendanceDatabase
 import com.attendance.tracker.data.model.AttendanceRecord
 import com.attendance.tracker.data.model.AttendanceStatus
@@ -67,10 +68,19 @@ import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 
 private val SubjectIdKey = ActionParameters.Key<Long>("subjectId")
+private val SlotIndexKey = ActionParameters.Key<Int>("slotIndex")
+private val TotalSlotsKey = ActionParameters.Key<Int>("totalSlots")
 private val StatusKey = ActionParameters.Key<String>("status")
 
-private data class TodayRow(val subject: Subject, val record: AttendanceRecord?, val label: String) {
-    fun stableId(): Long = (subject.id to listOf(record, label, subject.presentLectures, subject.totalLectures, subject.requiredAttendance)).hashCode().toLong()
+private data class TodayRow(
+    val subject: Subject,
+    val record: AttendanceRecord?,
+    val label: String,
+    val slotIndex: Int,
+    val totalSlots: Int,
+    val slotStatus: AttendanceStatus?
+) {
+    fun stableId(): Long = (subject.id to listOf(slotIndex, slotStatus, label, subject.presentLectures, subject.totalLectures, subject.requiredAttendance)).hashCode().toLong()
 }
 
 private data class TodayData(val date: LocalDate, val rows: List<TodayRow>, val hasSchedule: Boolean)
@@ -92,7 +102,7 @@ class TodayWidget : GlanceAppWidget() {
                 repository.allSubjects,
                 repository.allScheduleEntries,
                 repository.getAttendanceForDate(today)
-            ) { all, schedule, records -> buildToday(today, all, schedule, records) }
+            ) { all, schedule, records -> buildToday(today, all, schedule, records, context) }
         }.flowOn(Dispatchers.IO)
         val initial = withContext(Dispatchers.IO) { flow.first() }
         provideContent {
@@ -115,14 +125,34 @@ class TodayWidget : GlanceAppWidget() {
         today: LocalDate,
         all: List<Subject>,
         schedule: List<ScheduleEntry>,
-        records: List<AttendanceRecord>
+        records: List<AttendanceRecord>,
+        context: Context
     ): TodayData {
         val byId = all.associateBy { it.id }
         val subjects = all.filter { !it.isFolder }
         val scheduledIds = schedule.filter { it.occursOn(today) }.map { it.subjectId }.toSet()
         val shown = if (schedule.isEmpty()) subjects else subjects.filter { it.id in scheduledIds }
         val marks = records.associateBy { it.subjectId }
-        return TodayData(today, shown.map { TodayRow(it, marks[it.id], it.getDisplayName(byId)) }, schedule.isNotEmpty())
+
+        val rows = shown.flatMap { subject ->
+            val dayEntries = schedule.filter { it.occursOn(today) && it.subjectId == subject.id }.sortedBy { it.startTime }
+            if (dayEntries.size > 1) {
+                dayEntries.indices.map { idx ->
+                    val label = "${subject.getDisplayName(byId)} - Lecture ${idx + 1}"
+                    val effStatus = SlotAttendanceStore.getEffectiveSlotStatus(
+                        context, subject.id, today, idx, dayEntries.size, marks[subject.id]
+                    )
+                    TodayRow(subject, marks[subject.id], label, idx, dayEntries.size, effStatus)
+                }
+            } else {
+                val label = subject.getDisplayName(byId)
+                val effStatus = SlotAttendanceStore.getEffectiveSlotStatus(
+                    context, subject.id, today, 0, 1, marks[subject.id]
+                )
+                listOf(TodayRow(subject, marks[subject.id], label, 0, 1, effStatus))
+            }
+        }
+        return TodayData(today, rows, schedule.isNotEmpty())
     }
 }
 
@@ -178,22 +208,37 @@ private fun SubjectRow(row: TodayRow) {
                 )
             )
         }
-        StatusButton(row, AttendanceStatus.PRESENT, "Present")
-        Spacer(GlanceModifier.width(6.dp))
-        StatusButton(row, AttendanceStatus.ABSENT, "Absent")
+        if (row.slotStatus == AttendanceStatus.NO_CLASS) {
+            val openApp = actionStartActivity(Intent(LocalContext.current, MainActivity::class.java))
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = GlanceModifier
+                    .width(166.dp)
+                    .background(GlanceTheme.colors.secondaryContainer)
+                    .cornerRadius(16.dp)
+                    .padding(vertical = 6.dp)
+                    .clickable(openApp)
+            ) {
+                Text(
+                    text = "✓ No Class",
+                    style = TextStyle(
+                        color = GlanceTheme.colors.onSecondaryContainer,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                )
+            }
+        } else {
+            StatusButton(row, AttendanceStatus.PRESENT, "Present")
+            Spacer(GlanceModifier.width(6.dp))
+            StatusButton(row, AttendanceStatus.ABSENT, "Absent")
+        }
     }
 }
 
 @Composable
 private fun StatusButton(row: TodayRow, status: AttendanceStatus, label: String) {
-    // A day can hold both present and absent lectures, so both buttons can be selected
-    val selected = when (status) {
-        AttendanceStatus.PRESENT -> (row.record?.presentCount ?: 0) > 0
-        else -> (row.record?.absentCount ?: 0) > 0
-    }
-    // The widget only ever sets the whole day to ONE status for ONE lecture. A day that
-    // holds extra lectures (or both statuses) can only be changed inside the app.
-    val locked = row.record?.let { it.count + it.otherCount > 1 } ?: false
+    val selected = row.slotStatus == status
     val (bg, fg) = when {
         !selected -> GlanceTheme.colors.secondaryContainer to GlanceTheme.colors.onSecondaryContainer
         status == AttendanceStatus.PRESENT -> GlanceTheme.colors.primary to GlanceTheme.colors.onPrimary
@@ -207,10 +252,14 @@ private fun StatusButton(row: TodayRow, status: AttendanceStatus, label: String)
             .cornerRadius(16.dp)
             .padding(vertical = 6.dp)
             .let {
-                // Re-tapping a selected button is a no-op, and a locked day is app-only
-                if (selected || locked) it else it.clickable(
+                if (selected) it else it.clickable(
                     actionRunCallback<MarkAction>(
-                        actionParametersOf(SubjectIdKey to row.subject.id, StatusKey to status.name)
+                        actionParametersOf(
+                            SubjectIdKey to row.subject.id,
+                            SlotIndexKey to row.slotIndex,
+                            TotalSlotsKey to row.totalSlots,
+                            StatusKey to status.name
+                        )
                     )
                 )
             }
@@ -237,15 +286,26 @@ private fun standing(s: Subject): String {
 class MarkAction : ActionCallback {
     override suspend fun onAction(context: Context, glanceId: GlanceId, parameters: ActionParameters) {
         val subjectId = parameters[SubjectIdKey] ?: return
+        val slotIndex = parameters[SlotIndexKey] ?: 0
+        val totalSlots = parameters[TotalSlotsKey] ?: 1
         val status = parameters[StatusKey]?.let { AttendanceStatus.valueOf(it) } ?: return
         withContext(Dispatchers.IO) {
             val db = AttendanceDatabase.getDatabase(context)
             val repository = AttendanceRepository(db.subjectDao(), db.attendanceDao(), db.scheduleDao())
             val today = LocalDate.now()
-            when (status) {
-                AttendanceStatus.PRESENT -> repository.markPresent(subjectId, today)
-                AttendanceStatus.ABSENT -> repository.markAbsent(subjectId, today)
-                AttendanceStatus.NO_CLASS -> repository.markNoClass(subjectId, today)
+            val record = repository.getAttendanceForDate(today).first().find { it.subjectId == subjectId }
+            SlotAttendanceStore.ensureSlotsInitialized(
+                context, subjectId, today, totalSlots, record
+            )
+            val res = SlotAttendanceStore.updateSlotAndCompute(
+                context, subjectId, today, totalSlots, slotIndex, status
+            )
+            if (res.isAllNoClass) {
+                repository.markNoClass(subjectId, today)
+            } else if (res.presentCount > 0 || res.absentCount > 0) {
+                repository.setDayCounts(subjectId, today, res.presentCount, res.absentCount)
+            } else {
+                repository.clearDay(subjectId, today)
             }
         }
         refreshAllWidgets(context)

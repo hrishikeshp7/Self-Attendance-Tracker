@@ -329,4 +329,40 @@ class AttendanceRepositoryTest {
         assertEquals(2, scheduleDao.entries.size)
         assertEquals(java.time.LocalDate.of(2026, 1, 5), scheduleDao.entries.minOf { it.startDate!! })
     }
+
+    @Test
+    fun `markPresent with count marks all scheduled lectures`() = runBlocking {
+        subjectDao.insertSubject(Subject(id = 1L, name = "Physics", totalLectures = 0, presentLectures = 0, absentLectures = 0))
+        val today = LocalDate.of(2026, 10, 26)
+
+        repository.markPresent(1L, today, count = 2)
+
+        val s = repository.getSubjectById(1L)!!
+        assertEquals(2, s.presentLectures)
+        assertEquals(0, s.absentLectures)
+        assertEquals(2, s.totalLectures)
+
+        val record = attendanceDao.getAttendanceRecord(1L, today)!!
+        assertEquals(AttendanceStatus.PRESENT, record.status)
+        assertEquals(2, record.count)
+        assertEquals(2, record.presentCount)
+    }
+
+    @Test
+    fun `markAbsent with count marks all scheduled lectures`() = runBlocking {
+        subjectDao.insertSubject(Subject(id = 1L, name = "Chemistry", totalLectures = 0, presentLectures = 0, absentLectures = 0))
+        val today = LocalDate.of(2026, 10, 26)
+
+        repository.markAbsent(1L, today, count = 3)
+
+        val s = repository.getSubjectById(1L)!!
+        assertEquals(0, s.presentLectures)
+        assertEquals(3, s.absentLectures)
+        assertEquals(3, s.totalLectures)
+
+        val record = attendanceDao.getAttendanceRecord(1L, today)!!
+        assertEquals(AttendanceStatus.ABSENT, record.status)
+        assertEquals(3, record.count)
+        assertEquals(3, record.absentCount)
+    }
 }

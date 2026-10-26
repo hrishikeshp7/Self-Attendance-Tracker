@@ -9,6 +9,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Folder
@@ -31,6 +32,7 @@ fun SubjectsScreen(
     onAddFolder: (String) -> Unit,
     onUpdateSubject: (Subject) -> Unit,
     onDeleteSubject: (Subject) -> Unit,
+    onSubjectClick: (Subject) -> Unit = {},
     modifier: Modifier = Modifier,
     // Set when another screen (Home's edit button / + FAB) navigates here to do one of these
     initialEditSubject: Subject? = null,
@@ -139,6 +141,7 @@ fun SubjectsScreen(
                         } else {
                             SubjectListItem(
                                 subject = subject,
+                                onSubjectClick = { onSubjectClick(subject) },
                                 onEditClick = {
                                     selectedSubject = subject
                                     showEditDialog = true
@@ -276,6 +279,7 @@ private fun FolderListItem(
 @Composable
 private fun SubjectListItem(
     subject: Subject,
+    onSubjectClick: () -> Unit,
     onEditClick: () -> Unit,
     onDeleteClick: () -> Unit
 ) {
@@ -284,7 +288,8 @@ private fun SubjectListItem(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 4.dp),
+            .padding(vertical = 4.dp)
+            .clickable(onClick = onSubjectClick),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Row(
@@ -313,7 +318,10 @@ private fun SubjectListItem(
                     )
                 }
             }
-            Row {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = onSubjectClick) {
+                    Icon(Icons.Default.DateRange, contentDescription = "View Calendar", tint = MaterialTheme.colorScheme.primary)
+                }
                 IconButton(onClick = onEditClick) {
                     Icon(Icons.Default.Edit, contentDescription = "Edit")
                 }

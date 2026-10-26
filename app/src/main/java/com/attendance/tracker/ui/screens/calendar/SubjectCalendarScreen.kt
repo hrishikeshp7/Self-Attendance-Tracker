@@ -19,9 +19,11 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.attendance.tracker.data.model.AttendanceRecord
 import com.attendance.tracker.data.model.AttendanceStatus
+import com.attendance.tracker.data.model.ScheduleEntry
 import com.attendance.tracker.data.model.Subject
 import com.attendance.tracker.data.model.getDisplayName
 import com.attendance.tracker.ui.components.CalendarView
+import com.attendance.tracker.ui.components.CountStepper
 import com.attendance.tracker.ui.theme.AbsentRed
 import com.attendance.tracker.ui.theme.NoClassGray
 import com.attendance.tracker.ui.theme.PresentGreen
@@ -39,12 +41,13 @@ fun SubjectCalendarScreen(
     attendanceRecords: List<AttendanceRecord>,
     onDateSelected: (LocalDate) -> Unit,
     onMonthChanged: (YearMonth) -> Unit,
-    onMarkAttendance: (AttendanceStatus, LocalDate) -> Unit,
+    onMarkAttendance: (AttendanceStatus, LocalDate, Int) -> Unit,
     onAddExtraClass: (AttendanceStatus, LocalDate) -> Unit,
     onClearAttendance: (LocalDate) -> Unit,
     onSetDayCounts: (LocalDate, Int, Int) -> Unit,
     onNavigateBack: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    scheduleEntries: List<ScheduleEntry> = emptyList()
 ) {
     val dateFormatter = DateTimeFormatter.ofPattern("EEEE, MMMM d")
     
@@ -298,6 +301,11 @@ fun SubjectCalendarScreen(
                             // wipe all of them at once, so they give way to the per-lecture editor below.
                             val multi = ((selectedDateRecord?.presentCount ?: 0) + (selectedDateRecord?.absentCount ?: 0)) > 1
 
+                            val scheduledCount = scheduleEntries.count { it.occursOn(effectiveSingleDate) && it.subjectId == subject.id }
+                            val isMultiScheduled = scheduledCount > 1 && selectedDateRecord == null
+                            val presentText = if (isMultiScheduled) "Present ($scheduledCount)" else "Present"
+                            val absentText = if (isMultiScheduled) "Absent ($scheduledCount)" else "Absent"
+
                             // Attendance Action Buttons.
                             // Each button gets an equal share of the width via `weight(1f)`
                             // with a fixed gap between them, instead of a fixed 100.dp width
@@ -310,21 +318,21 @@ fun SubjectCalendarScreen(
                             ) {
                                 SubjectCalendarAttendanceButton(
                                     enabled = !multi,
-                                    text = "Present",
+                                    text = presentText,
                                     isSelected = (selectedDateRecord?.presentCount ?: 0) > 0,
                                     color = PresentGreen,
                                     onClick = {
-                                        onMarkAttendance(AttendanceStatus.PRESENT, effectiveSingleDate)
+                                        onMarkAttendance(AttendanceStatus.PRESENT, effectiveSingleDate, if (isMultiScheduled) scheduledCount else 1)
                                     },
                                     modifier = Modifier.weight(1f)
                                 )
                                 SubjectCalendarAttendanceButton(
                                     enabled = !multi,
-                                    text = "Absent",
+                                    text = absentText,
                                     isSelected = (selectedDateRecord?.absentCount ?: 0) > 0,
                                     color = AbsentRed,
                                     onClick = {
-                                        onMarkAttendance(AttendanceStatus.ABSENT, effectiveSingleDate)
+                                        onMarkAttendance(AttendanceStatus.ABSENT, effectiveSingleDate, if (isMultiScheduled) scheduledCount else 1)
                                     },
                                     modifier = Modifier.weight(1f)
                                 )
@@ -334,7 +342,7 @@ fun SubjectCalendarScreen(
                                     isSelected = selectedDateRecord?.status == AttendanceStatus.NO_CLASS,
                                     color = NoClassGray,
                                     onClick = {
-                                        onMarkAttendance(AttendanceStatus.NO_CLASS, effectiveSingleDate)
+                                        onMarkAttendance(AttendanceStatus.NO_CLASS, effectiveSingleDate, 1)
                                     },
                                     modifier = Modifier.weight(1f)
                                 )
@@ -350,9 +358,10 @@ fun SubjectCalendarScreen(
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
                                 TextButton(onClick = { showExtraClassDialog = true }) { Text("Extra class?") }
-                                if (dayLectures > 1) {
+                                if (dayLectures > 1 || scheduledCount > 1 || recorded != null) {
                                     TextButton(onClick = { showEditLecturesDialog = true }) { Text("Edit lectures") }
-                                } else if (recorded != null) {
+                                }
+                                if (recorded != null && dayLectures <= 1) {
                                     TextButton(onClick = { onClearAttendance(effectiveSingleDate) }) {
                                         Text("Clear day", color = MaterialTheme.colorScheme.error)
                                     }
@@ -442,44 +451,6 @@ private fun RangeStatsSection(
     }
 }
 
-@Composable
-private fun CountStepper(label: String, color: Color, value: Int, onChange: (Int) -> Unit) {
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(label, color = color, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
-        // One slim tinted pill: "−  2  +". Whole 36dp halves are the tap targets, no outlines.
-        Surface(shape = RoundedCornerShape(50), color = color.copy(alpha = 0.14f)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    modifier = Modifier.size(width = 40.dp, height = 36.dp)
-                        .clickable(enabled = value > 0, role = Role.Button) { onChange(value - 1) },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        "−",
-                        color = color.copy(alpha = if (value > 0) 1f else 0.3f),
-                        style = MaterialTheme.typography.titleMedium
-                    )
-                }
-                Text(
-                    text = value.toString(),
-                    style = MaterialTheme.typography.titleSmall,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.widthIn(min = 24.dp)
-                )
-                Box(
-                    modifier = Modifier.size(width = 40.dp, height = 36.dp)
-                        .clickable(role = Role.Button) { onChange(value + 1) },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("+", color = color, style = MaterialTheme.typography.titleMedium)
-                }
-            }
-        }
-    }
-}
 
 @Composable
 private fun SubjectCalendarAttendanceButton(

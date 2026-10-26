@@ -22,6 +22,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -66,6 +67,7 @@ fun WeeklyCalendarScreen(
     onAddLecture: (subjectId: Long, dayOfWeek: DayOfWeek, startTime: LocalTime, endTime: LocalTime, startDate: LocalDate?, endDate: LocalDate?) -> Unit,
     onUpdateLecture: (entry: ScheduleEntry, subjectId: Long, dayOfWeek: DayOfWeek, startTime: LocalTime, endTime: LocalTime, startDate: LocalDate?, endDate: LocalDate?) -> Unit,
     onDeleteLecture: (ScheduleEntry) -> Unit,
+    onOpenSubjectCalendar: ((Long) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     var editorState by remember { mutableStateOf<LectureEditorState?>(null) }
@@ -181,7 +183,8 @@ fun WeeklyCalendarScreen(
                     onAddLecture(subjectId, day, start, end, from, until)
                 }
             },
-            onDelete = state.existingEntry?.let { entry -> { onDeleteLecture(entry) } }
+            onDelete = state.existingEntry?.let { entry -> { onDeleteLecture(entry) } },
+            onOpenSubjectCalendar = onOpenSubjectCalendar
         )
     }
 
@@ -447,17 +450,34 @@ private fun WeekGrid(
                     }
                 }
 
-                // "Now" indicator across today's column.
+                // "Now" indicator across today's column (circle bullet + line, like Google Calendar).
                 if (today != null && now.hour in gridStartHour until gridEndHour) {
                     val dayIndex = DayOfWeek.entries.indexOf(today)
                     val minutesFromStart = (now.hour - gridStartHour) * 60 + now.minute
                     val yOffset = HOUR_HEIGHT * (minutesFromStart / 60f)
+                    val nowColor = Color(0xFFE53935)
+                    val context = LocalContext.current
+                    val onNowTap = {
+                        android.widget.Toast.makeText(
+                            context,
+                            "Current time: ${now.format(DateTimeFormatter.ofPattern("h:mm a"))}",
+                            android.widget.Toast.LENGTH_SHORT
+                        ).show()
+                    }
                     Box(
                         modifier = Modifier
-                            .offset(x = DAY_COLUMN_WIDTH * dayIndex, y = yOffset)
+                            .offset(x = DAY_COLUMN_WIDTH * dayIndex, y = yOffset - 1.dp)
                             .width(DAY_COLUMN_WIDTH)
                             .height(2.dp)
-                            .background(MaterialTheme.colorScheme.error)
+                            .background(nowColor)
+                            .clickable(onClick = onNowTap)
+                    )
+                    Box(
+                        modifier = Modifier
+                            .offset(x = DAY_COLUMN_WIDTH * dayIndex - 4.dp, y = yOffset - 4.dp)
+                            .size(8.dp)
+                            .background(nowColor, androidx.compose.foundation.shape.CircleShape)
+                            .clickable(onClick = onNowTap)
                     )
                 }
             }
@@ -636,7 +656,8 @@ private fun LectureEditorSheet(
     allSubjects: Map<Long, Subject>,
     onDismiss: () -> Unit,
     onSave: (subjectId: Long, dayOfWeek: DayOfWeek, startTime: LocalTime, endTime: LocalTime, startDate: LocalDate?, endDate: LocalDate?) -> Unit,
-    onDelete: (() -> Unit)?
+    onDelete: (() -> Unit)?,
+    onOpenSubjectCalendar: ((Long) -> Unit)? = null
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val coroutineScope = rememberCoroutineScope()
@@ -808,6 +829,21 @@ private fun LectureEditorSheet(
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.error
                 )
+            }
+
+            if (isEditing && onOpenSubjectCalendar != null) {
+                Spacer(modifier = Modifier.height(16.dp))
+                OutlinedButton(
+                    onClick = {
+                        dismissAfterHide()
+                        onOpenSubjectCalendar(subjectId)
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(Icons.Default.Schedule, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("View Attendance & Calendar")
+                }
             }
 
             Spacer(modifier = Modifier.height(24.dp))

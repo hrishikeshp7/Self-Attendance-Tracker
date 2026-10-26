@@ -192,25 +192,25 @@ class AttendanceViewModel(application: Application) : AndroidViewModel(applicati
     }
 
     // Attendance operations
-    fun markAttendance(subjectId: Long, status: AttendanceStatus, date: LocalDate = LocalDate.now()) {
+    fun markAttendance(subjectId: Long, status: AttendanceStatus, date: LocalDate = LocalDate.now(), count: Int = 1) {
         val opKey = "$subjectId|$date"
         // Ignore this call if a mark/clear for the same subject+date is still in flight.
         if (!pendingAttendanceOps.add(opKey)) return
         viewModelScope.launch {
             try {
-                attendanceMutex.withLock { markAttendanceLocked(subjectId, status, date) }
+                attendanceMutex.withLock { markAttendanceLocked(subjectId, status, date, count) }
             } finally {
                 pendingAttendanceOps.remove(opKey)
             }
         }
     }
 
-    private suspend fun markAttendanceLocked(subjectId: Long, status: AttendanceStatus, date: LocalDate) {
+    private suspend fun markAttendanceLocked(subjectId: Long, status: AttendanceStatus, date: LocalDate, count: Int = 1) {
         // Re-tapping the current status is a no-op (the repository ignores it too)
         if (repository.getSubjectById(subjectId) == null) return
         when (status) {
-            AttendanceStatus.PRESENT -> repository.markPresent(subjectId, date)
-            AttendanceStatus.ABSENT -> repository.markAbsent(subjectId, date)
+            AttendanceStatus.PRESENT -> repository.markPresent(subjectId, date, count)
+            AttendanceStatus.ABSENT -> repository.markAbsent(subjectId, date, count)
             AttendanceStatus.NO_CLASS -> repository.markNoClass(subjectId, date)
         }
     }

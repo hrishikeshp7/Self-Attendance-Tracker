@@ -31,6 +31,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.attendance.tracker.data.model.AttendanceStatus
+import java.time.LocalDate
 import com.attendance.tracker.ui.screens.about.AboutScreen
 import com.attendance.tracker.ui.screens.backup.BackupRestoreScreen
 import com.attendance.tracker.ui.screens.calendar.SubjectCalendarScreen
@@ -138,11 +139,17 @@ fun AttendanceApp(
                     allSubjects = subjectsMap,
                     todayAttendance = todayAttendance,
                     scheduleEntries = scheduleEntries,
-                    onMarkAttendance = { subjectId, status ->
-                        viewModel.markAttendance(subjectId, status)
+                    onMarkAttendance = { subjectId, status, count ->
+                        viewModel.markAttendance(subjectId, status, LocalDate.now(), count)
                     },
                     onAddExtraClass = { subjectId, status ->
                         viewModel.addExtraClass(subjectId, status)
+                    },
+                    onSetDayCounts = { subjectId, present, absent ->
+                        viewModel.setDayCounts(subjectId, LocalDate.now(), present, absent)
+                    },
+                    onClearAttendance = { subjectId ->
+                        viewModel.clearAttendance(subjectId, LocalDate.now())
                     },
                     onAddSubject = {
                         showAddSubjectOnSubjectsScreen = true
@@ -164,6 +171,14 @@ fun AttendanceApp(
                     },
                     onSubjectClick = { subject ->
                         navController.navigate(Screen.SubjectCalendar.createRoute(subject.id))
+                    },
+                    onViewAllSubjects = {
+                        navController.navigate(Screen.Subjects.route) {
+                            popUpTo(navController.graph.findStartDestination().id) {
+                                saveState = true
+                            }
+                            launchSingleTop = true
+                        }
                     }
                 )
             }
@@ -188,14 +203,15 @@ fun AttendanceApp(
                     selectedMonth = selectedMonth,
                     selectedDate = selectedDate,
                     attendanceRecords = attendanceRecords,
+                    scheduleEntries = scheduleEntries,
                     onDateSelected = { date ->
                         viewModel.setSelectedDate(date)
                     },
                     onMonthChanged = { month ->
                         viewModel.setSelectedMonth(month)
                     },
-                    onMarkAttendance = { status, date ->
-                        viewModel.markAttendance(subjectId, status, date)
+                    onMarkAttendance = { status, date, count ->
+                        viewModel.markAttendance(subjectId, status, date, count)
                     },
                     onAddExtraClass = { status, date ->
                         viewModel.addExtraClass(subjectId, status, date)
@@ -216,6 +232,9 @@ fun AttendanceApp(
                 SubjectsScreen(
                     subjects = allSubjectsIncludingFolders,
                     allSubjects = subjectsMap,
+                    onSubjectClick = { sub ->
+                        navController.navigate(Screen.SubjectCalendar.createRoute(sub.id))
+                    },
                     onAddSubject = { name, required, parentId ->
                         if (parentId != null) {
                             viewModel.addSubSubject(name, parentId, required)
@@ -246,6 +265,9 @@ fun AttendanceApp(
                     subjects = subjects,
                     allSubjects = subjectsMap,
                     scheduleEntries = scheduleEntries,
+                    onOpenSubjectCalendar = { subId ->
+                        navController.navigate(Screen.SubjectCalendar.createRoute(subId))
+                    },
                     onAddLecture = { subjectId, day, start, end, from, until ->
                         viewModel.addLectureSlot(subjectId, day, start, end, from, until)
                     },

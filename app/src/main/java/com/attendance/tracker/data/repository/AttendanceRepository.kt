@@ -46,28 +46,61 @@ class AttendanceRepository(
         subjectDao.deleteSubject(subject)
     }
 
-    suspend fun markPresent(subjectId: Long, date: LocalDate) = setDayStatus(subjectId, date, AttendanceStatus.PRESENT)
+    suspend fun markPresent(subjectId: Long, date: LocalDate, count: Int = 1) =
+        setDayStatus(subjectId, date, AttendanceStatus.PRESENT, targetCount = count)
 
-    suspend fun markAbsent(subjectId: Long, date: LocalDate) = setDayStatus(subjectId, date, AttendanceStatus.ABSENT)
+    suspend fun markAbsent(subjectId: Long, date: LocalDate, count: Int = 1) =
+        setDayStatus(subjectId, date, AttendanceStatus.ABSENT, targetCount = count)
 
-    suspend fun markNoClass(subjectId: Long, date: LocalDate) = setDayStatus(subjectId, date, AttendanceStatus.NO_CLASS)
+    suspend fun markNoClass(subjectId: Long, date: LocalDate) =
+        setDayStatus(subjectId, date, AttendanceStatus.NO_CLASS)
 
     /**
      * Sets the whole day to [status]. A day that already holds lectures (including a mixed
      * present+absent day) keeps its total lecture count, all switched to [status]; marking
      * a day with the status it already has is a no-op so repeated taps never add a lecture.
      * Subject totals are adjusted by the difference.
+     * When marking a new day, [targetCount] specifies how many scheduled lectures were held.
      */
-    private suspend fun setDayStatus(subjectId: Long, date: LocalDate, status: AttendanceStatus) {
+    private suspend fun setDayStatus(
+        subjectId: Long,
+        date: LocalDate,
+        status: AttendanceStatus,
+        targetCount: Int = 1
+    ) {
         val existing = attendanceDao.getAttendanceRecord(subjectId, date)
         if (existing?.status == status) return
-        val total = if (existing == null) 1 else existing.count + existing.otherCount
+        val total = if (existing == null) maxOf(targetCount, 1) else existing.count + existing.otherCount
         val newPresent = if (status == AttendanceStatus.PRESENT) total else 0
         val newAbsent = if (status == AttendanceStatus.ABSENT) total else 0
         if (existing == null) {
             when (status) {
-                AttendanceStatus.PRESENT -> subjectDao.markPresent(subjectId)
-                AttendanceStatus.ABSENT -> subjectDao.markAbsent(subjectId)
+                AttendanceStatus.PRESENT -> {
+                    if (total == 1) {
+                        subjectDao.markPresent(subjectId)
+                    } else {
+                        getSubjectById(subjectId)?.let {
+                            subjectDao.updateAttendanceCounts(
+                                subjectId,
+                                it.presentLectures + total,
+                                it.absentLectures
+                            )
+                        }
+                    }
+                }
+                AttendanceStatus.ABSENT -> {
+                    if (total == 1) {
+                        subjectDao.markAbsent(subjectId)
+                    } else {
+                        getSubjectById(subjectId)?.let {
+                            subjectDao.updateAttendanceCounts(
+                                subjectId,
+                                it.presentLectures,
+                                it.absentLectures + total
+                            )
+                        }
+                    }
+                }
                 AttendanceStatus.NO_CLASS -> {}
             }
         } else {
