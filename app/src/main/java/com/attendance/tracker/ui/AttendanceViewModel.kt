@@ -5,6 +5,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.room.withTransaction
 import com.attendance.tracker.backup.BackupManager
+import com.attendance.tracker.data.SlotAttendanceStore
 import com.attendance.tracker.data.database.AttendanceDatabase
 import com.attendance.tracker.data.model.AttendanceRecord
 import com.attendance.tracker.data.model.AttendanceStatus
@@ -267,6 +268,81 @@ class AttendanceViewModel(application: Application) : AndroidViewModel(applicati
                 pendingAttendanceOps.remove(opKey)
             }
         }
+    }
+
+    /**
+     * Applies Time Off (Holiday, Leave/Bunk, or Clear) across [startDate]..[endDate].
+     */
+    fun applyTimeOff(
+        startDate: LocalDate,
+        endDate: LocalDate,
+        status: AttendanceStatus?,
+        subjectIds: Set<Long>? = null,
+        onComplete: ((Int) -> Unit)? = null
+    ) {
+        viewModelScope.launch {
+            attendanceMutex.withLock {
+                val affected = repository.applyTimeOff(startDate, endDate, status, subjectIds)
+                val context = getApplication<Application>()
+                val allSubs = repository.getAllSubjectsOnce().filter { !it.isFolder }
+                val targetIds = subjectIds ?: allSubs.map { it.id }.toSet()
+                var curr = startDate
+                while (!curr.isAfter(endDate)) {
+                    for (subId in targetIds) {
+                        SlotAttendanceStore.clearSlotsForDate(context, subId, curr, 8)
+                    }
+                    curr = curr.plusDays(1)
+                }
+                val today = LocalDate.now()
+                if (!today.isBefore(startDate) && !today.isAfter(endDate)) {
+                    loadAttendanceForDate(today)
+                }
+                loadAttendanceForMonth(_selectedMonth.value)
+                try {
+                    refreshAllWidgets(context)
+                } catch (_: Exception) {}
+                onComplete?.invoke(affected)
+            }
+        }
+    }
+
+    /**
+     * Estimates affected lectures and days with classes for Time Off UI preview.
+     */
+    fun estimateTimeOffImpact(
+        startDate: LocalDate,
+        endDate: LocalDate,
+        subjectIds: Set<Long>? = null
+    ): Pair<Int, Int> {
+        if (endDate.isBefore(startDate)) return Pair(0, 0)
+        val entries = scheduleEntries.value
+        val actualSubs = subjects.value
+        val allSubIds = actualSubs.map { it.id }.toSet()
+        val targetIds = subjectIds ?: allSubIds
+
+        var totalLectures = 0
+        var daysWithClasses = 0
+        var curr = startDate
+        while (!curr.isAfter(endDate)) {
+            val date = curr
+            if (entries.isNotEmpty()) {
+                val dayEntries = entries.filter { it.occursOn(date) && it.subjectId in targetIds }
+                if (dayEntries.isNotEmpty()) {
+                    daysWithClasses++
+                    totalLectures += dayEntries.size
+                }
+            } else {
+                if (date.dayOfWeek != DayOfWeek.SATURDAY && date.dayOfWeek != DayOfWeek.SUNDAY) {
+                    val count = actualSubs.count { it.id in targetIds }
+                    if (count > 0) {
+                        daysWithClasses++
+                        totalLectures += count
+                    }
+                }
+            }
+            curr = curr.plusDays(1)
+        }
+        return Pair(totalLectures, daysWithClasses)
     }
 
     // Schedule operations

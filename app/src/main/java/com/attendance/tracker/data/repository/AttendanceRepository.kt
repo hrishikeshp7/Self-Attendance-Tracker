@@ -184,6 +184,73 @@ class AttendanceRepository(
     fun getAttendanceInRange(startDate: LocalDate, endDate: LocalDate): Flow<List<AttendanceRecord>> =
         attendanceDao.getAttendanceInRange(startDate, endDate)
 
+    suspend fun getAttendanceInRangeOnce(startDate: LocalDate, endDate: LocalDate): List<AttendanceRecord> =
+        attendanceDao.getAttendanceInRangeOnce(startDate, endDate)
+
+    /**
+     * Applies Time Off (Holiday, Leave/Bunk, or Reset) across [startDate]..[endDate].
+     * Targets subjects occurring on each date based on the schedule (or all actual subjects if unscheduled).
+     * Returns total count of affected lecture slots.
+     */
+    suspend fun applyTimeOff(
+        startDate: LocalDate,
+        endDate: LocalDate,
+        status: AttendanceStatus?,
+        subjectIds: Set<Long>? = null
+    ): Int {
+        if (endDate.isBefore(startDate)) return 0
+        val scheduleList = scheduleDao.getAllScheduleEntriesOnce()
+        val actualSubs = subjectDao.getAllSubjectsOnce().filter { !it.isFolder }
+        val allSubIds = actualSubs.map { it.id }.toSet()
+        val targetSubjectIds = subjectIds ?: allSubIds
+
+        var affectedSlots = 0
+        var curr = startDate
+        while (!curr.isAfter(endDate)) {
+            val date = curr
+            if (scheduleList.isNotEmpty()) {
+                val dayEntries = scheduleList.filter { it.occursOn(date) && it.subjectId in targetSubjectIds }
+                val subjectCounts = dayEntries.groupBy { it.subjectId }.mapValues { it.value.size }
+                for ((subId, count) in subjectCounts) {
+                    if (status != null) {
+                        setDayStatus(subId, date, status, targetCount = count)
+                    } else {
+                        clearDay(subId, date)
+                    }
+                    affectedSlots += count
+                }
+                if (status == null) {
+                    val existingForDate = attendanceDao.getAttendanceRecordsForSubjectsOnDateOnce(targetSubjectIds.toList(), date)
+                    for (rec in existingForDate) {
+                        if (!subjectCounts.containsKey(rec.subjectId)) {
+                            clearDay(rec.subjectId, date)
+                            affectedSlots += (rec.presentCount + rec.absentCount).coerceAtLeast(1)
+                        }
+                    }
+                }
+            } else {
+                if (status != null) {
+                    if (date.dayOfWeek != DayOfWeek.SATURDAY && date.dayOfWeek != DayOfWeek.SUNDAY) {
+                        for (sub in actualSubs) {
+                            if (sub.id in targetSubjectIds) {
+                                setDayStatus(sub.id, date, status, targetCount = 1)
+                                affectedSlots += 1
+                            }
+                        }
+                    }
+                } else {
+                    val existingForDate = attendanceDao.getAttendanceRecordsForSubjectsOnDateOnce(targetSubjectIds.toList(), date)
+                    for (rec in existingForDate) {
+                        clearDay(rec.subjectId, date)
+                        affectedSlots += (rec.presentCount + rec.absentCount).coerceAtLeast(1)
+                    }
+                }
+            }
+            curr = curr.plusDays(1)
+        }
+        return affectedSlots
+    }
+
     suspend fun deleteAttendanceRecord(subjectId: Long, date: LocalDate) {
         attendanceDao.deleteAttendanceForSubjectOnDate(subjectId, date)
     }

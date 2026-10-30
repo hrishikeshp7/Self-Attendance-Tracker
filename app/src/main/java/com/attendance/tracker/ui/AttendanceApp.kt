@@ -32,6 +32,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.attendance.tracker.data.model.AttendanceStatus
 import java.time.LocalDate
+import com.attendance.tracker.ui.components.TimeOffSheet
 import com.attendance.tracker.ui.screens.about.AboutScreen
 import com.attendance.tracker.ui.screens.backup.BackupRestoreScreen
 import com.attendance.tracker.ui.screens.calendar.SubjectCalendarScreen
@@ -75,6 +76,8 @@ fun AttendanceApp(
     // Variables for navigation to subjects screen
     var showAddSubjectOnSubjectsScreen by remember { mutableStateOf(false) }
     var subjectToEdit by remember { mutableStateOf<com.attendance.tracker.data.model.Subject?>(null) }
+    var showTimeOffSheet by remember { mutableStateOf(false) }
+    var timeOffInitialRange by remember { mutableStateOf<Pair<LocalDate, LocalDate>?>(null) }
 
     Scaffold(
         // Each screen's own Scaffold/TopAppBar applies the status-bar inset; applying it here
@@ -179,6 +182,10 @@ fun AttendanceApp(
                             }
                             launchSingleTop = true
                         }
+                    },
+                    onOpenTimeOff = {
+                        timeOffInitialRange = null
+                        showTimeOffSheet = true
                     }
                 )
             }
@@ -221,6 +228,9 @@ fun AttendanceApp(
                     },
                     onSetDayCounts = { date, present, absent ->
                         viewModel.setDayCounts(subjectId, date, present, absent)
+                    },
+                    onApplyRangeTimeOff = { startDate, endDate, status ->
+                        viewModel.applyTimeOff(startDate, endDate, status, setOf(subjectId))
                     },
                     onNavigateBack = {
                         navController.popBackStack()
@@ -265,8 +275,13 @@ fun AttendanceApp(
                     subjects = subjects,
                     allSubjects = subjectsMap,
                     scheduleEntries = scheduleEntries,
+                    attendanceRecords = attendanceRecords,
                     onOpenSubjectCalendar = { subId ->
                         navController.navigate(Screen.SubjectCalendar.createRoute(subId))
+                    },
+                    onOpenTimeOff = { start, end ->
+                        timeOffInitialRange = Pair(start, end)
+                        showTimeOffSheet = true
                     },
                     onAddLecture = { subjectId, day, start, end, from, until ->
                         viewModel.addLectureSlot(subjectId, day, start, end, from, until)
@@ -352,5 +367,21 @@ fun AttendanceApp(
                 )
             }
         }
+    }
+
+    if (showTimeOffSheet) {
+        TimeOffSheet(
+            subjects = subjects,
+            allSubjects = subjectsMap,
+            scheduleEntries = scheduleEntries,
+            initialRange = timeOffInitialRange,
+            onDismiss = {
+                showTimeOffSheet = false
+                timeOffInitialRange = null
+            },
+            onApply = { startDate, endDate, status, subjectIds ->
+                viewModel.applyTimeOff(startDate, endDate, status, subjectIds)
+            }
+        )
     }
 }

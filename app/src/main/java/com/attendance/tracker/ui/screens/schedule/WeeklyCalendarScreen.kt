@@ -9,6 +9,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.BeachAccess
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.KeyboardArrowRight
@@ -29,6 +30,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.attendance.tracker.data.model.AttendanceRecord
+import com.attendance.tracker.data.model.AttendanceStatus
 import com.attendance.tracker.data.model.ScheduleEntry
 import com.attendance.tracker.data.model.Subject
 import com.attendance.tracker.data.model.getDisplayName
@@ -64,10 +67,12 @@ fun WeeklyCalendarScreen(
     subjects: List<Subject>,
     allSubjects: Map<Long, Subject>,
     scheduleEntries: List<ScheduleEntry>,
+    attendanceRecords: List<AttendanceRecord> = emptyList(),
     onAddLecture: (subjectId: Long, dayOfWeek: DayOfWeek, startTime: LocalTime, endTime: LocalTime, startDate: LocalDate?, endDate: LocalDate?) -> Unit,
     onUpdateLecture: (entry: ScheduleEntry, subjectId: Long, dayOfWeek: DayOfWeek, startTime: LocalTime, endTime: LocalTime, startDate: LocalDate?, endDate: LocalDate?) -> Unit,
     onDeleteLecture: (ScheduleEntry) -> Unit,
     onOpenSubjectCalendar: ((Long) -> Unit)? = null,
+    onOpenTimeOff: ((LocalDate, LocalDate) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     var editorState by remember { mutableStateOf<LectureEditorState?>(null) }
@@ -99,7 +104,36 @@ fun WeeklyCalendarScreen(
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.background,
                     titleContentColor = MaterialTheme.colorScheme.onBackground
-                )
+                ),
+                actions = {
+                    if (onOpenTimeOff != null) {
+                        Surface(
+                            onClick = { onOpenTimeOff(weekStart, weekStart.plusDays(6)) },
+                            shape = RoundedCornerShape(20.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                            modifier = Modifier.padding(end = 12.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.BeachAccess,
+                                    contentDescription = "Time Off",
+                                    modifier = Modifier.size(16.dp),
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                                Text(
+                                    text = "Time Off",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+                        }
+                    }
+                }
             )
         },
         floatingActionButton = {
@@ -142,6 +176,7 @@ fun WeeklyCalendarScreen(
                 WeekGrid(
                     allSubjects = allSubjects,
                     scheduleEntries = weekEntries,
+                    attendanceRecords = attendanceRecords,
                     weekStart = weekStart,
                     onCellTap = { day, time ->
                         editorState = LectureEditorState(
@@ -331,6 +366,7 @@ private fun WeekNavigator(
 private fun WeekGrid(
     allSubjects: Map<Long, Subject>,
     scheduleEntries: List<ScheduleEntry>,
+    attendanceRecords: List<AttendanceRecord>,
     weekStart: LocalDate,
     onCellTap: (DayOfWeek, LocalTime) -> Unit,
     onBlockTap: (ScheduleEntry) -> Unit,
@@ -372,10 +408,14 @@ private fun WeekGrid(
             Spacer(modifier = Modifier.width(TIME_AXIS_WIDTH))
             Row(modifier = Modifier.horizontalScroll(hScroll)) {
                 DayOfWeek.entries.forEach { day ->
+                    val dayDate = weekStart.plusDays(day.ordinal.toLong())
+                    val dayRecords = attendanceRecords.filter { it.date == dayDate }
+                    val isDayHoliday = dayRecords.isNotEmpty() && dayRecords.all { it.status == AttendanceStatus.NO_CLASS }
                     DayHeaderCell(
                         day = day,
                         isToday = day == today,
-                        date = weekStart.plusDays(day.ordinal.toLong()),
+                        date = dayDate,
+                        isHoliday = isDayHoliday,
                         modifier = Modifier.width(DAY_COLUMN_WIDTH)
                     )
                 }
@@ -391,11 +431,6 @@ private fun WeekGrid(
                     .verticalScroll(vScroll)
                     .padding(top = GRID_TOP_PADDING, bottom = 88.dp) // room to scroll the last hour clear of the + button
             ) {
-                // Each label's Box starts exactly at its hour boundary (y=0 for gridStartHour),
-                // matching the background cells below and the lecture blocks' own offsets —
-                // they all share the same origin so a tap and a block line up with the label.
-                // The hour lines continue through the axis so each time reads as
-                // part of the same row as the grid lines beside it.
                 val hourLine = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.9f)
                 for (hour in gridStartHour until gridEndHour) {
                     Box(modifier = Modifier.height(HOUR_HEIGHT).fillMaxWidth()) {
@@ -435,8 +470,11 @@ private fun WeekGrid(
 
                 // Lecture blocks, layered on top so they intercept taps meant for editing.
                 DayOfWeek.entries.forEachIndexed { dayIndex, day ->
+                    val dayDate = weekStart.plusDays(day.ordinal.toLong())
+                    val dayRecords = attendanceRecords.filter { it.date == dayDate }
                     val dayEntries = entriesByDay[day].orEmpty()
                     layoutDayEntries(dayEntries).forEach { (entry, lane) ->
+                        val isCancelled = dayRecords.any { it.subjectId == entry.subjectId && it.status == AttendanceStatus.NO_CLASS }
                         LectureBlock(
                             entry = entry,
                             subject = allSubjects[entry.subjectId],
@@ -445,6 +483,7 @@ private fun WeekGrid(
                             lane = lane.index,
                             totalLanes = lane.total,
                             gridStartHour = gridStartHour,
+                            isCancelled = isCancelled,
                             onClick = { onBlockTap(entry) }
                         )
                     }
@@ -490,6 +529,7 @@ private fun DayHeaderCell(
     day: DayOfWeek,
     isToday: Boolean,
     date: LocalDate,
+    isHoliday: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -508,6 +548,21 @@ private fun DayHeaderCell(
             fontWeight = if (isToday) FontWeight.Bold else FontWeight.Normal,
             color = if (isToday) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
         )
+        if (isHoliday) {
+            Surface(
+                shape = RoundedCornerShape(4.dp),
+                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.8f),
+                modifier = Modifier.padding(top = 2.dp)
+            ) {
+                Text(
+                    text = "OFF",
+                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                )
+            }
+        }
     }
 }
 
@@ -601,6 +656,7 @@ private fun LectureBlock(
     lane: Int,
     totalLanes: Int,
     gridStartHour: Int,
+    isCancelled: Boolean = false,
     onClick: () -> Unit
 ) {
     val startMinutes = entry.startTime.hour * 60 + entry.startTime.minute
@@ -612,6 +668,7 @@ private fun LectureBlock(
     val laneWidth: Dp = DAY_COLUMN_WIDTH / totalLanes
     val xOffset = DAY_COLUMN_WIDTH * dayIndex + laneWidth * lane
     val color = subjectAvatarColor(entry.subjectId)
+    val bgAlpha = if (isCancelled) 0.35f else 0.85f
 
     Box(
         modifier = Modifier
@@ -619,7 +676,7 @@ private fun LectureBlock(
             .width((laneWidth - 4.dp).coerceAtLeast(24.dp))
             .height((blockHeight - 2.dp).coerceAtLeast(26.dp))
             .clip(RoundedCornerShape(6.dp))
-            .background(color.copy(alpha = 0.85f))
+            .background(color.copy(alpha = bgAlpha))
             .clickable(onClick = onClick)
             .padding(horizontal = 5.dp, vertical = 3.dp)
     ) {
@@ -633,8 +690,8 @@ private fun LectureBlock(
                 overflow = TextOverflow.Ellipsis
             )
             Text(
-                // Whole hours read "9 AM", anything else keeps its minutes ("5:30 AM")
-                text = entry.startTime.format(if (entry.startTime.minute == 0) timeLabelFormatter else timeSheetFormatter),
+                text = if (isCancelled) "Holiday / Off"
+                else entry.startTime.format(if (entry.startTime.minute == 0) timeLabelFormatter else timeSheetFormatter),
                 style = MaterialTheme.typography.labelSmall,
                 color = Color.White.copy(alpha = 0.85f),
                 maxLines = 1,

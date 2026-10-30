@@ -9,12 +9,16 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.BeachAccess
+import androidx.compose.material.icons.filled.FlightTakeoff
+import androidx.compose.material.icons.filled.RestartAlt
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.attendance.tracker.data.model.AttendanceRecord
@@ -46,6 +50,7 @@ fun SubjectCalendarScreen(
     onClearAttendance: (LocalDate) -> Unit,
     onSetDayCounts: (LocalDate, Int, Int) -> Unit,
     onNavigateBack: () -> Unit,
+    onApplyRangeTimeOff: (startDate: LocalDate, endDate: LocalDate, status: AttendanceStatus?) -> Unit = { _, _, _ -> },
     modifier: Modifier = Modifier,
     scheduleEntries: List<ScheduleEntry> = emptyList()
 ) {
@@ -210,6 +215,11 @@ fun SubjectCalendarScreen(
                         rangeEnd = null
                         isRangeMode = false
                         // Keep rangeStart as the still-selected single date
+                    },
+                    onApplyAction  = { status ->
+                        onApplyRangeTimeOff(normalizedStart, normalizedEnd, status)
+                        rangeEnd = null
+                        isRangeMode = false
                     }
                 )
             } else {
@@ -383,7 +393,8 @@ private fun RangeStatsSection(
     absentCount: Int,
     total: Int,
     percentage: Float,
-    onClearRange: () -> Unit
+    onClearRange: () -> Unit,
+    onApplyAction: (AttendanceStatus?) -> Unit = {}
 ) {
     val dateRangeFormatter = DateTimeFormatter.ofPattern("MMM d")
     val rangeLabel = "${rangeStart.format(dateRangeFormatter)} – ${rangeEnd.format(dateRangeFormatter)}"
@@ -446,6 +457,56 @@ private fun RangeStatsSection(
                         color = if (percentage >= 75f) PresentGreen else AbsentRed
                     )
                 }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Button(
+                onClick = { onApplyAction(AttendanceStatus.NO_CLASS) },
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = Color.White
+                ),
+                shape = RoundedCornerShape(12.dp),
+                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp),
+                modifier = Modifier.weight(1f)
+            ) {
+                Icon(Icons.Default.BeachAccess, contentDescription = null, modifier = Modifier.size(16.dp))
+                Spacer(modifier = Modifier.width(4.dp))
+                Text("Holiday", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+            }
+
+            Button(
+                onClick = { onApplyAction(AttendanceStatus.ABSENT) },
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = AbsentRed,
+                    contentColor = Color.White
+                ),
+                shape = RoundedCornerShape(12.dp),
+                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp),
+                modifier = Modifier.weight(1f)
+            ) {
+                Icon(Icons.Default.FlightTakeoff, contentDescription = null, modifier = Modifier.size(16.dp))
+                Spacer(modifier = Modifier.width(4.dp))
+                Text("Leave", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+            }
+
+            OutlinedButton(
+                onClick = { onApplyAction(null) },
+                shape = RoundedCornerShape(12.dp),
+                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp),
+                modifier = Modifier.weight(1f)
+            ) {
+                Icon(Icons.Default.RestartAlt, contentDescription = null, modifier = Modifier.size(16.dp))
+                Spacer(modifier = Modifier.width(4.dp))
+                Text("Reset", style = MaterialTheme.typography.labelMedium)
             }
         }
     }
