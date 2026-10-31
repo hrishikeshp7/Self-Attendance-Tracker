@@ -13,6 +13,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.FileUpload
@@ -21,12 +22,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.attendance.tracker.backup.AiImport
 import com.attendance.tracker.backup.CsvImporter
 import com.attendance.tracker.ui.AttendanceViewModel
 import kotlinx.coroutines.Dispatchers
@@ -38,7 +36,8 @@ import java.time.LocalDate
 @Composable
 fun BackupRestoreScreen(
     viewModel: AttendanceViewModel,
-    onNavigateBack: () -> Unit
+    onNavigateBack: () -> Unit,
+    onNavigateToAiImport: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -48,10 +47,7 @@ fun BackupRestoreScreen(
     var showRestoreConfirmDialog by remember { mutableStateOf(false) }
     var pendingRestoreUri by remember { mutableStateOf<Uri?>(null) }
     var csvPreview by remember { mutableStateOf<CsvImporter.Result?>(null) }
-    var showAiPaste by remember { mutableStateOf(false) }
-    var aiText by remember { mutableStateOf("") }
     var replaceExisting by remember { mutableStateOf(false) }
-    val clipboard = LocalClipboardManager.current
     val subjects by viewModel.allSubjectsIncludingFolders.collectAsState()
 
     // ---------------------------------------------------------------
@@ -176,32 +172,6 @@ fun BackupRestoreScreen(
             dismissButton = {
                 TextButton(onClick = { showRestoreConfirmDialog = false }) { Text("Cancel") }
             }
-        )
-    }
-
-    if (showAiPaste) {
-        AlertDialog(
-            onDismissRequest = { showAiPaste = false },
-            title = { Text("Paste the chatbot's reply") },
-            text = {
-                OutlinedTextField(
-                    value = aiText,
-                    onValueChange = { aiText = it },
-                    placeholder = { Text("Paste here") },
-                    modifier = Modifier.fillMaxWidth().heightIn(min = 120.dp, max = 240.dp)
-                )
-            },
-            confirmButton = {
-                TextButton(
-                    enabled = aiText.isNotBlank(),
-                    onClick = {
-                        csvPreview = viewModel.previewAiImport(aiText)
-                        replaceExisting = false
-                        showAiPaste = false
-                    }
-                ) { Text("Check") }
-            },
-            dismissButton = { TextButton(onClick = { showAiPaste = false }) { Text("Cancel") } }
         )
     }
 
@@ -400,28 +370,15 @@ fun BackupRestoreScreen(
 
             // ---- Import section ----
             Divider()
-            Text("Import with AI", style = MaterialTheme.typography.titleMedium)
-
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(
-                    modifier = Modifier.fillMaxWidth().padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Text(
-                        text = "1. Copy the prompt.\n" +
-                            "2. Paste it into Claude, Gemini or any chatbot and attach your timetable (PDF or photo).\n" +
-                            "3. Copy its reply and paste it here. You'll see a preview before anything is saved.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Row(modifier = Modifier.align(Alignment.End), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedButton(onClick = {
-                            clipboard.setText(AnnotatedString(AiImport.PROMPT))
-                            android.widget.Toast.makeText(context, "Prompt copied.", android.widget.Toast.LENGTH_SHORT).show()
-                        }) { Text("Copy prompt") }
-                        Button(onClick = { showAiPaste = true }) { Text("Paste reply") }
-                    }
-                }
+            if (onNavigateToAiImport != null) {
+                Text("AI Timetable Import", style = MaterialTheme.typography.titleMedium)
+                BackupActionCard(
+                    title = "Extract from photo or PDF",
+                    description = "Use ChatGPT, Claude, or Gemini to turn your timetable image or document into subjects and timetable slots.",
+                    icon = { Icon(Icons.Default.AutoAwesome, contentDescription = null) },
+                    buttonLabel = "Open AI Import",
+                    onClick = onNavigateToAiImport
+                )
             }
 
             Text("Import from CSV", style = MaterialTheme.typography.titleMedium)

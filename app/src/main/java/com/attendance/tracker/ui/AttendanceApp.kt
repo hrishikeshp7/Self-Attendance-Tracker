@@ -34,6 +34,7 @@ import com.attendance.tracker.data.model.AttendanceStatus
 import java.time.LocalDate
 import com.attendance.tracker.ui.components.TimeOffSheet
 import com.attendance.tracker.ui.screens.about.AboutScreen
+import com.attendance.tracker.ui.screens.aiimport.AiImportScreen
 import com.attendance.tracker.ui.screens.backup.BackupRestoreScreen
 import com.attendance.tracker.ui.screens.calendar.SubjectCalendarScreen
 import com.attendance.tracker.ui.screens.home.HomeScreen
@@ -302,6 +303,9 @@ fun AttendanceApp(
                     onNavigateToCustomizations = {
                         navController.navigate(Screen.Customizations.route)
                     },
+                    onNavigateToAiImport = {
+                        navController.navigate(Screen.AiImport.route)
+                    },
                     onNavigateToBackupRestore = {
                         navController.navigate(Screen.BackupRestore.route)
                     },
@@ -360,6 +364,23 @@ fun AttendanceApp(
             ) {
                 BackupRestoreScreen(
                     viewModel = viewModel,
+                    onNavigateBack = {
+                        navController.popBackStack()
+                    },
+                    onNavigateToAiImport = {
+                        navController.navigate(Screen.AiImport.route)
+                    }
+                )
+            }
+
+            composable(
+                Screen.AiImport.route,
+                enterTransition = { slideInHorizontally(initialOffsetX = { it }, animationSpec = tween(200)) },
+                popExitTransition = { slideOutHorizontally(targetOffsetX = { it }, animationSpec = tween(200)) }
+            ) {
+                AiImportScreen(
+                    viewModel = viewModel,
+                    subjects = subjects,
                     onNavigateBack = {
                         navController.popBackStack()
                     }

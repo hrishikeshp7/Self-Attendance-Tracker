@@ -12,4 +12,5 @@ sealed class Screen(val route: String) {
     data object Customizations : Screen("customizations")
     data object About : Screen("about")
     data object BackupRestore : Screen("backup_restore")
+    data object AiImport : Screen("ai_import")
 }
