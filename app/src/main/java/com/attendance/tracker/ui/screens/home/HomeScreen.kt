@@ -1,24 +1,31 @@
 package com.attendance.tracker.ui.screens.home
 
+import androidx.compose.animation.animateContentSize
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.BeachAccess
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.attendance.tracker.data.SlotAttendanceStore
@@ -28,6 +35,8 @@ import com.attendance.tracker.data.model.ScheduleEntry
 import com.attendance.tracker.data.model.Subject
 import com.attendance.tracker.data.model.getDisplayName
 import com.attendance.tracker.ui.components.SubjectCard
+import com.attendance.tracker.ui.theme.AbsentRed
+import com.attendance.tracker.ui.theme.subjectAvatarColor
 import com.attendance.tracker.widget.refreshAllWidgets
 import kotlinx.coroutines.launch
 import java.time.LocalDate
@@ -48,7 +57,6 @@ fun HomeScreen(
     onEditSubject: (Subject) -> Unit,
     onSubjectClick: (Subject) -> Unit,
     onViewAllSubjects: (() -> Unit)? = null,
-    onOpenTimeOff: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -149,34 +157,7 @@ fun HomeScreen(
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.background,
                     titleContentColor = MaterialTheme.colorScheme.onBackground
-                ),
-                actions = {
-                    Surface(
-                        onClick = onOpenTimeOff,
-                        shape = RoundedCornerShape(20.dp),
-                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                        modifier = Modifier.padding(end = 12.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.BeachAccess,
-                                contentDescription = "Time Off",
-                                modifier = Modifier.size(16.dp),
-                                tint = MaterialTheme.colorScheme.primary
-                            )
-                            Text(
-                                text = "Time Off",
-                                style = MaterialTheme.typography.labelMedium,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-                    }
-                }
+                )
             )
         },
         floatingActionButton = {
@@ -192,33 +173,36 @@ fun HomeScreen(
         containerColor = MaterialTheme.colorScheme.background,
         modifier = modifier
     ) { paddingValues ->
-        if (subjects.isEmpty()) {
-            EmptySubjectsState(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(paddingValues)
-            )
-        } else if (hasAnySchedule && todaySlots.isEmpty()) {
-            NoClassesTodayState(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(paddingValues),
-                onAddExtraClass = { showExtraClassDialog = true },
-                onViewAllSubjects = onViewAllSubjects
-            )
-        } else {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(paddingValues),
-                contentPadding = PaddingValues(bottom = 88.dp)
-            ) {
-                if (belowTarget.isNotEmpty()) {
-                    item { BelowTargetBanner(belowTarget, allSubjects) }
-                }
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+        ) {
+            if (belowTarget.isNotEmpty()) {
+                BelowTargetBanner(
+                    subjects = belowTarget,
+                    allSubjects = allSubjects,
+                    onSubjectClick = onSubjectClick
+                )
+            }
 
-                // Subject Cards – discrete lecture cards when multiple sessions exist today
-                items(todaySlots, key = { "${it.subject.id}_${it.slotIndex}" }) { slotItem ->
+            if (subjects.isEmpty()) {
+                EmptySubjectsState(
+                    modifier = Modifier.fillMaxSize()
+                )
+            } else if (hasAnySchedule && todaySlots.isEmpty()) {
+                NoClassesTodayState(
+                    modifier = Modifier.fillMaxSize(),
+                    onAddExtraClass = { showExtraClassDialog = true },
+                    onViewAllSubjects = onViewAllSubjects
+                )
+            } else {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(bottom = 88.dp)
+                ) {
+                    // Subject Cards – discrete lecture cards when multiple sessions exist today
+                    items(todaySlots, key = { "${it.subject.id}_${it.slotIndex}" }) { slotItem ->
                     val subject = slotItem.subject
                     val currentRecord = todayAttendance[subject.id]
                     val trigger = slotUpdateTrigger
@@ -271,6 +255,7 @@ fun HomeScreen(
             }
         }
     }
+}
 
     // Extra Class Dialog
     if (showExtraClassDialog) {
@@ -458,52 +443,187 @@ private fun EmptySubjectsState(modifier: Modifier = Modifier) {
     }
 }
 
-/** One collapsed line ("2 subjects below target"); tap to list them. */
+/** One collapsed card ("2 subjects below target"); tap to expand structured subject cards. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun BelowTargetBanner(subjects: List<Subject>, allSubjects: Map<Long, Subject>) {
+private fun BelowTargetBanner(
+    subjects: List<Subject>,
+    allSubjects: Map<Long, Subject>,
+    onSubjectClick: (Subject) -> Unit
+) {
     var expanded by remember { mutableStateOf(false) }
+
     Card(
-        onClick = { expanded = !expanded },
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 4.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
-        shape = RoundedCornerShape(12.dp)
+            .padding(horizontal = 16.dp, vertical = 6.dp)
+            .animateContentSize(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f)
+        ),
+        shape = RoundedCornerShape(16.dp),
+        border = androidx.compose.foundation.BorderStroke(
+            1.dp,
+            MaterialTheme.colorScheme.error.copy(alpha = 0.25f)
+        )
     ) {
-        Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+        Column(modifier = Modifier.padding(14.dp)) {
+            // Header Row (Clickable)
             Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { expanded = !expanded },
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Icon(
-                    imageVector = Icons.Default.Warning,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onErrorContainer,
-                    modifier = Modifier.size(16.dp)
-                )
-                Text(
-                    text = "${subjects.size} subject${if (subjects.size != 1) "s" else ""} below target",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onErrorContainer,
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
                     modifier = Modifier.weight(1f)
-                )
-                Text(
-                    text = if (expanded) "Hide" else "Details",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onErrorContainer
-                )
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(28.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.error.copy(alpha = 0.15f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Warning,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                    Column {
+                        Text(
+                            text = "${subjects.size} subject${if (subjects.size != 1) "s" else ""} below target",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onErrorContainer
+                        )
+                        Text(
+                            text = if (expanded) "Tap to collapse" else "Tap to see recovery details",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.75f)
+                        )
+                    }
+                }
+
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.1f)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = if (expanded) "Hide" else "Details",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onErrorContainer
+                        )
+                        Spacer(modifier = Modifier.width(2.dp))
+                        Icon(
+                            imageVector = if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onErrorContainer,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                }
             }
+
+            // Expanded content: structured cards
             if (expanded) {
-                subjects.forEach { subject ->
-                    val needed = subject.classesToAttend
-                    Text(
-                        text = "${subject.getDisplayName(allSubjects)} · ${"%.0f".format(subject.currentAttendancePercentage)}% of ${subject.requiredAttendance}% · " +
-                            if (needed >= 999) "can't reach target" else "attend $needed more",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onErrorContainer,
-                        modifier = Modifier.padding(top = 4.dp)
-                    )
+                Spacer(modifier = Modifier.height(12.dp))
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    subjects.forEach { subject ->
+                        val needed = subject.classesToAttend
+                        val currentPct = subject.currentAttendancePercentage
+                        val targetPct = subject.requiredAttendance
+
+                        Surface(
+                            onClick = { onSubjectClick(subject) },
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.surface,
+                            tonalElevation = 1.dp,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(10.dp)
+                                                .clip(CircleShape)
+                                                .background(subjectAvatarColor(subject.id))
+                                        )
+                                        Text(
+                                            text = subject.getDisplayName(allSubjects),
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            fontWeight = FontWeight.SemiBold,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+
+                                    // Attendance % pill
+                                    Text(
+                                        text = "${"%.1f".format(currentPct)}% / ${targetPct}%",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = AbsentRed
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.height(8.dp))
+
+                                // Progress bar
+                                val progress = (currentPct / 100f).coerceIn(0f, 1f)
+                                LinearProgressIndicator(
+                                    progress = progress,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(6.dp)
+                                        .clip(RoundedCornerShape(3.dp)),
+                                    color = AbsentRed,
+                                    trackColor = MaterialTheme.colorScheme.surfaceVariant
+                                )
+
+                                Spacer(modifier = Modifier.height(6.dp))
+
+                                // Bottom row: target action
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = if (needed >= 999) "Target cannot be reached"
+                                        else "Attend next $needed class${if (needed != 1) "es" else ""} to reach ${targetPct}%",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = if (needed >= 999) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Text(
+                                        text = "View >",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }

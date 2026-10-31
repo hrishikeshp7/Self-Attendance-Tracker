@@ -182,10 +182,6 @@ fun AttendanceApp(
                             }
                             launchSingleTop = true
                         }
-                    },
-                    onOpenTimeOff = {
-                        timeOffInitialRange = null
-                        showTimeOffSheet = true
                     }
                 )
             }
