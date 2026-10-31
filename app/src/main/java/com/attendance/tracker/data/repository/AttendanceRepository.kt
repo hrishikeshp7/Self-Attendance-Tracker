@@ -267,6 +267,9 @@ class AttendanceRepository(
     suspend fun insertScheduleEntry(entry: ScheduleEntry): Long =
         scheduleDao.insertScheduleEntry(entry)
 
+    suspend fun insertScheduleEntries(entries: List<ScheduleEntry>) =
+        scheduleDao.insertScheduleEntries(entries)
+
     suspend fun updateScheduleEntry(entry: ScheduleEntry) =
         scheduleDao.updateScheduleEntry(entry)
 

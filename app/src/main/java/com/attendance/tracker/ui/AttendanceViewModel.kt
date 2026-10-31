@@ -357,17 +357,26 @@ class AttendanceViewModel(application: Application) : AndroidViewModel(applicati
         subjectId: Long, dayOfWeek: DayOfWeek, startTime: LocalTime, endTime: LocalTime,
         startDate: LocalDate? = null, endDate: LocalDate? = null
     ) {
+        addLectureSlots(subjectId, listOf(dayOfWeek), startTime, endTime, startDate, endDate)
+    }
+
+    /** Creates multiple timed lecture slots in one operation (e.g. for recurring days of week). */
+    fun addLectureSlots(
+        subjectId: Long, days: Collection<DayOfWeek>, startTime: LocalTime, endTime: LocalTime,
+        startDate: LocalDate? = null, endDate: LocalDate? = null
+    ) {
         viewModelScope.launch {
-            repository.insertScheduleEntry(
+            val entries = days.map { day ->
                 ScheduleEntry(
                     subjectId = subjectId,
-                    dayOfWeek = dayOfWeek,
+                    dayOfWeek = day,
                     startTime = startTime,
                     endTime = endTime,
                     startDate = startDate,
                     endDate = endDate
                 )
-            )
+            }
+            repository.insertScheduleEntries(entries)
         }
     }
 

@@ -10,6 +10,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.BeachAccess
+import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.KeyboardArrowRight
@@ -39,8 +40,10 @@ import com.attendance.tracker.ui.theme.subjectAvatarColor
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.time.DayOfWeek
+import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
+import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
 import java.util.Locale
@@ -69,6 +72,7 @@ fun WeeklyCalendarScreen(
     scheduleEntries: List<ScheduleEntry>,
     attendanceRecords: List<AttendanceRecord> = emptyList(),
     onAddLecture: (subjectId: Long, dayOfWeek: DayOfWeek, startTime: LocalTime, endTime: LocalTime, startDate: LocalDate?, endDate: LocalDate?) -> Unit,
+    onAddLectures: ((subjectId: Long, days: Collection<DayOfWeek>, startTime: LocalTime, endTime: LocalTime, startDate: LocalDate?, endDate: LocalDate?) -> Unit)? = null,
     onUpdateLecture: (entry: ScheduleEntry, subjectId: Long, dayOfWeek: DayOfWeek, startTime: LocalTime, endTime: LocalTime, startDate: LocalDate?, endDate: LocalDate?) -> Unit,
     onDeleteLecture: (ScheduleEntry) -> Unit,
     onOpenSubjectCalendar: ((Long) -> Unit)? = null,
@@ -216,6 +220,15 @@ fun WeeklyCalendarScreen(
                     onUpdateLecture(existing, subjectId, day, start, end, from, until)
                 } else {
                     onAddLecture(subjectId, day, start, end, from, until)
+                }
+            },
+            onSaveMultiple = { subjectId, days, start, end, from, until ->
+                if (onAddLectures != null) {
+                    onAddLectures(subjectId, days, start, end, from, until)
+                } else {
+                    days.forEach { day ->
+                        onAddLecture(subjectId, day, start, end, from, until)
+                    }
                 }
             },
             onDelete = state.existingEntry?.let { entry -> { onDeleteLecture(entry) } },
@@ -705,6 +718,12 @@ private fun LectureBlock(
 // Add / edit sheet
 // -----------------------------------------------------------------------
 
+private enum class LectureRecurrence(val label: String) {
+    ONGOING("Until cancelled"),
+    THIS_WEEK("This week only"),
+    UNTIL_DATE("Until date...")
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun LectureEditorSheet(
@@ -713,36 +732,41 @@ private fun LectureEditorSheet(
     allSubjects: Map<Long, Subject>,
     onDismiss: () -> Unit,
     onSave: (subjectId: Long, dayOfWeek: DayOfWeek, startTime: LocalTime, endTime: LocalTime, startDate: LocalDate?, endDate: LocalDate?) -> Unit,
+    onSaveMultiple: (subjectId: Long, days: Collection<DayOfWeek>, startTime: LocalTime, endTime: LocalTime, startDate: LocalDate?, endDate: LocalDate?) -> Unit,
     onDelete: (() -> Unit)?,
     onOpenSubjectCalendar: ((Long) -> Unit)? = null
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val coroutineScope = rememberCoroutineScope()
+    val existing = state.existingEntry
+    val isEditing = existing != null
+
     var subjectId by remember { mutableStateOf(state.subjectId) }
-    var dayOfWeek by remember { mutableStateOf(state.dayOfWeek) }
+    var singleDayOfWeek by remember { mutableStateOf(state.dayOfWeek) }
+    var selectedDays by remember { mutableStateOf(setOf(state.dayOfWeek)) }
     var startTime by remember { mutableStateOf(state.startTime) }
     var endTime by remember { mutableStateOf(state.endTime) }
-    val existing = state.existingEntry
-    // A slot limited to a range of dates (e.g. one semester) keeps that range; otherwise
-    // the user picks between every week and just one date.
-    val hasRange = existing != null && existing.startDate != null && existing.startDate != existing.endDate
-    var oneOff by remember { mutableStateOf(existing != null && existing.startDate != null && existing.startDate == existing.endDate) }
-    val oneOffDate: LocalDate =
-        if (existing?.startDate != null && existing.startDate == existing.endDate && existing.dayOfWeek == dayOfWeek) existing.startDate
-        else state.weekStart.plusDays(dayOfWeek.ordinal.toLong())
+
+    val initialRecurrence = when {
+        existing == null -> LectureRecurrence.ONGOING
+        existing.startDate != null && existing.startDate == existing.endDate -> LectureRecurrence.THIS_WEEK
+        existing.endDate != null -> LectureRecurrence.UNTIL_DATE
+        else -> LectureRecurrence.ONGOING
+    }
+    var recurrence by remember { mutableStateOf(initialRecurrence) }
+    var customEndDate by remember {
+        mutableStateOf(existing?.endDate ?: state.weekStart.plusMonths(4))
+    }
+    var showCustomEndDatePicker by remember { mutableStateOf(false) }
+
     var subjectMenuExpanded by remember { mutableStateOf(false) }
     var showStartPicker by remember { mutableStateOf(false) }
     var showEndPicker by remember { mutableStateOf(false) }
-    // Save/Delete stay tappable while the sheet animates away; without this a double tap
-    // inserted the same lecture twice.
     var submitted by remember { mutableStateOf(false) }
 
-    val isEditing = state.existingEntry != null
     val isTimeValid = endTime.isAfter(startTime)
     val selectedSubject = allSubjects[subjectId]
 
-    // Plays the sheet's collapse animation before actually tearing it down, instead of
-    // yanking it out of composition the instant Save/Delete is tapped.
     val dismissAfterHide: () -> Unit = {
         coroutineScope.launch {
             sheetState.hide()
@@ -795,8 +819,87 @@ private fun LectureEditorSheet(
             }
 
             Spacer(modifier = Modifier.height(16.dp))
+
+            if (isEditing) {
+                Text(
+                    text = "Day",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    DayOfWeek.entries.forEach { day ->
+                        FilterChip(
+                            selected = singleDayOfWeek == day,
+                            onClick = { singleDayOfWeek = day },
+                            label = { Text(day.getDisplayName(TextStyle.SHORT, Locale.getDefault())) }
+                        )
+                    }
+                }
+            } else {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = "Day(s)",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        AssistChip(
+                            onClick = {
+                                selectedDays = setOf(
+                                    DayOfWeek.MONDAY,
+                                    DayOfWeek.TUESDAY,
+                                    DayOfWeek.WEDNESDAY,
+                                    DayOfWeek.THURSDAY,
+                                    DayOfWeek.FRIDAY
+                                )
+                            },
+                            label = { Text("Weekdays", style = MaterialTheme.typography.labelSmall) }
+                        )
+                        AssistChip(
+                            onClick = {
+                                selectedDays = DayOfWeek.entries.toSet()
+                            },
+                            label = { Text("All Days", style = MaterialTheme.typography.labelSmall) }
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    DayOfWeek.entries.forEach { day ->
+                        val isChosen = day in selectedDays
+                        FilterChip(
+                            selected = isChosen,
+                            onClick = {
+                                selectedDays = if (isChosen) {
+                                    if (selectedDays.size > 1) selectedDays - day else selectedDays
+                                } else {
+                                    selectedDays + day
+                                }
+                            },
+                            label = { Text(day.getDisplayName(TextStyle.SHORT, Locale.getDefault())) }
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
             Text(
-                text = "Day",
+                text = "Duration / Repeat",
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -805,32 +908,66 @@ private fun LectureEditorSheet(
                 modifier = Modifier
                     .fillMaxWidth()
                     .horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                DayOfWeek.entries.forEach { day ->
+                LectureRecurrence.entries.forEach { opt ->
                     FilterChip(
-                        selected = dayOfWeek == day,
-                        onClick = { dayOfWeek = day },
-                        label = { Text(day.getDisplayName(TextStyle.SHORT, Locale.getDefault())) }
+                        selected = recurrence == opt,
+                        onClick = { recurrence = opt },
+                        label = { Text(opt.label) }
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
-            if (hasRange) {
-                Text(
-                    text = "Runs ${existing!!.startDate} to ${existing.endDate ?: "no end"}",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            } else {
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    FilterChip(selected = !oneOff, onClick = { oneOff = false }, label = { Text("Every week") })
-                    FilterChip(
-                        selected = oneOff,
-                        onClick = { oneOff = true },
-                        label = { Text("Only ${oneOffDate.format(weekRangeFormatter)}") }
+            Spacer(modifier = Modifier.height(6.dp))
+            when (recurrence) {
+                LectureRecurrence.ONGOING -> {
+                    Text(
+                        text = "Repeats every week indefinitely until cancelled.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                }
+                LectureRecurrence.THIS_WEEK -> {
+                    val weekEnd = state.weekStart.plusDays(6)
+                    Text(
+                        text = "Held only this week (${state.weekStart.format(weekRangeFormatter)} – ${weekEnd.format(weekRangeFormatter)}).",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                LectureRecurrence.UNTIL_DATE -> {
+                    OutlinedCard(
+                        onClick = { showCustomEndDatePicker = true },
+                        modifier = Modifier.fillMaxWidth().padding(top = 4.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 14.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column {
+                                Text(
+                                    text = "REPEATS UNTIL",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Text(
+                                    text = customEndDate.format(DateTimeFormatter.ofPattern("EEE, MMM d, yyyy")),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                            Icon(
+                                Icons.Default.CalendarMonth,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
                 }
             }
 
@@ -931,18 +1068,51 @@ private fun LectureEditorSheet(
                 Button(
                     onClick = {
                         submitted = true
-                        when {
-                            hasRange -> onSave(subjectId, dayOfWeek, startTime, endTime, existing!!.startDate, existing.endDate)
-                            oneOff -> onSave(subjectId, dayOfWeek, startTime, endTime, oneOffDate, oneOffDate)
-                            else -> onSave(subjectId, dayOfWeek, startTime, endTime, null, null)
+                        val (from, until) = when (recurrence) {
+                            LectureRecurrence.ONGOING -> Pair(null, null)
+                            LectureRecurrence.THIS_WEEK -> Pair(state.weekStart, state.weekStart.plusDays(6))
+                            LectureRecurrence.UNTIL_DATE -> Pair(state.weekStart, customEndDate)
+                        }
+                        if (isEditing) {
+                            onSave(subjectId, singleDayOfWeek, startTime, endTime, from, until)
+                        } else {
+                            onSaveMultiple(subjectId, selectedDays, startTime, endTime, from, until)
                         }
                         dismissAfterHide()
                     },
-                    enabled = !submitted && isTimeValid && selectedSubject != null
+                    enabled = !submitted && isTimeValid && selectedSubject != null && (isEditing || selectedDays.isNotEmpty())
                 ) {
-                    Text("Save")
+                    Text(
+                        if (isEditing) "Save"
+                        else if (selectedDays.size > 1) "Save (${selectedDays.size} Days)"
+                        else "Save"
+                    )
                 }
             }
+        }
+    }
+
+    if (showCustomEndDatePicker) {
+        val zone = remember { ZoneId.of("UTC") }
+        val pickerState = rememberDatePickerState(
+            initialSelectedDateMillis = customEndDate.atStartOfDay(zone).toInstant().toEpochMilli()
+        )
+        DatePickerDialog(
+            onDismissRequest = { showCustomEndDatePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    pickerState.selectedDateMillis?.let {
+                        val picked = Instant.ofEpochMilli(it).atZone(zone).toLocalDate()
+                        customEndDate = picked
+                    }
+                    showCustomEndDatePicker = false
+                }) { Text("OK") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showCustomEndDatePicker = false }) { Text("Cancel") }
+            }
+        ) {
+            DatePicker(state = pickerState)
         }
     }
 
@@ -951,7 +1121,6 @@ private fun LectureEditorSheet(
             title = "Select start time",
             initial = startTime,
             onConfirm = {
-                // Keep the lecture's length when moving its start, as calendar apps do.
                 val length = if (isTimeValid) java.time.Duration.between(startTime, endTime).toMinutes().toInt() else 60
                 startTime = it
                 endTime = endAfter(it, length)

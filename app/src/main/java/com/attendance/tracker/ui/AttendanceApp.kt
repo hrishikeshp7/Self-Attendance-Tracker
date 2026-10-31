@@ -286,6 +286,9 @@ fun AttendanceApp(
                     onAddLecture = { subjectId, day, start, end, from, until ->
                         viewModel.addLectureSlot(subjectId, day, start, end, from, until)
                     },
+                    onAddLectures = { subjectId, days, start, end, from, until ->
+                        viewModel.addLectureSlots(subjectId, days, start, end, from, until)
+                    },
                     onUpdateLecture = { entry, subjectId, day, start, end, from, until ->
                         viewModel.updateLectureSlot(entry, subjectId, day, start, end, from, until)
                     },
