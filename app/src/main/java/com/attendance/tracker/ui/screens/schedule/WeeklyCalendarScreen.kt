@@ -35,6 +35,7 @@ import com.attendance.tracker.data.model.AttendanceRecord
 import com.attendance.tracker.data.model.AttendanceStatus
 import com.attendance.tracker.data.model.ScheduleEntry
 import com.attendance.tracker.data.model.Subject
+import com.attendance.tracker.data.model.datesOverlap
 import com.attendance.tracker.data.model.getDisplayName
 import com.attendance.tracker.ui.theme.subjectAvatarColor
 import kotlinx.coroutines.delay
@@ -223,11 +224,36 @@ fun WeeklyCalendarScreen(
                 }
             },
             onSaveMultiple = { subjectId, days, start, end, from, until ->
-                if (onAddLectures != null) {
-                    onAddLectures(subjectId, days, start, end, from, until)
+                val existing = state.existingEntry
+                if (existing != null) {
+                    val updateDay = if (existing.dayOfWeek in days) existing.dayOfWeek else days.first()
+                    onUpdateLecture(existing, subjectId, updateDay, start, end, from, until)
+                    val additionalDays = (days - updateDay).filter { day ->
+                        !scheduleEntries.any { other ->
+                            other.id != existing.id &&
+                                other.subjectId == subjectId &&
+                                other.dayOfWeek == day &&
+                                other.startTime == start &&
+                                other.endTime == end &&
+                                datesOverlap(other.startDate, other.endDate, from, until)
+                        }
+                    }
+                    if (additionalDays.isNotEmpty()) {
+                        if (onAddLectures != null) {
+                            onAddLectures(subjectId, additionalDays, start, end, from, until)
+                        } else {
+                            additionalDays.forEach { day ->
+                                onAddLecture(subjectId, day, start, end, from, until)
+                            }
+                        }
+                    }
                 } else {
-                    days.forEach { day ->
-                        onAddLecture(subjectId, day, start, end, from, until)
+                    if (onAddLectures != null) {
+                        onAddLectures(subjectId, days, start, end, from, until)
+                    } else {
+                        days.forEach { day ->
+                            onAddLecture(subjectId, day, start, end, from, until)
+                        }
                     }
                 }
             },
@@ -742,14 +768,13 @@ private fun LectureEditorSheet(
     val isEditing = existing != null
 
     var subjectId by remember { mutableStateOf(state.subjectId) }
-    var singleDayOfWeek by remember { mutableStateOf(state.dayOfWeek) }
     var selectedDays by remember { mutableStateOf(setOf(state.dayOfWeek)) }
     var startTime by remember { mutableStateOf(state.startTime) }
     var endTime by remember { mutableStateOf(state.endTime) }
 
     val initialRecurrence = when {
         existing == null -> LectureRecurrence.ONGOING
-        existing.startDate != null && existing.startDate == existing.endDate -> LectureRecurrence.THIS_WEEK
+        existing.startDate != null && (existing.startDate == existing.endDate || (existing.endDate != null && existing.startDate == state.weekStart && existing.endDate == state.weekStart.plusDays(6))) -> LectureRecurrence.THIS_WEEK
         existing.endDate != null -> LectureRecurrence.UNTIL_DATE
         else -> LectureRecurrence.ONGOING
     }
@@ -820,80 +845,57 @@ private fun LectureEditorSheet(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            if (isEditing) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
                 Text(
-                    text = "Day",
+                    text = "Day(s)",
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                Spacer(modifier = Modifier.height(8.dp))
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    DayOfWeek.entries.forEach { day ->
-                        FilterChip(
-                            selected = singleDayOfWeek == day,
-                            onClick = { singleDayOfWeek = day },
-                            label = { Text(day.getDisplayName(TextStyle.SHORT, Locale.getDefault())) }
-                        )
-                    }
-                }
-            } else {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text(
-                        text = "Day(s)",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    AssistChip(
+                        onClick = {
+                            selectedDays = setOf(
+                                DayOfWeek.MONDAY,
+                                DayOfWeek.TUESDAY,
+                                DayOfWeek.WEDNESDAY,
+                                DayOfWeek.THURSDAY,
+                                DayOfWeek.FRIDAY
+                            )
+                        },
+                        label = { Text("Weekdays", style = MaterialTheme.typography.labelSmall) }
                     )
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        AssistChip(
-                            onClick = {
-                                selectedDays = setOf(
-                                    DayOfWeek.MONDAY,
-                                    DayOfWeek.TUESDAY,
-                                    DayOfWeek.WEDNESDAY,
-                                    DayOfWeek.THURSDAY,
-                                    DayOfWeek.FRIDAY
-                                )
-                            },
-                            label = { Text("Weekdays", style = MaterialTheme.typography.labelSmall) }
-                        )
-                        AssistChip(
-                            onClick = {
-                                selectedDays = DayOfWeek.entries.toSet()
-                            },
-                            label = { Text("All Days", style = MaterialTheme.typography.labelSmall) }
-                        )
-                    }
+                    AssistChip(
+                        onClick = {
+                            selectedDays = DayOfWeek.entries.toSet()
+                        },
+                        label = { Text("All Days", style = MaterialTheme.typography.labelSmall) }
+                    )
                 }
-                Spacer(modifier = Modifier.height(8.dp))
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    DayOfWeek.entries.forEach { day ->
-                        val isChosen = day in selectedDays
-                        FilterChip(
-                            selected = isChosen,
-                            onClick = {
-                                selectedDays = if (isChosen) {
-                                    if (selectedDays.size > 1) selectedDays - day else selectedDays
-                                } else {
-                                    selectedDays + day
-                                }
-                            },
-                            label = { Text(day.getDisplayName(TextStyle.SHORT, Locale.getDefault())) }
-                        )
-                    }
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                DayOfWeek.entries.forEach { day ->
+                    val isChosen = day in selectedDays
+                    FilterChip(
+                        selected = isChosen,
+                        onClick = {
+                            selectedDays = if (isChosen) {
+                                if (selectedDays.size > 1) selectedDays - day else selectedDays
+                            } else {
+                                selectedDays + day
+                            }
+                        },
+                        label = { Text(day.getDisplayName(TextStyle.SHORT, Locale.getDefault())) }
+                    )
                 }
             }
 
@@ -1071,20 +1073,19 @@ private fun LectureEditorSheet(
                         val (from, until) = when (recurrence) {
                             LectureRecurrence.ONGOING -> Pair(null, null)
                             LectureRecurrence.THIS_WEEK -> Pair(state.weekStart, state.weekStart.plusDays(6))
-                            LectureRecurrence.UNTIL_DATE -> Pair(state.weekStart, customEndDate)
+                            LectureRecurrence.UNTIL_DATE -> Pair(existing?.startDate ?: state.weekStart, customEndDate)
                         }
-                        if (isEditing) {
-                            onSave(subjectId, singleDayOfWeek, startTime, endTime, from, until)
+                        if (selectedDays.size == 1) {
+                            onSave(subjectId, selectedDays.first(), startTime, endTime, from, until)
                         } else {
                             onSaveMultiple(subjectId, selectedDays, startTime, endTime, from, until)
                         }
                         dismissAfterHide()
                     },
-                    enabled = !submitted && isTimeValid && selectedSubject != null && (isEditing || selectedDays.isNotEmpty())
+                    enabled = !submitted && isTimeValid && selectedSubject != null && selectedDays.isNotEmpty()
                 ) {
                     Text(
-                        if (isEditing) "Save"
-                        else if (selectedDays.size > 1) "Save (${selectedDays.size} Days)"
+                        if (selectedDays.size > 1) "Save (${selectedDays.size} Days)"
                         else "Save"
                     )
                 }
