@@ -216,7 +216,8 @@ private fun VacationAbsentView(openApp: Action) {
                 .fillMaxWidth()
                 .background(GlanceTheme.colors.secondaryContainer)
                 .cornerRadius(16.dp)
-                .padding(12.dp),
+                .padding(12.dp)
+                .clickable(openApp),
             horizontalAlignment = Alignment.Start
         ) {
             Text(

@@ -173,89 +173,95 @@ fun HomeScreen(
         containerColor = MaterialTheme.colorScheme.background,
         modifier = modifier
     ) { paddingValues ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-        ) {
-            if (belowTarget.isNotEmpty()) {
-                BelowTargetBanner(
-                    subjects = belowTarget,
-                    allSubjects = allSubjects,
-                    onSubjectClick = onSubjectClick
-                )
-            }
-
-            if (subjects.isEmpty()) {
-                EmptySubjectsState(
-                    modifier = Modifier.fillMaxSize()
-                )
-            } else if (hasAnySchedule && todaySlots.isEmpty()) {
-                NoClassesTodayState(
-                    modifier = Modifier.fillMaxSize(),
-                    onAddExtraClass = { showExtraClassDialog = true },
-                    onViewAllSubjects = onViewAllSubjects
-                )
-            } else {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(bottom = 88.dp)
-                ) {
-                    // Subject Cards – discrete lecture cards when multiple sessions exist today
-                    items(todaySlots, key = { "${it.subject.id}_${it.slotIndex}" }) { slotItem ->
-                    val subject = slotItem.subject
-                    val currentRecord = todayAttendance[subject.id]
-                    val trigger = slotUpdateTrigger
-                    val effStatus = remember(trigger, currentRecord, slotItem) {
-                        SlotAttendanceStore.getEffectiveSlotStatus(
-                            context, subject.id, today, slotItem.slotIndex, slotItem.totalSlots, currentRecord
+        if (subjects.isEmpty()) {
+            EmptySubjectsState(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues)
+            )
+        } else {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues),
+                contentPadding = PaddingValues(bottom = 88.dp)
+            ) {
+                if (belowTarget.isNotEmpty()) {
+                    item(key = "below_target_banner") {
+                        BelowTargetBanner(
+                            subjects = belowTarget,
+                            allSubjects = allSubjects,
+                            onSubjectClick = onSubjectClick
                         )
                     }
-                    SubjectCard(
-                        subject = subject,
-                        allSubjects = allSubjects,
-                        currentRecord = currentRecord,
-                        titleOverride = slotItem.title,
-                        effectiveStatus = effStatus,
-                        scheduledLectures = slotItem.totalSlots,
-                        onMarkPresent = {
-                            onMarkSlot(subject.id, slotItem.slotIndex, slotItem.totalSlots, AttendanceStatus.PRESENT)
-                        },
-                        onMarkAbsent = {
-                            onMarkSlot(subject.id, slotItem.slotIndex, slotItem.totalSlots, AttendanceStatus.ABSENT)
-                        },
-                        onMarkNoClass = {
-                            onMarkSlot(subject.id, slotItem.slotIndex, slotItem.totalSlots, AttendanceStatus.NO_CLASS)
-                        },
-                        onSetDayCounts = { p, a -> onSetDayCounts(subject.id, p, a) },
-                        onClearAttendance = { onClearAttendance(subject.id) },
-                        onEditClick = { onEditSubject(subject) },
-                        onCardClick = { onSubjectClick(subject) }
-                    )
                 }
 
-                // "Add Extra Class" button at the bottom of the list
-                item {
-                    OutlinedButton(
-                        onClick = { showExtraClassDialog = true },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 8.dp),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Icon(
-                            Icons.Default.Add,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp)
+                if (hasAnySchedule && todaySlots.isEmpty()) {
+                    item(key = "no_classes_today") {
+                        NoClassesTodayState(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 48.dp),
+                            onAddExtraClass = { showExtraClassDialog = true },
+                            onViewAllSubjects = onViewAllSubjects
                         )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Add Extra Class")
+                    }
+                } else {
+                    // Subject Cards – discrete lecture cards when multiple sessions exist today
+                    items(todaySlots, key = { "${it.subject.id}_${it.slotIndex}" }) { slotItem ->
+                        val subject = slotItem.subject
+                        val currentRecord = todayAttendance[subject.id]
+                        val trigger = slotUpdateTrigger
+                        val effStatus = remember(trigger, currentRecord, slotItem) {
+                            SlotAttendanceStore.getEffectiveSlotStatus(
+                                context, subject.id, today, slotItem.slotIndex, slotItem.totalSlots, currentRecord
+                            )
+                        }
+                        SubjectCard(
+                            subject = subject,
+                            allSubjects = allSubjects,
+                            currentRecord = currentRecord,
+                            titleOverride = slotItem.title,
+                            effectiveStatus = effStatus,
+                            scheduledLectures = slotItem.totalSlots,
+                            onMarkPresent = {
+                                onMarkSlot(subject.id, slotItem.slotIndex, slotItem.totalSlots, AttendanceStatus.PRESENT)
+                            },
+                            onMarkAbsent = {
+                                onMarkSlot(subject.id, slotItem.slotIndex, slotItem.totalSlots, AttendanceStatus.ABSENT)
+                            },
+                            onMarkNoClass = {
+                                onMarkSlot(subject.id, slotItem.slotIndex, slotItem.totalSlots, AttendanceStatus.NO_CLASS)
+                            },
+                            onSetDayCounts = { p, a -> onSetDayCounts(subject.id, p, a) },
+                            onClearAttendance = { onClearAttendance(subject.id) },
+                            onEditClick = { onEditSubject(subject) },
+                            onCardClick = { onSubjectClick(subject) }
+                        )
+                    }
+
+                    // "Add Extra Class" button at the bottom of the list
+                    item(key = "add_extra_class_btn") {
+                        OutlinedButton(
+                            onClick = { showExtraClassDialog = true },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 8.dp),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.Add,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Add Extra Class")
+                        }
                     }
                 }
             }
         }
     }
-}
 
     // Extra Class Dialog
     if (showExtraClassDialog) {
@@ -456,18 +462,18 @@ private fun BelowTargetBanner(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 6.dp)
+            .padding(horizontal = 16.dp, vertical = 4.dp)
             .animateContentSize(),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f)
+            containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.35f)
         ),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(12.dp),
         border = androidx.compose.foundation.BorderStroke(
             1.dp,
-            MaterialTheme.colorScheme.error.copy(alpha = 0.25f)
+            MaterialTheme.colorScheme.error.copy(alpha = 0.18f)
         )
     ) {
-        Column(modifier = Modifier.padding(14.dp)) {
+        Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
             // Header Row (Clickable)
             Row(
                 modifier = Modifier
@@ -478,67 +484,46 @@ private fun BelowTargetBanner(
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                     modifier = Modifier.weight(1f)
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(28.dp)
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.error.copy(alpha = 0.15f)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Warning,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.error,
-                            modifier = Modifier.size(16.dp)
-                        )
-                    }
-                    Column {
-                        Text(
-                            text = "${subjects.size} subject${if (subjects.size != 1) "s" else ""} below target",
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onErrorContainer
-                        )
-                        Text(
-                            text = if (expanded) "Tap to collapse" else "Tap to see recovery details",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.75f)
-                        )
-                    }
+                    Icon(
+                        imageVector = Icons.Default.Warning,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Text(
+                        text = "${subjects.size} subject${if (subjects.size != 1) "s" else ""} below target",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onErrorContainer
+                    )
                 }
 
-                Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.1f)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(2.dp)
                 ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = if (expanded) "Hide" else "Details",
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onErrorContainer
-                        )
-                        Spacer(modifier = Modifier.width(2.dp))
-                        Icon(
-                            imageVector = if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onErrorContainer,
-                            modifier = Modifier.size(16.dp)
-                        )
-                    }
+                    Text(
+                        text = if (expanded) "Hide" else "Details",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.85f)
+                    )
+                    Icon(
+                        imageVector = if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.85f),
+                        modifier = Modifier.size(16.dp)
+                    )
                 }
             }
 
             // Expanded content: structured cards
             if (expanded) {
-                Spacer(modifier = Modifier.height(12.dp))
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Spacer(modifier = Modifier.height(10.dp))
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     subjects.forEach { subject ->
                         val needed = subject.classesToAttend
                         val currentPct = subject.currentAttendancePercentage

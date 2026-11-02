@@ -53,8 +53,8 @@ private val HOUR_HEIGHT = 64.dp
 private val GRID_TOP_PADDING = 8.dp
 private val DAY_COLUMN_WIDTH = 108.dp
 private val TIME_AXIS_WIDTH = 64.dp
-private const val DEFAULT_GRID_START_HOUR = 7
-private const val DEFAULT_GRID_END_HOUR = 21 // exclusive
+private const val DEFAULT_GRID_START_HOUR = 6
+private const val DEFAULT_GRID_END_HOUR = 24 // exclusive (6 AM through 11 PM/midnight)
 
 private val timeLabelFormatter = DateTimeFormatter.ofPattern("h a")
 private val timeSheetFormatter = DateTimeFormatter.ofPattern("h:mm a")
