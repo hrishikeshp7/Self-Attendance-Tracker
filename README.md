@@ -25,21 +25,41 @@ Attendance Tracker helps students keep track of their daily attendance, ensuring
 ## 🚀 How It Works
 
 ```mermaid
-graph TD
-    A[Add Subjects] -->|Set minimum % required| B(Set Weekly Schedule)
-    B --> C{Daily Tracking}
-    C -->|Mark Present| D[Stats Update: % Increases]
-    C -->|Mark Absent| E[Stats Update: % Decreases]
-    C -->|Mark No Class| F[Stats Unchanged]
-    D --> G[Review Calendar & Analytics]
-    E --> G
-    F --> G
+flowchart TD
+    subgraph Setup["1. Setup & Timetable"]
+        A["Add Subjects & Target %"] --> B["Build Timetable & Folders"]
+        CSV["Bulk CSV Import"] -.-> A
+    end
+
+    subgraph Tracking["2. Daily Attendance Tracking"]
+        B --> C{"Tracking Channels"}
+        C -->|"Home Dashboard"| D["Mark Present / Absent / No Class"]
+        C -->|"Glance Widgets"| W["Interactive 5x2 Widget"]
+        C -->|"Time-Off Mode"| V["Day-by-Day Vacation Sync"]
+        W --> D
+        V --> D
+        X["+ Add Extra Class"] -.-> D
+    end
+
+    subgraph Logic["3. Live Attendance Engine"]
+        D --> E["Update Records & Recalculate %"]
+        E --> F{"Target Check"}
+        F -->|"At or Above Target"| G["Safe: Bunk Calculator"]
+        F -->|"Below Target"| H["Alert: Classes Needed to Recover"]
+    end
+
+    subgraph Insights["4. Insights & Backups"]
+        G --> I["Color-Coded Calendar History"]
+        H --> I
+        I --> J["Analytics & Monthly Trends"]
+        J --> K["JSON Backup & CSV Export"]
+    end
 ```
 
-1. **Setup**: Add your subjects and define the minimum required attendance (e.g., 75%).
-2. **Schedule**: Configure which subjects happen on which days.
-3. **Track**: Mark your daily attendance straight from the Home screen.
-4. **Review**: Check your calendar history and overall statistics at a glance.
+1. **Setup & Timetable**: Add subjects, set individual target attendance percentages (e.g., 75%), organize folders, or import your timetable in bulk via CSV.
+2. **Flexible Daily Tracking**: Mark Present, Absent, or No Class from the app dashboard, interactive Glance home screen widgets, or scheduled Vacation/Time-off mode.
+3. **Smart Calculations & Recovery**: Instantly see your attendance percentage, how many classes you can safely skip, or exactly how many consecutive classes you must attend to get back on track.
+4. **Insights & Backups**: Review monthly calendar heatmaps, track attendance trends, and safeguard your data with JSON backup/restore and CSV exports.
 
 ---
 
