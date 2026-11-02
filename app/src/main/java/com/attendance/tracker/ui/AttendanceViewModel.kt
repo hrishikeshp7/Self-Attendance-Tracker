@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.room.withTransaction
 import com.attendance.tracker.backup.BackupManager
 import com.attendance.tracker.data.SlotAttendanceStore
+import com.attendance.tracker.data.TimeOffStore
 import com.attendance.tracker.data.database.AttendanceDatabase
 import com.attendance.tracker.data.model.AttendanceRecord
 import com.attendance.tracker.data.model.AttendanceStatus
@@ -85,8 +86,11 @@ class AttendanceViewModel(application: Application) : AndroidViewModel(applicati
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
     init {
-        // Load today's attendance when ViewModel is created
-        loadAttendanceForDate(LocalDate.now())
+        // Sync active time-off rules, purge any future records, and load today's attendance
+        viewModelScope.launch {
+            TimeOffStore.syncActiveTimeOff(getApplication<Application>(), repository)
+            loadAttendanceForDate(LocalDate.now())
+        }
         // Initialize theme preferences
         viewModelScope.launch {
             themeRepository.initializeDefaultIfNeeded()
@@ -282,18 +286,22 @@ class AttendanceViewModel(application: Application) : AndroidViewModel(applicati
     ) {
         viewModelScope.launch {
             attendanceMutex.withLock {
-                val affected = repository.applyTimeOff(startDate, endDate, status, subjectIds)
+                val today = LocalDate.now()
                 val context = getApplication<Application>()
+                TimeOffStore.recordTimeOff(context, startDate, endDate, status, subjectIds)
+                val affected = repository.applyTimeOff(startDate, endDate, status, subjectIds, today = today)
                 val allSubs = repository.getAllSubjectsOnce().filter { !it.isFolder }
                 val targetIds = subjectIds ?: allSubs.map { it.id }.toSet()
-                var curr = startDate
-                while (!curr.isAfter(endDate)) {
-                    for (subId in targetIds) {
-                        SlotAttendanceStore.clearSlotsForDate(context, subId, curr, 8)
+                val effectiveEnd = if (status != null && endDate.isAfter(today)) today else endDate
+                if (!effectiveEnd.isBefore(startDate)) {
+                    var curr = startDate
+                    while (!curr.isAfter(effectiveEnd)) {
+                        for (subId in targetIds) {
+                            SlotAttendanceStore.clearSlotsForDate(context, subId, curr, 8)
+                        }
+                        curr = curr.plusDays(1)
                     }
-                    curr = curr.plusDays(1)
                 }
-                val today = LocalDate.now()
                 if (!today.isBefore(startDate) && !today.isAfter(endDate)) {
                     loadAttendanceForDate(today)
                 }

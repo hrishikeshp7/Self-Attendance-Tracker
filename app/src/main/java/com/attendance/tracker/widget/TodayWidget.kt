@@ -18,6 +18,7 @@ import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
 import androidx.glance.GlanceTheme
 import androidx.glance.LocalContext
+import androidx.glance.action.Action
 import androidx.glance.action.ActionParameters
 import androidx.glance.action.actionParametersOf
 import androidx.glance.action.clickable
@@ -40,6 +41,7 @@ import androidx.glance.layout.Spacer
 import androidx.glance.layout.fillMaxSize
 import androidx.glance.layout.fillMaxWidth
 import androidx.glance.layout.padding
+import androidx.glance.layout.height
 import androidx.glance.layout.width
 import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
@@ -47,6 +49,7 @@ import androidx.glance.text.TextStyle
 import androidx.glance.unit.ColorProvider
 import com.attendance.tracker.MainActivity
 import com.attendance.tracker.data.SlotAttendanceStore
+import com.attendance.tracker.data.TimeOffStore
 import com.attendance.tracker.data.database.AttendanceDatabase
 import com.attendance.tracker.data.model.AttendanceRecord
 import com.attendance.tracker.data.model.AttendanceStatus
@@ -83,7 +86,12 @@ private data class TodayRow(
     fun stableId(): Long = (subject.id to listOf(slotIndex, slotStatus, label, subject.presentLectures, subject.totalLectures, subject.requiredAttendance)).hashCode().toLong()
 }
 
-private data class TodayData(val date: LocalDate, val rows: List<TodayRow>, val hasSchedule: Boolean)
+private data class TodayData(
+    val date: LocalDate,
+    val rows: List<TodayRow>,
+    val hasSchedule: Boolean,
+    val isVacationAbsent: Boolean = false
+)
 
 /**
  * The one home-screen widget: today's classes with their standing and Present/Absent buttons.
@@ -91,6 +99,7 @@ private data class TodayData(val date: LocalDate, val rows: List<TodayRow>, val 
  */
 class TodayWidget : GlanceAppWidget() {
 
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val db = AttendanceDatabase.getDatabase(context)
         val repository = AttendanceRepository(db.subjectDao(), db.attendanceDao(), db.scheduleDao())
@@ -98,6 +107,7 @@ class TodayWidget : GlanceAppWidget() {
         // updateAll but does not re-run provideGlance, so a one-off snapshot here went stale.
         // The date is part of the flow too, so a session that outlives midnight rolls over.
         val flow = currentDateFlow().flatMapLatest { today ->
+            TimeOffStore.syncActiveTimeOff(context, repository, today)
             combine(
                 repository.allSubjects,
                 repository.allScheduleEntries,
@@ -152,7 +162,11 @@ class TodayWidget : GlanceAppWidget() {
                 listOf(TodayRow(subject, marks[subject.id], label, 0, 1, effStatus))
             }
         }
-        return TodayData(today, rows, schedule.isNotEmpty())
+
+        val allAbsent = rows.isNotEmpty() && rows.all { it.slotStatus == AttendanceStatus.ABSENT }
+        val isVacationAbsent = allAbsent && TimeOffStore.isVacationAbsent(context, today)
+
+        return TodayData(today, rows, schedule.isNotEmpty(), isVacationAbsent)
     }
 }
 
@@ -177,12 +191,61 @@ private fun TodayContent(data: TodayData) {
                 style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = 13.sp),
                 modifier = GlanceModifier.clickable(openApp)
             )
+        } else if (data.isVacationAbsent) {
+            VacationAbsentView(openApp)
         } else {
             LazyColumn(modifier = GlanceModifier.fillMaxSize()) {
                 // The list adapter caches rows by id; fold the displayed state into it so a mark
                 // actually re-renders the row instead of showing the stale one.
                 items(data.rows, itemId = { it.stableId() }) { SubjectRow(it) }
             }
+        }
+    }
+}
+
+@Composable
+private fun VacationAbsentView(openApp: Action) {
+    Box(
+        modifier = GlanceModifier
+            .fillMaxSize()
+            .clickable(openApp),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            modifier = GlanceModifier
+                .fillMaxWidth()
+                .background(GlanceTheme.colors.secondaryContainer)
+                .cornerRadius(16.dp)
+                .padding(12.dp),
+            horizontalAlignment = Alignment.Start
+        ) {
+            Text(
+                text = "Vacations are set for now",
+                style = TextStyle(
+                    color = GlanceTheme.colors.onSecondaryContainer,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            )
+            Spacer(GlanceModifier.height(4.dp))
+            Text(
+                text = "All subjects are being marked absent.",
+                style = TextStyle(
+                    color = GlanceTheme.colors.onSecondaryContainer,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Normal
+                ),
+                maxLines = 2
+            )
+            Spacer(GlanceModifier.height(6.dp))
+            Text(
+                text = "Tap to open app",
+                style = TextStyle(
+                    color = GlanceTheme.colors.primary,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Medium
+                )
+            )
         }
     }
 }
@@ -341,6 +404,9 @@ class TodayWidgetReceiver : GlanceAppWidgetReceiver() {
  */
 class WidgetDayRolloverWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {
+        val db = AttendanceDatabase.getDatabase(applicationContext)
+        val repository = AttendanceRepository(db.subjectDao(), db.attendanceDao(), db.scheduleDao())
+        TimeOffStore.syncActiveTimeOff(applicationContext, repository)
         refreshAllWidgets(applicationContext)
         return Result.success()
     }

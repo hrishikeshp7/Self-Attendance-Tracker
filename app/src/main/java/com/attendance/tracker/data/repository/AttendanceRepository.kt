@@ -196,7 +196,8 @@ class AttendanceRepository(
         startDate: LocalDate,
         endDate: LocalDate,
         status: AttendanceStatus?,
-        subjectIds: Set<Long>? = null
+        subjectIds: Set<Long>? = null,
+        today: LocalDate = LocalDate.now()
     ): Int {
         if (endDate.isBefore(startDate)) return 0
         val scheduleList = scheduleDao.getAllScheduleEntriesOnce()
@@ -204,9 +205,14 @@ class AttendanceRepository(
         val allSubIds = actualSubs.map { it.id }.toSet()
         val targetSubjectIds = subjectIds ?: allSubIds
 
+        // Never mark future dates in advance; only mark dates up to today.
+        // When resetting (status == null), allow clearing up to endDate.
+        val effectiveEnd = if (status != null && endDate.isAfter(today)) today else endDate
+        if (effectiveEnd.isBefore(startDate)) return 0
+
         var affectedSlots = 0
         var curr = startDate
-        while (!curr.isAfter(endDate)) {
+        while (!curr.isAfter(effectiveEnd)) {
             val date = curr
             if (scheduleList.isNotEmpty()) {
                 val dayEntries = scheduleList.filter { it.occursOn(date) && it.subjectId in targetSubjectIds }

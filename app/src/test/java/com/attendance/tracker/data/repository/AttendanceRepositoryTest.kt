@@ -370,7 +370,7 @@ class AttendanceRepositoryTest {
     }
 
     @Test
-    fun `applyTimeOff marks holiday across week without affecting subject lecture counts`() = runBlocking {
+    fun `applyTimeOff does not mark future dates in advance and only marks up to today`() = runBlocking {
         subjectDao.insertSubject(Subject(id = 1L, name = "Math", totalLectures = 10, presentLectures = 8, absentLectures = 2))
         subjectDao.insertSubject(Subject(id = 2L, name = "Physics", totalLectures = 5, presentLectures = 4, absentLectures = 1))
 
@@ -382,30 +382,30 @@ class AttendanceRepositoryTest {
         val monday = LocalDate.of(2026, 11, 2) // Monday
         val friday = LocalDate.of(2026, 11, 6) // Friday
 
-        val affected = repository.applyTimeOff(monday, friday, AttendanceStatus.NO_CLASS)
-        assertEquals(3, affected)
+        // Calling on Monday (today = monday) for a Mon-Fri holiday:
+        // Must only mark Monday; Tuesday and Wednesday must NOT be touched in advance.
+        val affected = repository.applyTimeOff(monday, friday, AttendanceStatus.NO_CLASS, today = monday)
+        assertEquals(1, affected)
 
-        // Totals must remain unchanged for holidays
-        val math = repository.getSubjectById(1L)!!
-        assertEquals(10, math.totalLectures)
-        assertEquals(8, math.presentLectures)
-        assertEquals(2, math.absentLectures)
-
-        val physics = repository.getSubjectById(2L)!!
-        assertEquals(5, physics.totalLectures)
-        assertEquals(4, physics.presentLectures)
-        assertEquals(1, physics.absentLectures)
-
-        // Records must be marked NO_CLASS
+        // Records for Monday must be marked NO_CLASS
         val mathMon = attendanceDao.getAttendanceRecord(1L, monday)!!
         assertEquals(AttendanceStatus.NO_CLASS, mathMon.status)
 
-        val physicsTue = attendanceDao.getAttendanceRecord(2L, monday.plusDays(1))!!
+        // Tuesday (future) must NOT have attendance records
+        assertNull(attendanceDao.getAttendanceRecord(2L, monday.plusDays(1)))
+        // Wednesday (future) must NOT have attendance records
+        assertNull(attendanceDao.getAttendanceRecord(1L, monday.plusDays(2)))
+
+        // When Tuesday arrives (today = tuesday), applying for Tuesday marks Tuesday
+        val tuesday = monday.plusDays(1)
+        val affectedTue = repository.applyTimeOff(tuesday, tuesday, AttendanceStatus.NO_CLASS, today = tuesday)
+        assertEquals(1, affectedTue)
+        val physicsTue = attendanceDao.getAttendanceRecord(2L, tuesday)!!
         assertEquals(AttendanceStatus.NO_CLASS, physicsTue.status)
     }
 
     @Test
-    fun `applyTimeOff marks leave bunk across custom range and increments absent lectures`() = runBlocking {
+    fun `applyTimeOff marks leave bunk only up to today and updates stats day by day`() = runBlocking {
         subjectDao.insertSubject(Subject(id = 1L, name = "Math", totalLectures = 10, presentLectures = 8, absentLectures = 2))
 
         // Math scheduled 2 times on Monday, 1 time on Tuesday
@@ -416,20 +416,33 @@ class AttendanceRepositoryTest {
         val monday = LocalDate.of(2026, 11, 2)
         val tuesday = LocalDate.of(2026, 11, 3)
 
-        val affected = repository.applyTimeOff(monday, tuesday, AttendanceStatus.ABSENT)
-        assertEquals(3, affected) // 2 on Mon + 1 on Tue
+        // Apply on Monday (today = monday) for Mon-Tue absent
+        // Only Monday (2 slots) is marked; Tuesday (future) is NOT touched yet
+        val affectedMon = repository.applyTimeOff(monday, tuesday, AttendanceStatus.ABSENT, today = monday)
+        assertEquals(2, affectedMon) // 2 slots on Monday
 
-        val math = repository.getSubjectById(1L)!!
-        assertEquals(5, math.absentLectures) // was 2 + 3 = 5
-        assertEquals(8, math.presentLectures)
-        assertEquals(13, math.totalLectures)
+        val mathMon = repository.getSubjectById(1L)!!
+        assertEquals(4, mathMon.absentLectures) // was 2 + 2 = 4 (NOT 5!)
+        assertEquals(8, mathMon.presentLectures)
+        assertEquals(12, mathMon.totalLectures)
 
         val recordMon = attendanceDao.getAttendanceRecord(1L, monday)!!
         assertEquals(AttendanceStatus.ABSENT, recordMon.status)
         assertEquals(2, recordMon.count)
 
-        // Reset / Clear Time Off
-        val cleared = repository.applyTimeOff(monday, tuesday, null)
+        // Tuesday is still null in advance
+        assertNull(attendanceDao.getAttendanceRecord(1L, tuesday))
+
+        // When Tuesday arrives (today = tuesday): mark Tuesday
+        val affectedTue = repository.applyTimeOff(tuesday, tuesday, AttendanceStatus.ABSENT, today = tuesday)
+        assertEquals(1, affectedTue)
+
+        val mathTue = repository.getSubjectById(1L)!!
+        assertEquals(5, mathTue.absentLectures) // now 4 + 1 = 5
+        assertEquals(13, mathTue.totalLectures)
+
+        // Reset / Clear Time Off across both days
+        val cleared = repository.applyTimeOff(monday, tuesday, null, today = tuesday)
         assertEquals(3, cleared)
 
         val mathAfterClear = repository.getSubjectById(1L)!!
