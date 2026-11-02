@@ -28,23 +28,34 @@ data class Subject(
     val isAboveRequired: Boolean
         get() = if (totalLectures > 0) presentLectures * 100L >= requiredAttendance.toLong() * totalLectures
                 else requiredAttendance <= 0
+
+    val displayPercentage: Int
+        get() {
+            if (totalLectures == 0) return 0
+            val rounded = kotlin.math.round(currentAttendancePercentage).toInt()
+            return if (!isAboveRequired && rounded >= requiredAttendance && requiredAttendance > 0) {
+                requiredAttendance - 1
+            } else if (isAboveRequired && rounded < requiredAttendance) {
+                requiredAttendance
+            } else {
+                rounded
+            }
+        }
     
     /**
      * Calculate how many classes need to be attended to meet the required attendance
      * Returns 0 if already above required attendance
      */
+    val isTargetUnreachable: Boolean
+        get() = requiredAttendance >= 100 && presentLectures < totalLectures
+
     val classesToAttend: Int
         get() {
             if (isAboveRequired || totalLectures == 0) return 0
             
             // Edge case: if 100% required and already missed classes, impossible to reach
-            if (requiredAttendance >= 100) {
-                return if (presentLectures < totalLectures) {
-                    // Can't reach 100% if already missed classes - return a large number to indicate impossibility
-                    999
-                } else {
-                    0
-                }
+            if (isTargetUnreachable) {
+                return 999
             }
             
             // Formula: (P + x) / (T + x) = R/100
@@ -82,8 +93,7 @@ data class Subject(
 }
 
 /**
- * One-line standing for the subject card. classesToAttend/classesCanBunk use 999 as an
- * "impossible"/"unlimited" marker, which must never reach the screen as a number.
+ * One-line standing for the subject card.
  */
 val Subject.insight: String
     get() = when {
@@ -91,7 +101,7 @@ val Subject.insight: String
         isAboveRequired && requiredAttendance <= 0 -> "No minimum required"
         isAboveRequired && classesCanBunk > 0 -> "Can skip $classesCanBunk more"
         isAboveRequired -> "At minimum threshold"
-        classesToAttend >= 999 -> "Can't reach $requiredAttendance%"
+        isTargetUnreachable -> "Can't reach $requiredAttendance%"
         else -> "Need $classesToAttend more class${if (classesToAttend != 1) "es" else ""}"
     }
 

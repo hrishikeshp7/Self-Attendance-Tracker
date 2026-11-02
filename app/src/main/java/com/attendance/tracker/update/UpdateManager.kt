@@ -44,6 +44,8 @@ suspend fun checkForUpdate(context: Context): UpdateInfo? = withContext(Dispatch
         conn.setRequestProperty("Accept", "application/vnd.github+json")
         conn.connectTimeout = 15_000
         conn.readTimeout = 15_000
+        val code = conn.responseCode
+        if (code != HttpURLConnection.HTTP_OK) return@withContext null
         val json = JSONObject(conn.inputStream.bufferedReader().readText())
         val tag = json.getString("tag_name")
         if (!isNewer(parseVersion(tag), parseVersion(currentVersionName(context)))) return@withContext null
@@ -56,6 +58,8 @@ suspend fun checkForUpdate(context: Context): UpdateInfo? = withContext(Dispatch
             apkUrl = apk.getString("browser_download_url"),
             notes = json.optString("body")
         )
+    } catch (_: Exception) {
+        null
     } finally {
         conn.disconnect()
     }

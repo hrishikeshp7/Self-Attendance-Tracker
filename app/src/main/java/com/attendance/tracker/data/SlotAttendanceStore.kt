@@ -33,12 +33,29 @@ object SlotAttendanceStore {
         }
     }
 
-    fun clearSlotsForDate(context: Context, subjectId: Long, date: LocalDate, totalSlots: Int) {
+    fun clearSlotsForDate(context: Context, subjectId: Long, date: LocalDate, totalSlots: Int = 16) {
         val editor = prefs(context).edit()
-        for (i in 0 until totalSlots) {
+        val limit = maxOf(totalSlots, 16)
+        for (i in 0 until limit) {
             editor.remove("${subjectId}_${date}_$i")
         }
         editor.apply()
+    }
+
+    fun clearAllSlotsForSubject(context: Context, subjectId: Long) {
+        val p = prefs(context)
+        val prefix = "${subjectId}_"
+        val editor = p.edit()
+        for (key in p.all.keys) {
+            if (key.startsWith(prefix)) {
+                editor.remove(key)
+            }
+        }
+        editor.apply()
+    }
+
+    fun clear(context: Context) {
+        prefs(context).edit().clear().apply()
     }
 
     /**
@@ -89,22 +106,43 @@ object SlotAttendanceStore {
         totalSlots: Int,
         record: AttendanceRecord?
     ): AttendanceStatus? {
+        if (record == null) {
+            // Clean up any stale leftover preferences if record was deleted/cleared
+            if (getSlotStatus(context, subjectId, date, slotIndex) != null) {
+                clearSlotsForDate(context, subjectId, date, totalSlots)
+            }
+            return null
+        }
+        if (record.status == AttendanceStatus.NO_CLASS) return AttendanceStatus.NO_CLASS
+
         val explicit = getSlotStatus(context, subjectId, date, slotIndex)
-        if (explicit != null) return explicit
+        if (explicit != null) {
+            val isValid = when (explicit) {
+                AttendanceStatus.PRESENT -> record.presentCount > 0
+                AttendanceStatus.ABSENT -> record.absentCount > 0
+                AttendanceStatus.NO_CLASS -> record.status == AttendanceStatus.NO_CLASS
+            }
+            if (isValid) return explicit
+        }
 
         if (totalSlots > 1) {
             var anyExplicit = false
             for (i in 0 until totalSlots) {
-                if (getSlotStatus(context, subjectId, date, i) != null) {
-                    anyExplicit = true
-                    break
+                val st = getSlotStatus(context, subjectId, date, i)
+                if (st != null) {
+                    val valid = when (st) {
+                        AttendanceStatus.PRESENT -> record.presentCount > 0
+                        AttendanceStatus.ABSENT -> record.absentCount > 0
+                        AttendanceStatus.NO_CLASS -> record.status == AttendanceStatus.NO_CLASS
+                    }
+                    if (valid) {
+                        anyExplicit = true
+                        break
+                    }
                 }
             }
             if (anyExplicit) return null
         }
-
-        if (record == null) return null
-        if (record.status == AttendanceStatus.NO_CLASS) return AttendanceStatus.NO_CLASS
 
         // If recorded as aggregate counts:
         return when {

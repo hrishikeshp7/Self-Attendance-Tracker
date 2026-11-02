@@ -51,6 +51,7 @@ fun SubjectCalendarScreen(
     onSetDayCounts: (LocalDate, Int, Int) -> Unit,
     onNavigateBack: () -> Unit,
     onApplyRangeTimeOff: (startDate: LocalDate, endDate: LocalDate, status: AttendanceStatus?) -> Unit = { _, _, _ -> },
+    onGetRangeRecords: (suspend (LocalDate, LocalDate) -> List<AttendanceRecord>)? = null,
     modifier: Modifier = Modifier,
     scheduleEntries: List<ScheduleEntry> = emptyList()
 ) {
@@ -191,9 +192,18 @@ fun SubjectCalendarScreen(
                 // (Same normalization is applied in CalendarView/MonthCalendarGrid for visual highlighting.)
                 val normalizedStart = minOf(rangeStart!!, rangeEnd!!)
                 val normalizedEnd   = maxOf(rangeStart!!, rangeEnd!!)
-                val rangeRecords = remember(subjectRecords, normalizedStart, normalizedEnd) {
+                val subjectRangeRecords = remember(subjectRecords, normalizedStart, normalizedEnd) {
                     subjectRecords.filter {
                         !it.date.isBefore(normalizedStart) && !it.date.isAfter(normalizedEnd)
+                    }
+                }
+                var rangeRecords by remember { mutableStateOf(subjectRangeRecords) }
+                LaunchedEffect(subjectRangeRecords) {
+                    rangeRecords = subjectRangeRecords
+                }
+                LaunchedEffect(normalizedStart, normalizedEnd, subject.id) {
+                    if (onGetRangeRecords != null) {
+                        rangeRecords = onGetRangeRecords(normalizedStart, normalizedEnd).filter { it.subjectId == subject.id }
                     }
                 }
                 // Sum each day's lecture count rather than counting matching days, so a

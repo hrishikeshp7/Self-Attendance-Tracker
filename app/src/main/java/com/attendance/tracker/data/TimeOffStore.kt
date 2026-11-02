@@ -43,7 +43,13 @@ object TimeOffStore {
             if (rule != null) {
                 val overlaps = !startDate.isAfter(rule.endDate) && !endDate.isBefore(rule.startDate)
                 if (overlaps) {
-                    iterator.remove()
+                    val subjectOverlap = when {
+                        subjectIds == null || rule.subjectIds == null -> true
+                        else -> subjectIds.any { it in rule.subjectIds }
+                    }
+                    if (subjectOverlap) {
+                        iterator.remove()
+                    }
                 }
             }
         }
@@ -56,12 +62,18 @@ object TimeOffStore {
         prefs.edit().putStringSet(KEY_RULES, current).apply()
     }
 
-    fun isVacationAbsent(context: Context, date: LocalDate): Boolean =
-        isVacationAbsent(prefs(context), date)
+    fun isVacationAbsent(context: Context, date: LocalDate, subjectIds: Set<Long>? = null): Boolean =
+        isVacationAbsent(prefs(context), date, subjectIds)
 
-    fun isVacationAbsent(prefs: SharedPreferences, date: LocalDate): Boolean {
+    fun isVacationAbsent(prefs: SharedPreferences, date: LocalDate, subjectIds: Set<Long>? = null): Boolean {
         return getActiveRules(prefs).any { rule ->
-            rule.status == AttendanceStatus.ABSENT && !date.isBefore(rule.startDate) && !date.isAfter(rule.endDate)
+            val dateMatches = rule.status == AttendanceStatus.ABSENT && !date.isBefore(rule.startDate) && !date.isAfter(rule.endDate)
+            if (!dateMatches) return@any false
+            if (subjectIds == null) {
+                rule.subjectIds == null
+            } else {
+                rule.subjectIds == null || subjectIds.all { it in rule.subjectIds }
+            }
         }
     }
 
@@ -119,8 +131,19 @@ object TimeOffStore {
             var d = rule.startDate
             while (!d.isAfter(maxDate)) {
                 val existing = repository.getAttendanceInRangeOnce(d, d)
-                if (existing.isEmpty()) {
-                    repository.applyTimeOff(d, d, rule.status, rule.subjectIds, today = today)
+                val targetIds = rule.subjectIds
+                val needsSync = if (targetIds == null) {
+                    existing.isEmpty()
+                } else {
+                    val markedSubjectIds = existing.map { it.subjectId }.toSet()
+                    targetIds.any { it !in markedSubjectIds }
+                }
+                if (needsSync) {
+                    val unrecordedIds = if (targetIds == null) null else {
+                        val markedSubjectIds = existing.map { it.subjectId }.toSet()
+                        targetIds.filter { it !in markedSubjectIds }.toSet()
+                    }
+                    repository.applyTimeOff(d, d, rule.status, unrecordedIds ?: rule.subjectIds, today = today)
                 }
                 d = d.plusDays(1)
             }

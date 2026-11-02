@@ -145,12 +145,12 @@ object BackupManager {
                     dayOfWeek = DayOfWeek.valueOf(obj.getString("dayOfWeek")),
                     // Older backups predate per-slot times — default to 9–10 AM, same as a
                     // fresh migration, rather than failing to restore the whole backup.
-                    startTime = obj.optString("startTime", "09:00").let { LocalTime.parse(it) },
-                    endTime = obj.optString("endTime", "10:00").let { LocalTime.parse(it) },
+                    startTime = obj.optString("startTime").takeIf { it.isNotBlank() }?.let { runCatching { LocalTime.parse(it) }.getOrNull() } ?: LocalTime.of(9, 0),
+                    endTime = obj.optString("endTime").takeIf { it.isNotBlank() }?.let { runCatching { LocalTime.parse(it) }.getOrNull() } ?: LocalTime.of(10, 0),
                     isScheduled = obj.optBoolean("isScheduled", true),
                     // Absent in older backups, and when the slot has no date limit
-                    startDate = obj.optString("startDate").takeIf { it.isNotBlank() }?.let { LocalDate.parse(it) },
-                    endDate = obj.optString("endDate").takeIf { it.isNotBlank() }?.let { LocalDate.parse(it) }
+                    startDate = obj.optString("startDate").takeIf { it.isNotBlank() }?.let { runCatching { LocalDate.parse(it) }.getOrNull() },
+                    endDate = obj.optString("endDate").takeIf { it.isNotBlank() }?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
                 )
             }
 

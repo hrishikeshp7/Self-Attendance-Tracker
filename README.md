@@ -2,15 +2,15 @@
 
 # 🎓 Attendance Tracker
 
-**A beautiful, modern Android application for effortlessly tracking and managing your class attendance.**
+**A native Android app for tracking class attendance, hitting your target percentage, and knowing exactly when you can skip a lecture.**
 
 [![Build APK](https://github.com/hrishikeshp7/Self-Attendance-Tracker/actions/workflows/build.yml/badge.svg)](https://github.com/hrishikeshp7/Self-Attendance-Tracker/actions/workflows/build.yml)
 [![Kotlin](https://img.shields.io/badge/kotlin-%237F52FF.svg?style=flat&logo=kotlin&logoColor=white)](https://kotlinlang.org/)
 [![Jetpack Compose](https://img.shields.io/badge/Jetpack%20Compose-4285F4?style=flat&logo=android&logoColor=white)](https://developer.android.com/jetpack/compose)
 [![Material Design 3](https://img.shields.io/badge/Material%203-EADDFF?style=flat&logo=materialdesign&logoColor=black)](https://m3.material.io/)
-[![License](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPLv3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0.html)
 
-*Built with Kotlin, Jetpack Compose, and Room Database. Entirely vibe-coded with AI as a test project.*
+*Built with Kotlin, Jetpack Compose, Room, and Material 3. Entirely vibe-coded with AI as a test project.*
 
 </div>
 
@@ -18,7 +18,7 @@
 
 ## 🌟 Overview
 
-Attendance Tracker helps students keep track of their daily attendance, ensuring they meet their required attendance criteria without any stress. With an intuitive interface, it provides deep insights, monthly calendar views, and smart scheduling.
+Attendance Tracker keeps a per-lecture record of your attendance and turns it into a clear answer: how many classes you can still skip, or how many you must attend to get back above your target. It supports weekly timetables with real date ranges, multiple lectures per day, folders, holidays and leave, home-screen marking, calendar export, and local or Google Drive backups.
 
 ---
 
@@ -27,39 +27,39 @@ Attendance Tracker helps students keep track of their daily attendance, ensuring
 ```mermaid
 flowchart TD
     subgraph Setup["1. Setup & Timetable"]
-        A["Add Subjects & Target %"] --> B["Build Timetable & Folders"]
+        A["Add Subjects, Folders & Target %"] --> B["Build Weekly Timetable"]
         CSV["Bulk CSV Import"] -.-> A
+        AI["AI Timetable Import"] -.-> A
+        CAL["Calendar Sync / .ics Export"] -.-> B
     end
 
     subgraph Tracking["2. Daily Attendance Tracking"]
-        B --> C{"Tracking Channels"}
-        C -->|"Home Dashboard"| D["Mark Present / Absent / No Class"]
-        C -->|"Glance Widgets"| W["Interactive 5x2 Widget"]
-        C -->|"Time-Off Mode"| V["Day-by-Day Vacation Sync"]
-        W --> D
-        V --> D
-        X["+ Add Extra Class"] -.-> D
+        B --> C["Today's Classes"]
+        C --> D["Mark Present / Absent / No Class"]
+        C --> W["Home-Screen Widget"]
+        C --> TO["Time Off: Holiday / Absent / Reset"]
+        C --> SC["Subject Calendar & Range Edits"]
     end
 
     subgraph Logic["3. Live Attendance Engine"]
-        D --> E["Update Records & Recalculate %"]
-        E --> F{"Target Check"}
-        F -->|"At or Above Target"| G["Safe: Bunk Calculator"]
-        F -->|"Below Target"| H["Alert: Classes Needed to Recover"]
+        D --> E["Recalculate Percentage"]
+        E --> F{"Target Met?"}
+        F -->|"Yes"| G["Safe-to-Skip Count"]
+        F -->|"No"| H["Classes Needed / Below-Target Banner"]
     end
 
-    subgraph Insights["4. Insights & Backups"]
+    subgraph Insights["4. History, Backups & Updates"]
         G --> I["Color-Coded Calendar History"]
         H --> I
-        I --> J["Analytics & Monthly Trends"]
-        J --> K["JSON Backup & CSV Export"]
+        I --> J["JSON / CSV Backup & Google Drive"]
+        J --> K["In-App Update Check"]
     end
 ```
 
-1. **Setup & Timetable**: Add subjects, set individual target attendance percentages (e.g., 75%), organize folders, or import your timetable in bulk via CSV.
-2. **Flexible Daily Tracking**: Mark Present, Absent, or No Class from the app dashboard, interactive Glance home screen widgets, or scheduled Vacation/Time-off mode.
-3. **Smart Calculations & Recovery**: Instantly see your attendance percentage, how many classes you can safely skip, or exactly how many consecutive classes you must attend to get back on track.
-4. **Insights & Backups**: Review monthly calendar heatmaps, track attendance trends, and safeguard your data with JSON backup/restore and CSV exports.
+1. **Setup & Timetable**: add subjects (optionally inside folders), set individual target percentages, then build a weekly timetable by hand, import it from CSV, or convert a timetable photo/PDF with AI. Timetable slots can repeat weekly or be limited to a date range.
+2. **Flexible Daily Tracking**: mark Present, Absent, or No Class from Home or the home-screen widget. Mark individual lectures on multi-lecture days, add extra classes, and apply Time Off for holidays, leave, or a full reset across a date range.
+3. **Smart Calculations**: each subject instantly shows its percentage, how many classes can be skipped safely, or how many consecutive classes are needed to recover. A collapsible banner highlights every subject below target.
+4. **History & Backups**: review a color-coded calendar per subject, then protect your data with JSON/CSV exports, Google Drive backup, and restore. The app can also check GitHub Releases and install an update in place.
 
 ---
 
@@ -67,89 +67,71 @@ flowchart TD
 
 | Feature | Description |
 | :--- | :--- |
-| 📊 **Home Dashboard** | View all subjects with visual pie charts showing attendance percentage. Mark attendance quickly (Present / Absent / No Class). |
-| 📅 **Calendar History** | Monthly calendar with color-coded days (🟢 Present, 🔴 Absent, ⚫ No Class) to easily review your history. |
-| 📚 **Subject Management** | Add custom subjects, edit lecture counts, and set individual required attendance percentages. |
-| 📆 **Smart Scheduling** | Toggle which subjects occur on specific days of the week to streamline your daily tracking. |
-| 🎨 **Material 3 & Dark Mode** | Gorgeous dynamic colors (Android 12+) with seamless dark mode support based on system settings. |
-| 🗂 **Folders** | Group subjects into folders (file-explorer style). Subjects inside folders still appear on Home for marking. |
-| 🧩 **Widgets** | Compact 2x2 (read-only), Original 3x2 (read-only) and Large 5x2 (mark P / A / NC from the home screen). |
-| 🎛 **Customizations** | Settings → Customizations: System / Light / Dark / AMOLED themes and custom primary & secondary colors. |
-| 👆 **Swipe Navigation** | Swipe left/right to change months in the calendar and days in the schedule. |
-| 💾 **Backup & Import** | JSON backup/restore (local or Google Drive), CSV export, and bulk CSV import of subjects and timetable. |
+| 📊 **Home Dashboard** | Today's scheduled classes with per-lecture Present / Absent / No Class entries, a collapsible below-target banner, and one-tap "Add Extra Class". |
+| 📅 **Subject Calendar** | Monthly color-coded history (🟢 Present, 🔴 Absent, ⚫ No Class), range selection, extra classes, and exact present/absent counts per day. |
+| 📚 **Subjects & Folders** | Create subjects or folders, move subjects into folders, and set a required attendance percentage per subject. |
+| 🗓 **Weekly Timetable** | Multiple lectures per day, multi-day recurring slots, semester date ranges, one-off dated lectures, and quick editing or deletion of any slot. |
+| 🏖 **Time Off** | Apply Holiday (no penalty), Absent (leave), or Reset across a date range to all subjects or only selected ones, with Today / This Week / Next Week presets. |
+| 🧩 **Home-Screen Widget** | A resizable Glance widget showing today's classes with one-tap Present / Absent buttons. Refreshes automatically at midnight. |
+| 🔔 **Notifications** | Daily reminder at a time you choose, a missed-mark alert listing unmarked classes, and an at-risk alert when a subject drops below target. |
+| 📆 **Calendar Sync** | Write your timetable into an on-device calendar (Google Calendar, etc.) or export it as `.ics` for Notion Calendar, Outlook, or Apple Calendar. |
+| 🤖 **AI Timetable Import** | Copy the built-in prompt into ChatGPT, Claude, or Gemini with a timetable photo/PDF, then paste the JSON reply back into the app. |
+| 💾 **Backup & Import** | JSON backup/restore, CSV export, Google Drive backup via the system file picker, and CSV import with a preview before anything is saved. |
+| 🎨 **Themes** | System, Light, Dark, and AMOLED modes, plus dynamic Material You colors on Android 12+. |
+| 🔄 **In-App Updates** | Check GitHub Releases, download the newest APK, and hand it to the system installer from the About screen. |
+| 👆 **Swipe Navigation** | Swipe left/right to move between weeks in the timetable and months in the calendar. |
+
+### CSV import format
+
+One row per lecture slot (or one row per subject). Header names are case-insensitive; `subject` is required.
+
+```csv
+subject,target_percentage,attended,total,day,start,end
+Physics,75,20,25,Monday,09:00,10:00
+Physics,,,,Wednesday,11:00,12:00
+Chemistry,80,18,22,Tuesday,10:00,11:00
+```
+
+A template can be downloaded from **Backup & Restore → Import from CSV**.
 
 ---
 
 ## 🛠 Tech Stack
 
-- **Language**: Kotlin
-- **UI Framework**: Jetpack Compose (Material 3)
-- **Database**: Room (SQLite)
-- **Architecture**: MVVM (Model-View-ViewModel)
-- **Navigation**: Jetpack Navigation Compose
-- **SDK**: Min 26 (Android 8.0) / Target 36 (Android 16)
+- **Language**: Kotlin 2.0.21
+- **UI**: Jetpack Compose (Material 3), Navigation Compose
+- **Architecture**: MVVM with Kotlin Flow and a single repository layer
+- **Database**: Room (SQLite) with KSP
+- **Widgets**: Jetpack Glance
+- **Background work**: WorkManager
+- **Build**: Android Gradle Plugin 8.13.2, Gradle 9.5.0, JDK 17
+- **SDK**: min 26 (Android 8.0), compile/target 36 (Android 16)
 
 ---
 
 ## 🏗 Building the Project
 
 ### Prerequisites
-- Android Studio Hedgehog (or newer)
+
+- Android Studio (latest stable)
 - JDK 17
 - Android SDK 36
 
-### Quick Start
+### Build & test
+
 ```bash
 # Clone the repository
 git clone https://github.com/hrishikeshp7/Self-Attendance-Tracker.git
 cd Self-Attendance-Tracker
 
-# Build and run a debug APK
+# Debug build
 ./gradlew assembleDebug
+
+# Unit tests
+./gradlew test
 ```
 
-<details>
-<summary><b>📦 Release Builds & Keystore Setup (Click to expand)</b></summary>
-<br/>
-To ensure that users can upgrade between releases without conflicts, all release builds must be signed with the same keystore.
-
-#### For Repository Maintainers (GitHub Actions)
-1. Generate a keystore file:
-   ```bash
-   keytool -genkeypair -v -keystore release.keystore -alias release \
-     -keyalg RSA -keysize 2048 -validity 10000 \
-     -storepass YourSecurePassword -keypass YourSecureKeyPassword
-   ```
-2. Encode to base64:
-   ```bash
-   base64 release.keystore > release.keystore.base64
-   ```
-3. Add GitHub Secrets:
-   - `RELEASE_KEYSTORE_BASE64`
-   - `RELEASE_KEYSTORE_PASSWORD`
-   - `RELEASE_KEY_ALIAS`
-   - `RELEASE_KEY_PASSWORD`
-
-#### For Local Release Builds
-```bash
-export KEYSTORE_FILE=path/to/release.keystore
-export KEYSTORE_PASSWORD=your_password
-export KEY_ALIAS=release
-export KEY_PASSWORD=your_key_password
-
-./gradlew assembleRelease
-```
-</details>
-
----
-
-## 📌 Quick Notes
-
-- **Folders**: Subjects tab → **+** → toggle "Create as folder". Tap a folder to open it; the toolbar back button returns to the main list.
-- **Extra class**: on Home use "Add Extra Class"; in a subject's calendar use "+ Add extra class" on a date already marked Present/Absent. Re-tapping a status does not double-count.
-- **CSV import**: Backup & Restore → Import from CSV. Columns: `subject, target_percentage, attended, total, day, start, end`. The file is previewed first and existing subjects are never overwritten.
-- **Release signing**: every release must use the same keystore (see above), otherwise Android reports "App not installed as it conflicts with other package" on upgrade.
-- **CI versioning**: the release workflow reads version info via the `printVersionInfo` Gradle task (`./gradlew -q printVersionInfo`) because `versionName`/`versionCode` are computed in `build.gradle.kts`.
+`versionName` and `versionCode` are derived from the Git commit count, so build from a full clone (CI uses `fetch-depth: 0`).
 
 ---
 
@@ -157,22 +139,31 @@ export KEY_PASSWORD=your_key_password
 
 ```text
 app/src/main/java/com/attendance/tracker/
+├── backup/           # JSON backup, CSV import/export, AI timetable import
+├── calendarsync/     # Device calendar sync and .ics export
 ├── data/
-│   ├── database/    # Room DB, DAOs, Type Converters
-│   ├── model/       # Data Models (Subject, AttendanceRecord, ScheduleEntry)
-│   └── repository/  # Single source of truth for data access
+│   ├── database/     # Room DB, DAOs, type converters
+│   ├── model/        # Subject, AttendanceRecord, ScheduleEntry, ThemePreference
+│   ├── repository/   # Single source of truth for data access
+│   ├── SlotAttendanceStore.kt   # Per-lecture status for a day
+│   └── TimeOffStore.kt          # Stored Time Off rules and syncing
+├── notification/     # Daily reminder, missed-mark and at-risk notifications
 ├── ui/
-│   ├── components/  # Reusable UI elements (SubjectCard, CalendarView)
-│   ├── screens/     # App screens (Home, Calendar, Subjects, Schedule, Settings)
-│   └── theme/       # Material 3 Theme, Colors, Typography
-└── MainActivity.kt  # Entry point
+│   ├── components/   # SubjectCard, CalendarView, charts, Time Off sheet
+│   ├── screens/      # Home, Subjects, Schedule, Calendar, Settings, Backup, AI Import, About
+│   └── theme/        # Material 3 theme, colors, typography
+├── update/           # GitHub release check and APK installer
+├── widget/           # Glance Today widget
+└── MainActivity.kt   # Entry point
 ```
+
+Unit tests live under `app/src/test/` and cover the repository logic, Time Off rules, CSV/AI import, backups, `.ics` export, and date/schedule calculations.
 
 ---
 
-## 📥 Download
+## 📥 Download & Updates
 
-Grab the latest compiled APK from the [Releases page](https://github.com/hrishikeshp7/Self-Attendance-Tracker/releases).
+Grab the latest signed APK from the [Releases page](https://github.com/hrishikeshp7/Self-Attendance-Tracker/releases). Once installed, use **Settings → About & Updates → Check for updates** to update in place.
 
 ---
 
@@ -180,4 +171,4 @@ Grab the latest compiled APK from the [Releases page](https://github.com/hrishik
 
 Made with ❤️ by [hrishikeshp7](https://github.com/hrishikeshp7)
 
-This project is open-source and available under the [MIT License](LICENSE).
+This project is licensed under the **GNU Affero General Public License v3.0 (AGPL-3.0)**. See [LICENSE](LICENSE) for the full text.

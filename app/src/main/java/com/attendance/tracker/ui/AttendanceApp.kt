@@ -208,6 +208,9 @@ fun AttendanceApp(
                     selectedDate = selectedDate,
                     attendanceRecords = attendanceRecords,
                     scheduleEntries = scheduleEntries,
+                    onGetRangeRecords = { start, end ->
+                        viewModel.getAttendanceInRangeOnce(start, end)
+                    },
                     onDateSelected = { date ->
                         viewModel.setSelectedDate(date)
                     },
@@ -252,8 +255,8 @@ fun AttendanceApp(
                     onAddFolder = { name ->
                         viewModel.addSubjectFolder(name)
                     },
-                    onUpdateSubject = { subject ->
-                        viewModel.updateSubject(subject)
+                    onUpdateSubject = { subject, countsEdited ->
+                        viewModel.updateSubject(subject, countsEdited = countsEdited)
                     },
                     onDeleteSubject = { subject ->
                         viewModel.deleteSubject(subject)

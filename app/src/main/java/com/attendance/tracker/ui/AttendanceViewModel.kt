@@ -139,6 +139,10 @@ class AttendanceViewModel(application: Application) : AndroidViewModel(applicati
         }
     }
 
+    suspend fun getAttendanceInRangeOnce(startDate: LocalDate, endDate: LocalDate): List<AttendanceRecord> {
+        return repository.getAttendanceInRangeOnce(startDate, endDate)
+    }
+
     fun setSelectedDate(date: LocalDate) {
         // Only the calendar's selection: todayAttendance must stay on today for Home,
         // which always marks LocalDate.now().
@@ -184,8 +188,22 @@ class AttendanceViewModel(application: Application) : AndroidViewModel(applicati
         return repository.getSubSubjects(parentId)
     }
 
-    fun updateSubject(subject: Subject) {
+    fun updateSubject(subject: Subject, countsEdited: Boolean = true) {
         viewModelScope.launch {
+            if (!countsEdited) {
+                val fresh = repository.getSubjectById(subject.id)
+                if (fresh != null) {
+                    repository.updateSubject(
+                        fresh.copy(
+                            name = subject.name,
+                            requiredAttendance = subject.requiredAttendance,
+                            isFolder = subject.isFolder,
+                            parentSubjectId = subject.parentSubjectId
+                        )
+                    )
+                    return@launch
+                }
+            }
             repository.updateSubject(subject)
         }
     }
@@ -193,6 +211,7 @@ class AttendanceViewModel(application: Application) : AndroidViewModel(applicati
     fun deleteSubject(subject: Subject) {
         viewModelScope.launch {
             repository.deleteSubject(subject)
+            SlotAttendanceStore.clearAllSlotsForSubject(getApplication<Application>(), subject.id)
         }
     }
 
@@ -267,7 +286,10 @@ class AttendanceViewModel(application: Application) : AndroidViewModel(applicati
         if (!pendingAttendanceOps.add(opKey)) return
         viewModelScope.launch {
             try {
-                attendanceMutex.withLock { repository.clearDay(subjectId, date) }
+                attendanceMutex.withLock {
+                    repository.clearDay(subjectId, date)
+                    SlotAttendanceStore.clearSlotsForDate(getApplication<Application>(), subjectId, date)
+                }
             } finally {
                 pendingAttendanceOps.remove(opKey)
             }
@@ -470,6 +492,7 @@ class AttendanceViewModel(application: Application) : AndroidViewModel(applicati
                 database.withTransaction {
                     repository.restoreData(data.subjects, data.attendanceRecords, data.scheduleEntries)
                 }
+                SlotAttendanceStore.clear(getApplication<Application>())
                 _backupRestoreStatus.value = BackupRestoreStatus.SUCCESS
                 _backupRestoreMessage.value =
                     "Restore complete: ${data.subjects.size} subjects, " +

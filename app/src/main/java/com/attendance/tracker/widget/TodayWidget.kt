@@ -127,7 +127,7 @@ class TodayWidget : GlanceAppWidget() {
             val date = LocalDate.now()
             emit(date)
             val untilMidnight = Duration.between(LocalDateTime.now(), date.plusDays(1).atStartOfDay())
-            delay(untilMidnight.toMillis() + 1_000)
+            delay(maxOf(untilMidnight.toMillis() + 1_000, 1_000))
         }
     }
 
@@ -164,7 +164,8 @@ class TodayWidget : GlanceAppWidget() {
         }
 
         val allAbsent = rows.isNotEmpty() && rows.all { it.slotStatus == AttendanceStatus.ABSENT }
-        val isVacationAbsent = allAbsent && TimeOffStore.isVacationAbsent(context, today)
+        val scheduledSubjectIds = rows.map { it.subject.id }.toSet()
+        val isVacationAbsent = allAbsent && TimeOffStore.isVacationAbsent(context, today, scheduledSubjectIds)
 
         return TodayData(today, rows, schedule.isNotEmpty(), isVacationAbsent)
     }
@@ -338,9 +339,9 @@ private fun StatusButton(row: TodayRow, status: AttendanceStatus, label: String)
 /** "78% · can skip 2" / "62% · attend 3 more" — text, not just colour, carries the status. */
 private fun standing(s: Subject): String {
     if (s.totalLectures == 0) return "No classes yet"
-    val pct = "%.0f%%".format(s.currentAttendancePercentage)
+    val pct = "${s.displayPercentage}%"
     return when {
-        !s.isAboveRequired -> if (s.classesToAttend >= 999) "$pct · can't reach target" else "$pct · attend ${s.classesToAttend} more"
+        !s.isAboveRequired -> if (s.isTargetUnreachable) "$pct · can't reach target" else "$pct · attend ${s.classesToAttend} more"
         s.requiredAttendance <= 0 -> "$pct · no minimum"
         s.classesCanBunk > 0 -> "$pct · can skip ${s.classesCanBunk}"
         else -> "$pct · on target"

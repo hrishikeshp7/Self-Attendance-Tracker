@@ -37,7 +37,9 @@ class Converters {
 
     @TypeConverter
     fun toAttendanceStatus(value: String?): AttendanceStatus? {
-        return value?.let { AttendanceStatus.valueOf(it) }
+        return value?.let { valStr ->
+            AttendanceStatus.entries.find { it.name == valStr }
+        }
     }
 
     // Stored as minutes since midnight so values sort/compare correctly as plain integers.

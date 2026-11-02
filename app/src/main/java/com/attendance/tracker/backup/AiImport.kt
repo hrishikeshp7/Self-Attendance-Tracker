@@ -59,7 +59,7 @@ object AiImport {
             val obj = array.optJSONObject(i)
             val name = obj?.optString("name")?.trim().orEmpty()
             if (name.isEmpty()) { errors += "Subject ${i + 1}: name is missing."; continue }
-            val target = obj!!.opt("target")?.let { (it as? Number)?.toInt() ?: it.toString().removeSuffix("%").trim().toIntOrNull() }
+            val target = obj!!.opt("target")?.let { (it as? Number)?.toInt() ?: it.toString().removeSuffix("%").trim().toDoubleOrNull()?.toInt() }
             if (obj.has("target") && (target == null || target !in 0..100)) {
                 errors += "$name: target \"${obj.opt("target")}\" must be a number from 0 to 100."
             }

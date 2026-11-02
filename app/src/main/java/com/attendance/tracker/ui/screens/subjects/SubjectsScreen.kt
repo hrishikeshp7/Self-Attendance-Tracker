@@ -29,7 +29,7 @@ fun SubjectsScreen(
     allSubjects: Map<Long, Subject>,
     onAddSubject: (String, Int, Long?) -> Unit,
     onAddFolder: (String) -> Unit,
-    onUpdateSubject: (Subject) -> Unit,
+    onUpdateSubject: (Subject, Boolean) -> Unit,
     onDeleteSubject: (Subject) -> Unit,
     onSubjectClick: (Subject) -> Unit = {},
     modifier: Modifier = Modifier,
@@ -178,8 +178,8 @@ fun SubjectsScreen(
                 showEditDialog = false
                 selectedSubject = null
             },
-            onConfirm = { updatedSubject ->
-                onUpdateSubject(updatedSubject)
+            onConfirm = { updatedSubject, countsEdited ->
+                onUpdateSubject(updatedSubject, countsEdited)
                 showEditDialog = false
                 selectedSubject = null
             }
@@ -439,7 +439,7 @@ private fun AddSubjectDialog(
 private fun EditSubjectDialog(
     subject: Subject,
     onDismiss: () -> Unit,
-    onConfirm: (Subject) -> Unit
+    onConfirm: (Subject, Boolean) -> Unit
 ) {
     var name by remember { mutableStateOf(subject.name) }
     var requiredAttendance by remember { mutableStateOf(subject.requiredAttendance.toString()) }
@@ -500,6 +500,9 @@ private fun EditSubjectDialog(
                         val required = if (subject.isFolder) subject.requiredAttendance else (requiredAttendance.toIntOrNull() ?: 75)
                         val present = if (subject.isFolder) subject.presentLectures else (presentLectures.toIntOrNull() ?: 0)
                         val absent = if (subject.isFolder) subject.absentLectures else (absentLectures.toIntOrNull() ?: 0)
+                        val countsEdited = !subject.isFolder && (
+                            present != subject.presentLectures || absent != subject.absentLectures
+                        )
                         // Present/absent/total are folded into the same Subject update so the
                         // write is atomic — writing counts via a second, separate DB call raced
                         // with this one and could silently revert the edited counts.
@@ -510,7 +513,7 @@ private fun EditSubjectDialog(
                             absentLectures = absent,
                             totalLectures = present + absent
                         )
-                        onConfirm(updatedSubject)
+                        onConfirm(updatedSubject, countsEdited)
                     }
                 },
                 enabled = name.isNotBlank()

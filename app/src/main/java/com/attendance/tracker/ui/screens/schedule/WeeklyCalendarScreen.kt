@@ -665,8 +665,8 @@ private fun layoutDayEntries(entries: List<ScheduleEntry>): List<Pair<ScheduleEn
     if (entries.isEmpty()) return emptyList()
     val sorted = entries.sortedBy { it.startTime }
     val laneEndTimes = mutableListOf<LocalTime>()
-    val laneOf = mutableMapOf<Long, Int>()
-    for (entry in sorted) {
+    val resultLanes = IntArray(sorted.size)
+    for ((index, entry) in sorted.withIndex()) {
         var placedLane = -1
         for (i in laneEndTimes.indices) {
             if (!entry.startTime.isBefore(laneEndTimes[i])) {
@@ -680,10 +680,10 @@ private fun layoutDayEntries(entries: List<ScheduleEntry>): List<Pair<ScheduleEn
         } else {
             laneEndTimes[placedLane] = entry.endTime
         }
-        laneOf[entry.id] = placedLane
+        resultLanes[index] = placedLane
     }
     val totalLanes = laneEndTimes.size.coerceAtLeast(1)
-    return sorted.map { it to LaneInfo(laneOf[it.id] ?: 0, totalLanes) }
+    return sorted.mapIndexed { index, entry -> entry to LaneInfo(resultLanes[index], totalLanes) }
 }
 
 @Composable

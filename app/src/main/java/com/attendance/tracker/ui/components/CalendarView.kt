@@ -28,8 +28,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import java.time.temporal.ChronoUnit
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -68,9 +70,8 @@ fun CalendarView(
     val CALENDAR_INITIAL_PAGE = 10000
     val CALENDAR_MAX_PAGES = 20000
 
-    // Track base month for offset calculations - updates when month changes externally
-    var baseMonth by rememberSaveable { mutableStateOf(selectedMonth) }
-    var lastPagerPage by rememberSaveable { mutableStateOf(CALENDAR_INITIAL_PAGE) }
+    // Fixed anchor month for relative page offset calculations
+    val anchorMonth = remember { selectedMonth }
 
     // Initialize pager state centered at a large value to allow bidirectional swiping
     val pagerState = rememberPagerState(
@@ -80,25 +81,17 @@ fun CalendarView(
 
     // Track month changes from swipe gestures
     LaunchedEffect(pagerState.currentPage) {
-        if (pagerState.currentPage != lastPagerPage) {
-            lastPagerPage = pagerState.currentPage
-            val offset = pagerState.currentPage - CALENDAR_INITIAL_PAGE
-            if (offset != 0) {
-                val newMonth = baseMonth.plusMonths(offset.toLong())
-                if (newMonth != selectedMonth) {
-                    onMonthChanged(newMonth)
-                }
-            }
+        val currentMonth = anchorMonth.plusMonths((pagerState.currentPage - CALENDAR_INITIAL_PAGE).toLong())
+        if (currentMonth != selectedMonth) {
+            onMonthChanged(currentMonth)
         }
     }
 
-    // Reset base and pager when month changes externally (e.g., arrow buttons, Today button)
+    // Scroll pager when month changes externally (e.g., arrow buttons, Today button)
     LaunchedEffect(selectedMonth) {
-        if (selectedMonth != baseMonth) {
-            baseMonth = selectedMonth
-            if (pagerState.currentPage != CALENDAR_INITIAL_PAGE) {
-                pagerState.animateScrollToPage(CALENDAR_INITIAL_PAGE)
-            }
+        val targetPage = CALENDAR_INITIAL_PAGE + ChronoUnit.MONTHS.between(anchorMonth, selectedMonth).toInt()
+        if (pagerState.currentPage != targetPage) {
+            pagerState.animateScrollToPage(targetPage)
         }
     }
 
@@ -186,7 +179,7 @@ fun CalendarView(
                 modifier = Modifier.fillMaxWidth()
             ) { page ->
                 val offset = page - CALENDAR_INITIAL_PAGE
-                val monthToDisplay = baseMonth.plusMonths(offset.toLong())
+                val monthToDisplay = anchorMonth.plusMonths(offset.toLong())
 
                 MonthCalendarGrid(
                     month = monthToDisplay,

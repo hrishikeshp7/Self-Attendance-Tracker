@@ -166,20 +166,29 @@ object CalendarSyncManager {
     }
 
     private fun removeSyncedEventsLocked(context: Context): Int {
+        if (!hasCalendarPermissions(context)) {
+            syncPrefsStore(context).edit().remove(KEY_EVENT_IDS).apply()
+            return 0
+        }
         val resolver = context.applicationContext.contentResolver
         val prefs = syncPrefsStore(context)
         var removed = 0
-        // 1) By recorded id — exact, independent of any text a calendar app may have rewritten.
-        prefs.getStringSet(KEY_EVENT_IDS, emptySet()).orEmpty().forEach { id ->
-            val uri = ContentUris.withAppendedId(CalendarContract.Events.CONTENT_URI, id.toLong())
-            removed += resolver.delete(uri, null, null)
+        try {
+            // 1) By recorded id — exact, independent of any text a calendar app may have rewritten.
+            prefs.getStringSet(KEY_EVENT_IDS, emptySet()).orEmpty().forEach { id ->
+                val idLong = id.toLongOrNull() ?: return@forEach
+                val uri = ContentUris.withAppendedId(CalendarContract.Events.CONTENT_URI, idLong)
+                removed += resolver.delete(uri, null, null)
+            }
+            // 2) By marker — sweeps events from earlier app versions (which recorded no ids).
+            removed += resolver.delete(
+                CalendarContract.Events.CONTENT_URI,
+                "${CalendarContract.Events.DESCRIPTION} LIKE ?",
+                arrayOf("%$SYNC_MARKER%")
+            )
+        } catch (_: SecurityException) {
+            // Permission may have been revoked
         }
-        // 2) By marker — sweeps events from earlier app versions (which recorded no ids).
-        removed += resolver.delete(
-            CalendarContract.Events.CONTENT_URI,
-            "${CalendarContract.Events.DESCRIPTION} LIKE ?",
-            arrayOf("%$SYNC_MARKER%")
-        )
         prefs.edit().remove(KEY_EVENT_IDS).apply()
         return removed
     }
@@ -257,7 +266,7 @@ object CalendarSyncManager {
     }
 
     private fun icsEscape(text: String): String =
-        text.replace("\\", "\\\\").replace(";", "\\;").replace(",", "\\,").replace("\n", "\\n")
+        text.replace("\\", "\\\\").replace(";", "\\;").replace(",", "\\,").replace("\r\n", "\\n").replace("\r", "\\n").replace("\n", "\\n")
 
     private fun nextOrSameDate(from: LocalDate, dayOfWeek: DayOfWeek): LocalDate {
         var date = from

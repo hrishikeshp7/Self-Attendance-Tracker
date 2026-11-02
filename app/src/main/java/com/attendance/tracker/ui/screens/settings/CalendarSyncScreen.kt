@@ -63,12 +63,17 @@ fun CalendarSyncScreen(
         if (isBusy) return
         isBusy = true
         scope.launch {
-            val count = CalendarSyncManager.syncSchedule(context, calendarId, scheduleEntries, allSubjects, rangeEnd)
-            CalendarSyncManager.saveSyncPrefs(context, calendarId, label)
-            syncPrefs = CalendarSyncManager.getSyncPrefs(context)
-            isBusy = false
-            resultMessage = "Synced $count lecture${if (count != 1) "s" else ""} to \"$label\" through " +
-                "${rangeEnd.format(DateTimeFormatter.ofPattern("MMM d"))}. Syncing again replaces these, never duplicates them."
+            try {
+                val count = CalendarSyncManager.syncSchedule(context, calendarId, scheduleEntries, allSubjects, rangeEnd)
+                CalendarSyncManager.saveSyncPrefs(context, calendarId, label)
+                syncPrefs = CalendarSyncManager.getSyncPrefs(context)
+                resultMessage = "Synced $count lecture${if (count != 1) "s" else ""} to \"$label\" through " +
+                    "${rangeEnd.format(DateTimeFormatter.ofPattern("MMM d"))}. Syncing again replaces these, never duplicates them."
+            } catch (e: Exception) {
+                resultMessage = "Sync failed: ${e.message}"
+            } finally {
+                isBusy = false
+            }
         }
     }
 
@@ -288,11 +293,16 @@ fun CalendarSyncScreen(
                                 if (isBusy) return@TextButton
                                 isBusy = true
                                 scope.launch {
-                                    val removed = CalendarSyncManager.removeSyncedEvents(context)
-                                    CalendarSyncManager.clearSyncPrefs(context)
-                                    syncPrefs = CalendarSyncManager.getSyncPrefs(context)
-                                    isBusy = false
-                                    resultMessage = "Removed $removed synced event${if (removed != 1) "s" else ""} from your calendar."
+                                    try {
+                                        val removed = CalendarSyncManager.removeSyncedEvents(context)
+                                        CalendarSyncManager.clearSyncPrefs(context)
+                                        syncPrefs = CalendarSyncManager.getSyncPrefs(context)
+                                        resultMessage = "Removed $removed synced event${if (removed != 1) "s" else ""} from your calendar."
+                                    } catch (e: Exception) {
+                                        resultMessage = "Remove failed: ${e.message}"
+                                    } finally {
+                                        isBusy = false
+                                    }
                                 }
                             },
                             enabled = !isBusy,

@@ -257,7 +257,7 @@ fun SubjectCard(
                     modifier = Modifier.weight(1f)
                 )
             }
-            if (titleOverride == null && (scheduledLectures > 1 || dayLectures > 1)) {
+            if (titleOverride == null && (scheduledLectures > 1 || dayLectures > 1 || currentRecord != null)) {
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -269,8 +269,10 @@ fun SubjectCard(
                             currentRecord.absentCount.takeIf { it > 0 }?.let { "$it absent" }
                         ).joinToString(", ")
                         "$dayLectures lectures today: $parts"
-                    } else {
+                    } else if (scheduledLectures > 1) {
                         "$scheduledLectures lectures scheduled today"
+                    } else {
+                        "1 lecture today"
                     }
                     Text(
                         text = statusText,
@@ -283,9 +285,20 @@ fun SubjectCard(
                             contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
                         ) {
                             Text(
-                                text = if (dayLectures > 1) "Edit counts" else "Split / custom",
+                                text = if (dayLectures > 1) "Edit counts" else if (currentRecord != null) "Edit / Clear" else "Split / custom",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    } else if (currentRecord != null && onClearAttendance != null) {
+                        TextButton(
+                            onClick = onClearAttendance,
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                        ) {
+                            Text(
+                                text = "Clear",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.error
                             )
                         }
                     }

@@ -79,5 +79,21 @@ class SubjectTest {
         assertEquals("No minimum required", Subject(name = "a", requiredAttendance = 0, totalLectures = 7, presentLectures = 4, absentLectures = 3).insight)
         assertEquals("No classes recorded yet", Subject(name = "a").insight)
         assertEquals("Need 1 more class", Subject(name = "a", requiredAttendance = 75, totalLectures = 3, presentLectures = 2, absentLectures = 1).insight)
+        // Reachable requirement needing >= 999 classes should not say can't reach
+        val heavySubject = Subject(name = "a", requiredAttendance = 75, totalLectures = 1500, presentLectures = 100, absentLectures = 1400)
+        assertEquals("Need 4100 more classes", heavySubject.insight)
+    }
+
+    @Test
+    fun `displayPercentage respects isAboveRequired boundary`() {
+        // 74.8% should display 74% because it has not yet reached required 75%
+        val sub748 = Subject(name = "a", requiredAttendance = 75, totalLectures = 1000, presentLectures = 748, absentLectures = 252)
+        assertEquals(74, sub748.displayPercentage)
+        assertFalse(sub748.isAboveRequired)
+
+        // Exactly 75% should display 75%
+        val sub75 = Subject(name = "a", requiredAttendance = 75, totalLectures = 100, presentLectures = 75, absentLectures = 25)
+        assertEquals(75, sub75.displayPercentage)
+        assertTrue(sub75.isAboveRequired)
     }
 }

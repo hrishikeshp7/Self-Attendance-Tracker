@@ -101,8 +101,16 @@ fun AttendancePieChart(
         }
         
         if (showPercentageText) {
+            val rounded = kotlin.math.round(percentage).toInt()
+            val displayPct = if (!isAboveRequired && rounded >= requiredPercentage && requiredPercentage > 0) {
+                requiredPercentage - 1
+            } else if (isAboveRequired && rounded < requiredPercentage) {
+                requiredPercentage
+            } else {
+                rounded
+            }
             Text(
-                text = "${percentage.toInt()}%",
+                text = "$displayPct%",
                 style = MaterialTheme.typography.labelMedium,
                 // Sized from the ring, not the system font scale: toSp() cancels the scale, so
                 // "100%" stays inside the ring at 200% font size.
@@ -185,8 +193,9 @@ fun AttendanceDonutChart(
         Column(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            val displayPresent = kotlin.math.round(presentPercentage).toInt()
             Text(
-                text = "${presentPercentage.toInt()}%",
+                text = "$displayPresent%",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 color = if (presentPercentage >= 75) PresentGreen else AbsentRed

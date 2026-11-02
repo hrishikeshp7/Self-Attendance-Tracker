@@ -69,8 +69,8 @@ class AttendanceRepository(
         targetCount: Int = 1
     ) {
         val existing = attendanceDao.getAttendanceRecord(subjectId, date)
-        if (existing?.status == status) return
-        val total = if (existing == null) maxOf(targetCount, 1) else existing.count + existing.otherCount
+        if (existing != null && existing.status == status && existing.otherCount == 0 && existing.count >= maxOf(targetCount, 1)) return
+        val total = if (existing == null) maxOf(targetCount, 1) else maxOf(existing.count + existing.otherCount, targetCount)
         val newPresent = if (status == AttendanceStatus.PRESENT) total else 0
         val newAbsent = if (status == AttendanceStatus.ABSENT) total else 0
         if (existing == null) {
