@@ -77,6 +77,25 @@ object TimeOffStore {
         }
     }
 
+    fun getActiveRuleForDate(context: Context, date: LocalDate): TimeOffRule? =
+        getActiveRuleForDate(prefs(context), date)
+
+    fun getActiveRuleForDate(prefs: SharedPreferences, date: LocalDate): TimeOffRule? {
+        return getActiveRules(prefs).firstOrNull { rule ->
+            !date.isBefore(rule.startDate) && !date.isAfter(rule.endDate)
+        }
+    }
+
+    fun setRules(context: Context, rules: List<TimeOffRule>) = setRules(prefs(context), rules)
+
+    fun setRules(prefs: SharedPreferences, rules: List<TimeOffRule>) {
+        val set = rules.map { rule ->
+            val subsStr = rule.subjectIds?.joinToString(",") ?: "ALL"
+            "${rule.startDate}:${rule.endDate}:${rule.status.name}:$subsStr"
+        }.toSet()
+        prefs.edit().putStringSet(KEY_RULES, set).apply()
+    }
+
     fun getActiveRules(context: Context): List<TimeOffRule> =
         getActiveRules(prefs(context))
 
@@ -110,7 +129,22 @@ object TimeOffStore {
         context: Context,
         repository: AttendanceRepository,
         today: LocalDate = LocalDate.now()
-    ) = syncActiveTimeOff(getActiveRules(context), repository, today)
+    ) {
+        val rules = getActiveRules(context)
+        val allRecords = repository.getAllAttendanceRecordsOnce()
+        val futureRecords = allRecords.filter { it.date.isAfter(today) }
+        val effectiveRules = if (rules.isEmpty() && futureRecords.isNotEmpty()) {
+            val minDate = futureRecords.minOf { it.date }
+            val maxDate = futureRecords.maxOf { it.date }
+            val sampleStatus = futureRecords.first().status
+            val recovered = TimeOffRule(minDate, maxDate, sampleStatus, null)
+            recordTimeOff(context, minDate, maxDate, sampleStatus, null)
+            listOf(recovered)
+        } else {
+            rules
+        }
+        syncActiveTimeOff(effectiveRules, repository, today)
+    }
 
     suspend fun syncActiveTimeOff(
         rules: List<TimeOffRule>,
@@ -132,18 +166,15 @@ object TimeOffStore {
             while (!d.isAfter(maxDate)) {
                 val existing = repository.getAttendanceInRangeOnce(d, d)
                 val targetIds = rule.subjectIds
-                val needsSync = if (targetIds == null) {
-                    existing.isEmpty()
-                } else {
-                    val markedSubjectIds = existing.map { it.subjectId }.toSet()
-                    targetIds.any { it !in markedSubjectIds }
-                }
-                if (needsSync) {
-                    val unrecordedIds = if (targetIds == null) null else {
-                        val markedSubjectIds = existing.map { it.subjectId }.toSet()
-                        targetIds.filter { it !in markedSubjectIds }.toSet()
-                    }
-                    repository.applyTimeOff(d, d, rule.status, unrecordedIds ?: rule.subjectIds, today = today)
+                val scheduledForDay = repository.getAllScheduleEntriesOnce()
+                    .filter { it.occursOn(d) }
+                    .map { it.subjectId }
+                    .toSet()
+                val targetSubjectSet = targetIds ?: if (scheduledForDay.isNotEmpty()) scheduledForDay else repository.getAllSubjectsOnce().filter { !it.isFolder }.map { it.id }.toSet()
+                val markedSubjectIds = existing.map { it.subjectId }.toSet()
+                val unrecordedIds = targetSubjectSet.filter { it !in markedSubjectIds }.toSet()
+                if (unrecordedIds.isNotEmpty()) {
+                    repository.applyTimeOff(d, d, rule.status, unrecordedIds, today = today)
                 }
                 d = d.plusDays(1)
             }

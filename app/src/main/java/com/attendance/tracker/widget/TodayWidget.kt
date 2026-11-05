@@ -49,6 +49,7 @@ import androidx.glance.text.TextStyle
 import androidx.glance.unit.ColorProvider
 import com.attendance.tracker.MainActivity
 import com.attendance.tracker.data.SlotAttendanceStore
+import com.attendance.tracker.data.TimeOffRule
 import com.attendance.tracker.data.TimeOffStore
 import com.attendance.tracker.data.database.AttendanceDatabase
 import com.attendance.tracker.data.model.AttendanceRecord
@@ -90,7 +91,8 @@ private data class TodayData(
     val date: LocalDate,
     val rows: List<TodayRow>,
     val hasSchedule: Boolean,
-    val isVacationAbsent: Boolean = false
+    val isTimeOffActive: Boolean = false,
+    val timeOffRule: TimeOffRule? = null
 )
 
 /**
@@ -163,11 +165,10 @@ class TodayWidget : GlanceAppWidget() {
             }
         }
 
-        val allAbsent = rows.isNotEmpty() && rows.all { it.slotStatus == AttendanceStatus.ABSENT }
-        val scheduledSubjectIds = rows.map { it.subject.id }.toSet()
-        val isVacationAbsent = allAbsent && TimeOffStore.isVacationAbsent(context, today, scheduledSubjectIds)
+        val activeRule = TimeOffStore.getActiveRuleForDate(context, today)
+        val isTimeOffActive = activeRule != null && (activeRule.subjectIds == null || scheduledIds.isEmpty() || scheduledIds.all { it in activeRule.subjectIds })
 
-        return TodayData(today, rows, schedule.isNotEmpty(), isVacationAbsent)
+        return TodayData(today, rows, schedule.isNotEmpty(), isTimeOffActive, activeRule)
     }
 }
 
@@ -186,14 +187,14 @@ private fun TodayContent(data: TodayData) {
             style = TextStyle(color = GlanceTheme.colors.onSurface, fontSize = 14.sp, fontWeight = FontWeight.Bold),
             modifier = GlanceModifier.fillMaxWidth().padding(bottom = 8.dp).clickable(openApp)
         )
-        if (data.rows.isEmpty()) {
+        if (data.isTimeOffActive) {
+            VacationTimeOffView(openApp, data.timeOffRule)
+        } else if (data.rows.isEmpty()) {
             Text(
                 text = if (data.hasSchedule) "No classes today" else "Add subjects in the app",
                 style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = 13.sp),
                 modifier = GlanceModifier.clickable(openApp)
             )
-        } else if (data.isVacationAbsent) {
-            VacationAbsentView(openApp)
         } else {
             LazyColumn(modifier = GlanceModifier.fillMaxSize()) {
                 // The list adapter caches rows by id; fold the displayed state into it so a mark
@@ -205,7 +206,15 @@ private fun TodayContent(data: TodayData) {
 }
 
 @Composable
-private fun VacationAbsentView(openApp: Action) {
+private fun VacationTimeOffView(openApp: Action, rule: TimeOffRule?) {
+    val isLeave = rule?.status == AttendanceStatus.ABSENT
+    val title = if (isLeave) "Enjoy your vacation! 🌴" else "Enjoy your break! 🌴"
+    val subtitle = if (rule != null) {
+        val formatter = DateTimeFormatter.ofPattern("EEE, d MMM")
+        "Time off active until ${rule.endDate.format(formatter)}"
+    } else {
+        "Time off is active"
+    }
     Box(
         modifier = GlanceModifier
             .fillMaxSize()
@@ -222,7 +231,7 @@ private fun VacationAbsentView(openApp: Action) {
             horizontalAlignment = Alignment.Start
         ) {
             Text(
-                text = "Vacations are set for now",
+                text = title,
                 style = TextStyle(
                     color = GlanceTheme.colors.onSecondaryContainer,
                     fontSize = 13.sp,
@@ -231,7 +240,7 @@ private fun VacationAbsentView(openApp: Action) {
             )
             Spacer(GlanceModifier.height(4.dp))
             Text(
-                text = "All subjects are being marked absent.",
+                text = subtitle,
                 style = TextStyle(
                     color = GlanceTheme.colors.onSecondaryContainer,
                     fontSize = 12.sp,

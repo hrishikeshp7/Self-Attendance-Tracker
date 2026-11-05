@@ -12,6 +12,10 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.ChevronLeft
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Warning
@@ -29,6 +33,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.attendance.tracker.data.SlotAttendanceStore
+import com.attendance.tracker.data.TimeOffStore
 import com.attendance.tracker.data.model.AttendanceRecord
 import com.attendance.tracker.data.model.AttendanceStatus
 import com.attendance.tracker.data.model.ScheduleEntry
@@ -39,7 +44,9 @@ import com.attendance.tracker.ui.theme.AbsentRed
 import com.attendance.tracker.ui.theme.subjectAvatarColor
 import com.attendance.tracker.widget.refreshAllWidgets
 import kotlinx.coroutines.launch
+import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -49,6 +56,8 @@ fun HomeScreen(
     allSubjects: Map<Long, Subject>,
     todayAttendance: Map<Long, AttendanceRecord>,
     scheduleEntries: List<ScheduleEntry>,
+    selectedDate: LocalDate = LocalDate.now(),
+    onSelectDate: (LocalDate) -> Unit = {},
     onMarkAttendance: (Long, AttendanceStatus, Int) -> Unit,
     onAddExtraClass: (Long, AttendanceStatus) -> Unit,
     onSetDayCounts: (Long, Int, Int) -> Unit = { _, _, _ -> },
@@ -60,7 +69,7 @@ fun HomeScreen(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-    val today = LocalDate.now()
+    val isToday = selectedDate == LocalDate.now()
     val dayFormatter = DateTimeFormatter.ofPattern("EEEE")
     val dateFormatter = DateTimeFormatter.ofPattern("MMMM d, yyyy")
 
@@ -70,13 +79,13 @@ fun HomeScreen(
         subjects.filter { it.totalLectures > 0 && !it.isAboveRequired }
     }
 
-    // Determine today's scheduled subjects
-    val todaysScheduledIds: Set<Long> = remember(scheduleEntries, today) {
-        scheduleEntries.filter { it.occursOn(today) }.map { it.subjectId }.toSet()
+    // Determine selected date's scheduled subjects
+    val todaysScheduledIds: Set<Long> = remember(scheduleEntries, selectedDate) {
+        scheduleEntries.filter { it.occursOn(selectedDate) }.map { it.subjectId }.toSet()
     }
     // If the user has not set up any schedule at all, fall back to showing all subjects
     val hasAnySchedule = scheduleEntries.isNotEmpty()
-    // Also keep subjects already marked today (e.g. an extra class) so that mark stays
+    // Also keep subjects already marked for that day (e.g. an extra class) so that mark stays
     // visible and can be changed or cleared from here.
     val todaysSubjects: List<Subject> = remember(subjects, todaysScheduledIds, hasAnySchedule, todayAttendance) {
         if (!hasAnySchedule) subjects else subjects.filter { it.id in todaysScheduledIds || it.id in todayAttendance }
@@ -84,13 +93,14 @@ fun HomeScreen(
 
     val coroutineScope = rememberCoroutineScope()
     var slotUpdateTrigger by remember { mutableStateOf(0L) }
+    var showDatePicker by remember { mutableStateOf(false) }
 
     val onMarkSlot = { subjectId: Long, slotIndex: Int, totalSlots: Int, status: AttendanceStatus ->
         SlotAttendanceStore.ensureSlotsInitialized(
-            context, subjectId, today, totalSlots, todayAttendance[subjectId]
+            context, subjectId, selectedDate, totalSlots, todayAttendance[subjectId]
         )
         val res = SlotAttendanceStore.updateSlotAndCompute(
-            context, subjectId, today, totalSlots, slotIndex, status
+            context, subjectId, selectedDate, totalSlots, slotIndex, status
         )
         slotUpdateTrigger = System.currentTimeMillis()
         if (res.isAllNoClass) {
@@ -100,16 +110,18 @@ fun HomeScreen(
         } else {
             onClearAttendance(subjectId)
         }
-        coroutineScope.launch {
-            try {
-                refreshAllWidgets(context)
-            } catch (_: Exception) {}
+        if (isToday) {
+            coroutineScope.launch {
+                try {
+                    refreshAllWidgets(context)
+                } catch (_: Exception) {}
+            }
         }
     }
 
-    val todaySlots: List<TodaySlotItem> = remember(todaysSubjects, scheduleEntries, today, allSubjects) {
+    val todaySlots: List<TodaySlotItem> = remember(todaysSubjects, scheduleEntries, selectedDate, allSubjects) {
         todaysSubjects.flatMap { subject ->
-            val dayEntries = scheduleEntries.filter { it.occursOn(today) && it.subjectId == subject.id }.sortedBy { it.startTime }
+            val dayEntries = scheduleEntries.filter { it.occursOn(selectedDate) && it.subjectId == subject.id }.sortedBy { it.startTime }
             if (dayEntries.size > 1) {
                 dayEntries.indices.map { idx ->
                     TodaySlotItem(
@@ -134,24 +146,52 @@ fun HomeScreen(
 
     // Extra-class dialog state
     var showExtraClassDialog by remember { mutableStateOf(false) }
+    val activeTimeOffRule = remember(selectedDate) { TimeOffStore.getActiveRuleForDate(context, selectedDate) }
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = {
-                    Column {
-                        Text(
-                            text = today.format(dayFormatter),
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.primary,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                        Text(
-                            text = today.format(dateFormatter),
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.clickable { showDatePicker = true }
+                    ) {
+                        Column {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = if (isToday) "Today · ${selectedDate.format(dayFormatter)}" else selectedDate.format(dayFormatter),
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = if (isToday) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Icon(
+                                    Icons.Default.ArrowDropDown,
+                                    contentDescription = "Pick date",
+                                    modifier = Modifier.size(16.dp),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            Text(
+                                text = selectedDate.format(dateFormatter),
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                    }
+                },
+                actions = {
+                    IconButton(onClick = { onSelectDate(selectedDate.minusDays(1)) }) {
+                        Icon(Icons.Default.ChevronLeft, contentDescription = "Previous Day")
+                    }
+                    IconButton(onClick = { showDatePicker = true }) {
+                        Icon(Icons.Default.CalendarMonth, contentDescription = "Pick Date from Calendar")
+                    }
+                    IconButton(
+                        onClick = { onSelectDate(selectedDate.plusDays(1)) }
+                    ) {
+                        Icon(Icons.Default.ChevronRight, contentDescription = "Next Day")
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -186,6 +226,69 @@ fun HomeScreen(
                     .padding(paddingValues),
                 contentPadding = PaddingValues(bottom = 88.dp)
             ) {
+                if (!isToday) {
+                    item(key = "viewing_past_date_banner") {
+                        Surface(
+                            color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.7f),
+                            shape = RoundedCornerShape(14.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 6.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    text = "Viewing: ${selectedDate.format(DateTimeFormatter.ofPattern("EEE, d MMM"))}",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                                )
+                                TextButton(
+                                    onClick = { onSelectDate(LocalDate.now()) },
+                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
+                                ) {
+                                    Text("Jump to Today", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if (activeTimeOffRule != null) {
+                    item(key = "active_time_off_banner") {
+                        Surface(
+                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f),
+                            shape = RoundedCornerShape(14.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 6.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text("🌴", fontSize = 20.sp, modifier = Modifier.padding(end = 10.dp))
+                                Column {
+                                    Text(
+                                        text = if (activeTimeOffRule.status == AttendanceStatus.ABSENT) "Vacation Active" else "Holiday / Break Active",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                                    )
+                                    Text(
+                                        text = "${activeTimeOffRule.startDate} to ${activeTimeOffRule.endDate} • ${if (activeTimeOffRule.status == AttendanceStatus.ABSENT) "Marked Absent on day" else "No Class"}",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.85f)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
                 if (belowTarget.isNotEmpty()) {
                     item(key = "below_target_banner") {
                         BelowTargetBanner(
@@ -212,9 +315,9 @@ fun HomeScreen(
                         val subject = slotItem.subject
                         val currentRecord = todayAttendance[subject.id]
                         val trigger = slotUpdateTrigger
-                        val effStatus = remember(trigger, currentRecord, slotItem) {
+                        val effStatus = remember(trigger, currentRecord, slotItem, selectedDate) {
                             SlotAttendanceStore.getEffectiveSlotStatus(
-                                context, subject.id, today, slotItem.slotIndex, slotItem.totalSlots, currentRecord
+                                context, subject.id, selectedDate, slotItem.slotIndex, slotItem.totalSlots, currentRecord
                             )
                         }
                         SubjectCard(
@@ -274,6 +377,35 @@ fun HomeScreen(
                 showExtraClassDialog = false
             }
         )
+    }
+
+    if (showDatePicker) {
+        val datePickerState = rememberDatePickerState(
+            initialSelectedDateMillis = selectedDate.atStartOfDay(ZoneId.of("UTC")).toInstant().toEpochMilli()
+        )
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        datePickerState.selectedDateMillis?.let { millis ->
+                            val picked = Instant.ofEpochMilli(millis).atZone(ZoneId.of("UTC")).toLocalDate()
+                            onSelectDate(picked)
+                        }
+                        showDatePicker = false
+                    }
+                ) {
+                    Text("OK")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDatePicker = false }) {
+                    Text("Cancel")
+                }
+            }
+        ) {
+            DatePicker(state = datePickerState)
+        }
     }
 }
 

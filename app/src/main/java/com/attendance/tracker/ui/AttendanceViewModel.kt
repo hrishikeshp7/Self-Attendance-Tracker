@@ -81,6 +81,11 @@ class AttendanceViewModel(application: Application) : AndroidViewModel(applicati
     // Date todayAttendance is currently bound to; see refreshToday().
     private var todayAttendanceDate: LocalDate? = null
 
+    fun selectDate(date: LocalDate) {
+        _selectedDate.value = date
+        loadAttendanceForDate(date)
+    }
+
     // Theme preferences
     val themePreference = themeRepository.themePreference
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
@@ -113,12 +118,20 @@ class AttendanceViewModel(application: Application) : AndroidViewModel(applicati
     /** Re-binds todayAttendance to the current date if the day has rolled over since it was loaded. */
     fun refreshToday() {
         val today = LocalDate.now()
-        if (todayAttendanceDate != today) loadAttendanceForDate(today)
+        viewModelScope.launch {
+            TimeOffStore.syncActiveTimeOff(getApplication<Application>(), repository, today)
+            if (_selectedDate.value == todayAttendanceDate && todayAttendanceDate != today) {
+                _selectedDate.value = today
+                loadAttendanceForDate(today)
+            } else if (todayAttendanceDate != null) {
+                loadAttendanceForDate(_selectedDate.value)
+            }
+        }
     }
 
-    // todayAttendance always tracks one date (today, for the Home screen). The Room flow
+    // todayAttendance tracks the selected date (defaults to today, for Home screen). The Room flow
     // re-emits on every write, so callers never need to reload it after marking.
-    private fun loadAttendanceForDate(date: LocalDate) {
+    fun loadAttendanceForDate(date: LocalDate) {
         todayAttendanceDate = date
         todayAttendanceJob?.cancel()
         todayAttendanceJob = viewModelScope.launch {
@@ -466,7 +479,8 @@ class AttendanceViewModel(application: Application) : AndroidViewModel(applicati
         val subjects = repository.getAllSubjectsOnce()
         val records = repository.getAllAttendanceRecordsOnce()
         val schedule = repository.getAllScheduleEntriesOnce()
-        return BackupManager.exportToJson(subjects, records, schedule)
+        val timeOffRules = TimeOffStore.getActiveRules(getApplication<Application>())
+        return BackupManager.exportToJson(subjects, records, schedule, timeOffRules)
     }
 
     /** Collect attendance data and return a CSV string ready to be written to a file. */
@@ -493,6 +507,10 @@ class AttendanceViewModel(application: Application) : AndroidViewModel(applicati
                     repository.restoreData(data.subjects, data.attendanceRecords, data.scheduleEntries)
                 }
                 SlotAttendanceStore.clear(getApplication<Application>())
+                if (data.timeOffRules.isNotEmpty()) {
+                    TimeOffStore.setRules(getApplication<Application>(), data.timeOffRules)
+                    TimeOffStore.syncActiveTimeOff(getApplication<Application>(), repository)
+                }
                 _backupRestoreStatus.value = BackupRestoreStatus.SUCCESS
                 _backupRestoreMessage.value =
                     "Restore complete: ${data.subjects.size} subjects, " +

@@ -20,11 +20,20 @@ class BackupManagerTest {
 
     @Test
     fun `json export parses back to the same data`() {
-        val data = BackupManager.parseJson(BackupManager.exportToJson(subjects, records, schedule))
+        val rules = listOf(
+            com.attendance.tracker.data.TimeOffRule(
+                startDate = LocalDate.of(2026, 11, 2),
+                endDate = LocalDate.of(2026, 11, 6),
+                status = AttendanceStatus.ABSENT,
+                subjectIds = setOf(1L)
+            )
+        )
+        val data = BackupManager.parseJson(BackupManager.exportToJson(subjects, records, schedule, rules))
         assertNotNull(data)
         assertEquals(subjects, data!!.subjects)
         assertEquals(records, data.attendanceRecords)
         assertEquals(schedule, data.scheduleEntries)
+        assertEquals(rules, data.timeOffRules)
     }
 
     @Test

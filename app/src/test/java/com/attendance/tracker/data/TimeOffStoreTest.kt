@@ -127,4 +127,46 @@ class TimeOffStoreTest {
         org.junit.Assert.assertEquals(AttendanceStatus.ABSENT, rules[0].status)
         org.junit.Assert.assertEquals(setOf(1L, 2L), rules[0].subjectIds)
     }
+
+    @Test
+    fun `getActiveRuleForDate returns matching rule within date range`() {
+        val prefs = FakeSharedPreferences()
+        val monday = LocalDate.of(2026, 11, 2)
+        val friday = LocalDate.of(2026, 11, 6)
+
+        TimeOffStore.recordTimeOff(prefs, monday, friday, AttendanceStatus.ABSENT)
+        val ruleMon = TimeOffStore.getActiveRuleForDate(prefs, monday)
+        org.junit.Assert.assertNotNull(ruleMon)
+        org.junit.Assert.assertEquals(AttendanceStatus.ABSENT, ruleMon?.status)
+        org.junit.Assert.assertEquals(monday, ruleMon?.startDate)
+        org.junit.Assert.assertEquals(friday, ruleMon?.endDate)
+
+        val ruleWed = TimeOffStore.getActiveRuleForDate(prefs, monday.plusDays(2))
+        org.junit.Assert.assertNotNull(ruleWed)
+
+        val ruleSun = TimeOffStore.getActiveRuleForDate(prefs, monday.minusDays(1))
+        org.junit.Assert.assertNull(ruleSun)
+
+        val ruleNextSat = TimeOffStore.getActiveRuleForDate(prefs, friday.plusDays(1))
+        org.junit.Assert.assertNull(ruleNextSat)
+    }
+
+    @Test
+    fun `setRules replaces active rules and round-trips`() {
+        val prefs = FakeSharedPreferences()
+        val monday = LocalDate.of(2026, 11, 2)
+        val friday = LocalDate.of(2026, 11, 6)
+
+        val rulesToSet = listOf(
+            TimeOffRule(monday, friday, AttendanceStatus.ABSENT, setOf(5L, 6L))
+        )
+        TimeOffStore.setRules(prefs, rulesToSet)
+
+        val loaded = TimeOffStore.getActiveRules(prefs)
+        org.junit.Assert.assertEquals(1, loaded.size)
+        org.junit.Assert.assertEquals(monday, loaded[0].startDate)
+        org.junit.Assert.assertEquals(friday, loaded[0].endDate)
+        org.junit.Assert.assertEquals(AttendanceStatus.ABSENT, loaded[0].status)
+        org.junit.Assert.assertEquals(setOf(5L, 6L), loaded[0].subjectIds)
+    }
 }

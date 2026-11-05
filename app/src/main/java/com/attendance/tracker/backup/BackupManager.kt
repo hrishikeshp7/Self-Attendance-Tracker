@@ -1,5 +1,6 @@
 package com.attendance.tracker.backup
 
+import com.attendance.tracker.data.TimeOffRule
 import com.attendance.tracker.data.model.AttendanceRecord
 import com.attendance.tracker.data.model.AttendanceStatus
 import com.attendance.tracker.data.model.ScheduleEntry
@@ -34,7 +35,8 @@ object BackupManager {
     fun exportToJson(
         subjects: List<Subject>,
         attendanceRecords: List<AttendanceRecord>,
-        scheduleEntries: List<ScheduleEntry>
+        scheduleEntries: List<ScheduleEntry>,
+        timeOffRules: List<TimeOffRule> = emptyList()
     ): String {
         val root = JSONObject()
         root.put("version", BACKUP_VERSION)
@@ -84,6 +86,20 @@ object BackupManager {
         }
         root.put("scheduleEntries", scheduleArray)
 
+        // Time off / Vacation rules
+        if (timeOffRules.isNotEmpty()) {
+            val timeOffArray = JSONArray()
+            timeOffRules.forEach { r ->
+                val obj = JSONObject()
+                obj.put("startDate", r.startDate.toString())
+                obj.put("endDate", r.endDate.toString())
+                obj.put("status", r.status.name)
+                r.subjectIds?.let { obj.put("subjectIds", JSONArray(it.toList())) }
+                timeOffArray.put(obj)
+            }
+            root.put("timeOffRules", timeOffArray)
+        }
+
         return root.toString(2) // pretty-print with 2-space indent
     }
 
@@ -94,7 +110,8 @@ object BackupManager {
     data class BackupData(
         val subjects: List<Subject>,
         val attendanceRecords: List<AttendanceRecord>,
-        val scheduleEntries: List<ScheduleEntry>
+        val scheduleEntries: List<ScheduleEntry>,
+        val timeOffRules: List<TimeOffRule> = emptyList()
     )
 
     /**
@@ -154,7 +171,23 @@ object BackupManager {
                 )
             }
 
-            BackupData(subjects, attendanceRecords, scheduleEntries)
+            // --- time off rules ---
+            val timeOffArray = root.optJSONArray("timeOffRules")
+            val timeOffRules = if (timeOffArray != null) {
+                (0 until timeOffArray.length()).mapNotNull { i ->
+                    val obj = timeOffArray.getJSONObject(i)
+                    val s = runCatching { LocalDate.parse(obj.getString("startDate")) }.getOrNull() ?: return@mapNotNull null
+                    val e = runCatching { LocalDate.parse(obj.getString("endDate")) }.getOrNull() ?: return@mapNotNull null
+                    val st = runCatching { AttendanceStatus.valueOf(obj.getString("status")) }.getOrNull() ?: return@mapNotNull null
+                    val subIdsArray = obj.optJSONArray("subjectIds")
+                    val subIds = if (subIdsArray != null) {
+                        (0 until subIdsArray.length()).map { subIdsArray.getLong(it) }.toSet()
+                    } else null
+                    TimeOffRule(s, e, st, subIds)
+                }
+            } else emptyList()
+
+            BackupData(subjects, attendanceRecords, scheduleEntries, timeOffRules)
         } catch (e: Exception) {
             null
         }

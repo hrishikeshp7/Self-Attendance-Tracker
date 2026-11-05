@@ -128,8 +128,7 @@ fun AttendanceApp(
             popExitTransition = { ExitTransition.None }
         ) {
             composable(Screen.Home.route) {
-                // Home marks LocalDate.now(); make sure the cards show that same day even if
-                // the app was left open past midnight.
+                // Home marks current/selected date; refresh rules and current day on resume
                 val lifecycleOwner = LocalLifecycleOwner.current
                 DisposableEffect(lifecycleOwner) {
                     val observer = LifecycleEventObserver { _, event ->
@@ -143,17 +142,19 @@ fun AttendanceApp(
                     allSubjects = subjectsMap,
                     todayAttendance = todayAttendance,
                     scheduleEntries = scheduleEntries,
+                    selectedDate = selectedDate,
+                    onSelectDate = { viewModel.selectDate(it) },
                     onMarkAttendance = { subjectId, status, count ->
-                        viewModel.markAttendance(subjectId, status, LocalDate.now(), count)
+                        viewModel.markAttendance(subjectId, status, selectedDate, count)
                     },
                     onAddExtraClass = { subjectId, status ->
-                        viewModel.addExtraClass(subjectId, status)
+                        viewModel.addExtraClass(subjectId, status, selectedDate)
                     },
                     onSetDayCounts = { subjectId, present, absent ->
-                        viewModel.setDayCounts(subjectId, LocalDate.now(), present, absent)
+                        viewModel.setDayCounts(subjectId, selectedDate, present, absent)
                     },
                     onClearAttendance = { subjectId ->
-                        viewModel.clearAttendance(subjectId, LocalDate.now())
+                        viewModel.clearAttendance(subjectId, selectedDate)
                     },
                     onAddSubject = {
                         showAddSubjectOnSubjectsScreen = true
