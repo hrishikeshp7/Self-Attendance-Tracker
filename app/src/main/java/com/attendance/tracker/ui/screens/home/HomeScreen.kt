@@ -44,8 +44,12 @@ import com.attendance.tracker.ui.theme.AbsentRed
 import com.attendance.tracker.ui.theme.subjectAvatarColor
 import com.attendance.tracker.widget.refreshAllWidgets
 import kotlinx.coroutines.launch
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import com.attendance.tracker.ui.components.CalendarView
 import java.time.Instant
 import java.time.LocalDate
+import java.time.YearMonth
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
@@ -57,7 +61,9 @@ fun HomeScreen(
     todayAttendance: Map<Long, AttendanceRecord>,
     scheduleEntries: List<ScheduleEntry>,
     selectedDate: LocalDate = LocalDate.now(),
+    attendanceRecords: List<AttendanceRecord> = emptyList(),
     onSelectDate: (LocalDate) -> Unit = {},
+    onMonthChanged: (YearMonth) -> Unit = {},
     onMarkAttendance: (Long, AttendanceStatus, Int) -> Unit,
     onAddExtraClass: (Long, AttendanceStatus) -> Unit,
     onSetDayCounts: (Long, Int, Int) -> Unit = { _, _, _ -> },
@@ -176,33 +182,19 @@ fun HomeScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.clickable { showDatePicker = true }
-                    ) {
-                        Column {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(
-                                    text = if (isToday) "Today · ${selectedDate.format(dayFormatter)}" else selectedDate.format(dayFormatter),
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = if (isToday) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Icon(
-                                    Icons.Default.ArrowDropDown,
-                                    contentDescription = "Pick date",
-                                    modifier = Modifier.size(16.dp),
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                            Text(
-                                text = selectedDate.format(dateFormatter),
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                        }
+                    Column {
+                        Text(
+                            text = if (isToday) "Today · ${selectedDate.format(dayFormatter)}" else selectedDate.format(dayFormatter),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = if (isToday) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            text = selectedDate.format(dateFormatter),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
                     }
                 },
                 actions = {
@@ -404,31 +396,66 @@ fun HomeScreen(
     }
 
     if (showDatePicker) {
-        val datePickerState = rememberDatePickerState(
-            initialSelectedDateMillis = selectedDate.atStartOfDay(ZoneId.of("UTC")).toInstant().toEpochMilli()
-        )
-        DatePickerDialog(
+        var pickerMonth by remember(selectedDate) { mutableStateOf(YearMonth.from(selectedDate)) }
+        LaunchedEffect(pickerMonth) {
+            onMonthChanged(pickerMonth)
+        }
+        Dialog(
             onDismissRequest = { showDatePicker = false },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        datePickerState.selectedDateMillis?.let { millis ->
-                            val picked = Instant.ofEpochMilli(millis).atZone(ZoneId.of("UTC")).toLocalDate()
-                            onSelectDate(picked)
-                        }
-                        showDatePicker = false
-                    }
+            properties = DialogProperties(usePlatformDefaultWidth = false)
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 8.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Text("OK")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDatePicker = false }) {
-                    Text("Cancel")
+                    CalendarView(
+                        selectedMonth = pickerMonth,
+                        selectedDate = selectedDate,
+                        attendanceRecords = attendanceRecords,
+                        onDateSelected = { picked ->
+                            onSelectDate(picked)
+                            showDatePicker = false
+                        },
+                        onMonthChanged = { newMonth ->
+                            pickerMonth = newMonth
+                            onMonthChanged(newMonth)
+                        }
+                    )
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 20.dp, vertical = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        if (selectedDate != LocalDate.now()) {
+                            FilledTonalButton(
+                                onClick = {
+                                    onSelectDate(LocalDate.now())
+                                    showDatePicker = false
+                                },
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Text("Jump to Today")
+                            }
+                        } else {
+                            Spacer(modifier = Modifier.width(1.dp))
+                        }
+                        FilledTonalButton(
+                            onClick = { showDatePicker = false },
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Text("Close")
+                        }
+                    }
                 }
             }
-        ) {
-            DatePicker(state = datePickerState)
         }
     }
 }

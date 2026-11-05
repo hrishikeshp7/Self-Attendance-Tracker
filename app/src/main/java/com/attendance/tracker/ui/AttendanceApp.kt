@@ -142,9 +142,11 @@ fun AttendanceApp(
                     subjects = subjects,
                     allSubjects = subjectsMap,
                     todayAttendance = todayAttendance,
+                    attendanceRecords = attendanceRecords,
                     scheduleEntries = scheduleEntries,
                     selectedDate = selectedDate,
                     onSelectDate = { viewModel.selectDate(it) },
+                    onMonthChanged = { viewModel.loadAttendanceForMonth(it) },
                     onMarkAttendance = { subjectId, status, count ->
                         viewModel.markAttendance(subjectId, status, selectedDate, count)
                     },
