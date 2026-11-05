@@ -44,6 +44,7 @@ fun AttendancePieChart(
         modifier = modifier.size(size),
         contentAlignment = Alignment.Center
     ) {
+        val notchColor = MaterialTheme.colorScheme.onSurface
         Canvas(modifier = Modifier.fillMaxSize()) {
             val strokeWidthPx = strokeWidth.toPx()
             val arcSize = Size(
@@ -92,7 +93,7 @@ fun AttendancePieChart(
             val endY = centerY + (endRadius * kotlin.math.sin(radians)).toFloat()
             
             drawLine(
-                color = Color.White,
+                color = notchColor,
                 start = Offset(startX, startY),
                 end = Offset(endX, endY),
                 strokeWidth = 2.dp.toPx(),
@@ -133,6 +134,7 @@ fun AttendanceDonutChart(
     presentCount: Int,
     absentCount: Int,
     totalCount: Int,
+    requiredPercentage: Int = 75,
     modifier: Modifier = Modifier,
     size: Dp = 100.dp,
     strokeWidth: Dp = 12.dp
@@ -198,7 +200,7 @@ fun AttendanceDonutChart(
                 text = "$displayPresent%",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
-                color = if (presentPercentage >= 75) PresentGreen else AbsentRed
+                color = if (presentPercentage >= requiredPercentage) PresentGreen else AbsentRed
             )
         }
     }

@@ -2,6 +2,9 @@ package com.attendance.tracker.update
 
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
+import android.os.Build
+import android.provider.Settings
 import androidx.core.content.FileProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -58,8 +61,6 @@ suspend fun checkForUpdate(context: Context): UpdateInfo? = withContext(Dispatch
             apkUrl = apk.getString("browser_download_url"),
             notes = json.optString("body")
         )
-    } catch (_: Exception) {
-        null
     } finally {
         conn.disconnect()
     }
@@ -93,6 +94,17 @@ suspend fun downloadAndInstall(context: Context, info: UpdateInfo, onProgress: (
         }
         out
     }
+
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        if (!context.packageManager.canRequestPackageInstalls()) {
+            val intent = Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES)
+                .setData(Uri.parse("package:${context.packageName}"))
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            context.startActivity(intent)
+            return
+        }
+    }
+
     val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
     context.startActivity(
         Intent(Intent.ACTION_VIEW)

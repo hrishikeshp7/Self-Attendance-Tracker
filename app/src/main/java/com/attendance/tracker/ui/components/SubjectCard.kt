@@ -229,7 +229,7 @@ fun SubjectCard(
                     color = PresentGreen,
                     onClick = {
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        if (!isSelectPresent) onMarkPresent()
+                        if (isSelectPresent) onClearAttendance?.invoke() else onMarkPresent()
                     },
                     enabled = !locked,
                     modifier = Modifier.weight(1f)
@@ -240,7 +240,7 @@ fun SubjectCard(
                     color = AbsentRed,
                     onClick = {
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        if (!isSelectAbsent) onMarkAbsent()
+                        if (isSelectAbsent) onClearAttendance?.invoke() else onMarkAbsent()
                     },
                     enabled = !locked,
                     modifier = Modifier.weight(1f)
@@ -251,7 +251,7 @@ fun SubjectCard(
                     color = NoClassGray,
                     onClick = {
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        if (!isSelectNoClass) onMarkNoClass()
+                        if (isSelectNoClass) onClearAttendance?.invoke() else onMarkNoClass()
                     },
                     enabled = !locked,
                     modifier = Modifier.weight(1f)

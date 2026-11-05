@@ -31,6 +31,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.attendance.tracker.data.TimeOffStore
 import com.attendance.tracker.data.model.AttendanceRecord
 import com.attendance.tracker.data.model.AttendanceStatus
 import com.attendance.tracker.data.model.ScheduleEntry
@@ -78,6 +79,7 @@ fun WeeklyCalendarScreen(
     onDeleteLecture: (ScheduleEntry) -> Unit,
     onOpenSubjectCalendar: ((Long) -> Unit)? = null,
     onOpenTimeOff: ((LocalDate, LocalDate) -> Unit)? = null,
+    onWeekChanged: ((LocalDate) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     var editorState by remember { mutableStateOf<LectureEditorState?>(null) }
@@ -87,6 +89,10 @@ fun WeeklyCalendarScreen(
     val thisMonday = remember { LocalDate.now().with(DayOfWeek.MONDAY) }
     var weekEpoch by rememberSaveable { mutableStateOf(thisMonday.toEpochDay()) }
     val weekStart = LocalDate.ofEpochDay(weekEpoch)
+
+    LaunchedEffect(weekStart) {
+        onWeekChanged?.invoke(weekStart)
+    }
     // Only the lectures actually held in that week (a slot can be limited to a date range)
     val weekEntries = remember(scheduleEntries, weekEpoch) {
         scheduleEntries.filter { it.occursOn(weekStart.plusDays(it.dayOfWeek.ordinal.toLong())) }
@@ -210,10 +216,22 @@ fun WeeklyCalendarScreen(
     }
 
     editorState?.let { state ->
+        val siblings = remember(state.existingEntry, scheduleEntries) {
+            val existing = state.existingEntry
+            if (existing == null) emptyList()
+            else scheduleEntries.filter {
+                it.subjectId == existing.subjectId &&
+                    it.startTime == existing.startTime &&
+                    it.endTime == existing.endTime &&
+                    it.startDate == existing.startDate &&
+                    it.endDate == existing.endDate
+            }
+        }
         LectureEditorSheet(
             state = state,
             subjects = subjects,
             allSubjects = allSubjects,
+            existingSiblings = siblings,
             onDismiss = { editorState = null },
             onSave = { subjectId, day, start, end, from, until ->
                 val existing = state.existingEntry
@@ -226,25 +244,18 @@ fun WeeklyCalendarScreen(
             onSaveMultiple = { subjectId, days, start, end, from, until ->
                 val existing = state.existingEntry
                 if (existing != null) {
-                    val updateDay = if (existing.dayOfWeek in days) existing.dayOfWeek else days.first()
-                    onUpdateLecture(existing, subjectId, updateDay, start, end, from, until)
-                    val additionalDays = (days - updateDay).filter { day ->
-                        !scheduleEntries.any { other ->
-                            other.id != existing.id &&
-                                other.subjectId == subjectId &&
-                                other.dayOfWeek == day &&
-                                other.startTime == start &&
-                                other.endTime == end &&
-                                datesOverlap(other.startDate, other.endDate, from, until)
+                    val siblingByDay = siblings.associateBy { it.dayOfWeek }
+                    for (day in days) {
+                        val sib = siblingByDay[day]
+                        if (sib != null) {
+                            onUpdateLecture(sib, subjectId, day, start, end, from, until)
+                        } else {
+                            onAddLecture(subjectId, day, start, end, from, until)
                         }
                     }
-                    if (additionalDays.isNotEmpty()) {
-                        if (onAddLectures != null) {
-                            onAddLectures(subjectId, additionalDays, start, end, from, until)
-                        } else {
-                            additionalDays.forEach { day ->
-                                onAddLecture(subjectId, day, start, end, from, until)
-                            }
+                    for ((sibDay, sib) in siblingByDay) {
+                        if (sibDay !in days) {
+                            onDeleteLecture(sib)
                         }
                     }
                 } else {
@@ -257,7 +268,15 @@ fun WeeklyCalendarScreen(
                     }
                 }
             },
-            onDelete = state.existingEntry?.let { entry -> { onDeleteLecture(entry) } },
+            onDelete = state.existingEntry?.let { entry ->
+                {
+                    if (siblings.isNotEmpty()) {
+                        siblings.forEach { onDeleteLecture(it) }
+                    } else {
+                        onDeleteLecture(entry)
+                    }
+                }
+            },
             onOpenSubjectCalendar = onOpenSubjectCalendar
         )
     }
@@ -441,6 +460,8 @@ private fun WeekGrid(
         }
     }
 
+    val context = LocalContext.current
+
     Column(modifier = modifier) {
         // Day header row — scrolls horizontally in lockstep with the grid body below.
         Row(modifier = Modifier.fillMaxWidth()) {
@@ -449,7 +470,9 @@ private fun WeekGrid(
                 DayOfWeek.entries.forEach { day ->
                     val dayDate = weekStart.plusDays(day.ordinal.toLong())
                     val dayRecords = attendanceRecords.filter { it.date == dayDate }
-                    val isDayHoliday = dayRecords.isNotEmpty() && dayRecords.all { it.status == AttendanceStatus.NO_CLASS }
+                    val activeRule = TimeOffStore.getActiveRuleForDate(context, dayDate)
+                    val isDayHoliday = (dayRecords.isNotEmpty() && dayRecords.all { it.status == AttendanceStatus.NO_CLASS }) ||
+                        (activeRule != null && activeRule.status == AttendanceStatus.NO_CLASS)
                     DayHeaderCell(
                         day = day,
                         isToday = day == today,
@@ -513,7 +536,9 @@ private fun WeekGrid(
                     val dayRecords = attendanceRecords.filter { it.date == dayDate }
                     val dayEntries = entriesByDay[day].orEmpty()
                     layoutDayEntries(dayEntries).forEach { (entry, lane) ->
-                        val isCancelled = dayRecords.any { it.subjectId == entry.subjectId && it.status == AttendanceStatus.NO_CLASS }
+                        val activeRule = TimeOffStore.getActiveRuleForDate(context, dayDate, entry.subjectId)
+                        val isCancelled = dayRecords.any { it.subjectId == entry.subjectId && it.status == AttendanceStatus.NO_CLASS } ||
+                            (activeRule != null && activeRule.status == AttendanceStatus.NO_CLASS)
                         LectureBlock(
                             entry = entry,
                             subject = allSubjects[entry.subjectId],
@@ -746,6 +771,7 @@ private fun LectureBlock(
 
 private enum class LectureRecurrence(val label: String) {
     ONGOING("Until cancelled"),
+    ONE_OFF("Single date only"),
     THIS_WEEK("This week only"),
     UNTIL_DATE("Until date...")
 }
@@ -756,6 +782,7 @@ private fun LectureEditorSheet(
     state: LectureEditorState,
     subjects: List<Subject>,
     allSubjects: Map<Long, Subject>,
+    existingSiblings: List<ScheduleEntry> = emptyList(),
     onDismiss: () -> Unit,
     onSave: (subjectId: Long, dayOfWeek: DayOfWeek, startTime: LocalTime, endTime: LocalTime, startDate: LocalDate?, endDate: LocalDate?) -> Unit,
     onSaveMultiple: (subjectId: Long, days: Collection<DayOfWeek>, startTime: LocalTime, endTime: LocalTime, startDate: LocalDate?, endDate: LocalDate?) -> Unit,
@@ -768,13 +795,20 @@ private fun LectureEditorSheet(
     val isEditing = existing != null
 
     var subjectId by remember { mutableStateOf(state.subjectId) }
-    var selectedDays by remember { mutableStateOf(setOf(state.dayOfWeek)) }
+    val initialDays = remember(existing, existingSiblings) {
+        if (existing == null) setOf(state.dayOfWeek)
+        else existingSiblings.map { it.dayOfWeek }.toSet().ifEmpty { setOf(state.dayOfWeek) }
+    }
+    var selectedDays by remember { mutableStateOf(initialDays) }
     var startTime by remember { mutableStateOf(state.startTime) }
     var endTime by remember { mutableStateOf(state.endTime) }
 
+    val isOneOff = existing != null && existing.startDate != null && existing.startDate == existing.endDate
+    val isThisWeek = existing != null && existing.startDate == state.weekStart && existing.endDate == state.weekStart.plusDays(6)
     val initialRecurrence = when {
         existing == null -> LectureRecurrence.ONGOING
-        existing.startDate != null && (existing.startDate == existing.endDate || (existing.endDate != null && existing.startDate == state.weekStart && existing.endDate == state.weekStart.plusDays(6))) -> LectureRecurrence.THIS_WEEK
+        isOneOff -> LectureRecurrence.ONE_OFF
+        isThisWeek -> LectureRecurrence.THIS_WEEK
         existing.endDate != null -> LectureRecurrence.UNTIL_DATE
         else -> LectureRecurrence.ONGOING
     }
@@ -790,6 +824,10 @@ private fun LectureEditorSheet(
     var submitted by remember { mutableStateOf(false) }
 
     val isTimeValid = endTime.isAfter(startTime)
+    val isRecurrenceValid = when (recurrence) {
+        LectureRecurrence.UNTIL_DATE -> existing?.startDate?.let { !customEndDate.isBefore(it) } ?: true
+        else -> true
+    }
     val selectedSubject = allSubjects[subjectId]
 
     val dismissAfterHide: () -> Unit = {
@@ -930,6 +968,14 @@ private fun LectureEditorSheet(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
+                LectureRecurrence.ONE_OFF -> {
+                    val oneOffDate = existing?.startDate ?: state.weekStart.plusDays(selectedDays.firstOrNull()?.ordinal?.toLong() ?: 0L)
+                    Text(
+                        text = "Held only on ${oneOffDate.format(DateTimeFormatter.ofPattern("EEE, MMM d, yyyy"))}.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
                 LectureRecurrence.THIS_WEEK -> {
                     val weekEnd = state.weekStart.plusDays(6)
                     Text(
@@ -969,6 +1015,14 @@ private fun LectureEditorSheet(
                                 modifier = Modifier.size(20.dp)
                             )
                         }
+                    }
+                    if (existing?.startDate != null && customEndDate.isBefore(existing.startDate)) {
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = "End date cannot be before start date (${existing.startDate})",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.error
+                        )
                     }
                 }
             }
@@ -1072,8 +1126,12 @@ private fun LectureEditorSheet(
                         submitted = true
                         val (from, until) = when (recurrence) {
                             LectureRecurrence.ONGOING -> Pair(null, null)
+                            LectureRecurrence.ONE_OFF -> {
+                                val slotDate = existing?.startDate ?: state.weekStart.plusDays(selectedDays.first().ordinal.toLong())
+                                Pair(slotDate, slotDate)
+                            }
                             LectureRecurrence.THIS_WEEK -> Pair(state.weekStart, state.weekStart.plusDays(6))
-                            LectureRecurrence.UNTIL_DATE -> Pair(existing?.startDate ?: state.weekStart, customEndDate)
+                            LectureRecurrence.UNTIL_DATE -> Pair(existing?.startDate, customEndDate)
                         }
                         if (selectedDays.size == 1) {
                             onSave(subjectId, selectedDays.first(), startTime, endTime, from, until)
@@ -1082,7 +1140,7 @@ private fun LectureEditorSheet(
                         }
                         dismissAfterHide()
                     },
-                    enabled = !submitted && isTimeValid && selectedSubject != null && selectedDays.isNotEmpty()
+                    enabled = !submitted && isTimeValid && selectedSubject != null && selectedDays.isNotEmpty() && isRecurrenceValid
                 ) {
                     Text(
                         if (selectedDays.size > 1) "Save (${selectedDays.size} Days)"

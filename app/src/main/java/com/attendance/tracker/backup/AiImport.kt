@@ -38,13 +38,40 @@ object AiImport {
             "- Do not guess. If a time or subject is unclear, ask me before answering."
 
     fun parse(text: String): CsvImporter.Result {
-        val start = text.indexOf('{')
-        val end = text.lastIndexOf('}')
-        if (start < 0 || end <= start) return fail("No JSON found. Paste the chatbot's whole reply.")
+        val cleaned = text.trim()
+        val fenced = if (cleaned.contains("```")) {
+            val after = cleaned.substringAfter("```json", "").ifEmpty { cleaned.substringAfter("```") }
+            val block = after.substringBefore("```")
+            val s = block.indexOf('{')
+            val e = block.lastIndexOf('}')
+            if (s >= 0 && e > s) block.substring(s, e + 1) else null
+        } else null
+
+        val candidate = fenced ?: run {
+            val start = cleaned.indexOf('{')
+            val end = cleaned.lastIndexOf('}')
+            if (start >= 0 && end > start) cleaned.substring(start, end + 1) else null
+        }
+
+        if (candidate == null) return fail("No JSON found. Paste the chatbot's whole reply.")
+
         val root = try {
-            JSONObject(text.substring(start, end + 1))
-        } catch (e: Exception) {
-            return fail("That isn't valid JSON. Ask the chatbot to fix the format and try again.")
+            JSONObject(candidate)
+        } catch (_: Exception) {
+            val subjectsIdx = cleaned.indexOf("\"subjects\"")
+            val altCandidate = if (subjectsIdx > 0) {
+                val s = cleaned.lastIndexOf('{', subjectsIdx)
+                val lastBracket = cleaned.lastIndexOf(']')
+                val e = if (lastBracket > 0) cleaned.indexOf('}', lastBracket) else -1
+                if (s >= 0 && e > s) cleaned.substring(s, e + 1) else null
+            } else null
+
+            try {
+                if (altCandidate != null) JSONObject(altCandidate)
+                else return fail("That isn't valid JSON. Ask the chatbot to fix the format and try again.")
+            } catch (e: Exception) {
+                return fail("That isn't valid JSON. Ask the chatbot to fix the format and try again.")
+            }
         }
         if (root.optInt("version", 1) > 1) return fail("This format is from a newer version of the app.")
         val array = root.optJSONArray("subjects") ?: return fail("Missing \"subjects\" list.")

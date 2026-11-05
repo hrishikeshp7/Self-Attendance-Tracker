@@ -69,6 +69,7 @@ fun AttendanceApp(
     val subjectsMap by viewModel.subjectsMap.collectAsState()
     val scheduleEntries by viewModel.scheduleEntries.collectAsState()
     val selectedDate by viewModel.selectedDate.collectAsState()
+    val calendarSelectedDate by viewModel.calendarSelectedDate.collectAsState()
     val selectedMonth by viewModel.selectedMonth.collectAsState()
     val todayAttendance by viewModel.todayAttendance.collectAsState()
     val attendanceRecords by viewModel.attendanceRecords.collectAsState()
@@ -206,7 +207,7 @@ fun AttendanceApp(
                     subject = subject,
                     allSubjects = subjectsMap,
                     selectedMonth = selectedMonth,
-                    selectedDate = selectedDate,
+                    selectedDate = calendarSelectedDate,
                     attendanceRecords = attendanceRecords,
                     scheduleEntries = scheduleEntries,
                     onGetRangeRecords = { start, end ->
@@ -277,6 +278,9 @@ fun AttendanceApp(
                     allSubjects = subjectsMap,
                     scheduleEntries = scheduleEntries,
                     attendanceRecords = attendanceRecords,
+                    onWeekChanged = { monday ->
+                        viewModel.loadAttendanceForRange(monday, monday.plusDays(6))
+                    },
                     onOpenSubjectCalendar = { subId ->
                         navController.navigate(Screen.SubjectCalendar.createRoute(subId))
                     },

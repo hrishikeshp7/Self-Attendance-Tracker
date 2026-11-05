@@ -139,13 +139,14 @@ object CalendarSyncManager {
                 // Only the slot's own date range (e.g. one semester), and never the past
                 var date = nextOrSameDate(maxOf(today, entry.startDate ?: today), entry.dayOfWeek)
                 val last = minOf(endDate, entry.endDate ?: endDate)
+                val effectiveEndTime = if (entry.endTime.isAfter(entry.startTime)) entry.endTime else entry.startTime.plusMinutes(60)
                 while (!date.isAfter(last)) {
                     val values = ContentValues().apply {
                         put(CalendarContract.Events.CALENDAR_ID, calendarId)
                         put(CalendarContract.Events.TITLE, subject.getDisplayName(subjectsById))
                         put(CalendarContract.Events.DESCRIPTION, SYNC_MARKER)
                         put(CalendarContract.Events.DTSTART, date.atTime(entry.startTime).atZone(zoneId).toInstant().toEpochMilli())
-                        put(CalendarContract.Events.DTEND, date.atTime(entry.endTime).atZone(zoneId).toInstant().toEpochMilli())
+                        put(CalendarContract.Events.DTEND, date.atTime(effectiveEndTime).atZone(zoneId).toInstant().toEpochMilli())
                         put(CalendarContract.Events.EVENT_TIMEZONE, zoneId.id)
                         put(CalendarContract.Events.HAS_ALARM, 0)
                     }
@@ -248,11 +249,13 @@ object CalendarSyncManager {
             val anchorDate = nextOrSameDate(maxOf(today, entry.startDate ?: today), entry.dayOfWeek)
             if (anchorDate.isAfter(last)) continue
             val until = last.atTime(23, 59, 59).atZone(zoneId).withZoneSameInstant(ZoneOffset.UTC).format(icsUtcFormatter)
+            val effectiveEndTime = if (entry.endTime.isAfter(entry.startTime)) entry.endTime else entry.startTime.plusMinutes(60)
             val dtStart = anchorDate.atTime(entry.startTime)
-            val dtEnd = anchorDate.atTime(entry.endTime)
+            val dtEnd = anchorDate.atTime(effectiveEndTime)
 
+            val uid = if (entry.id > 0) "schedule-${entry.id}" else "schedule-${entry.subjectId}-${entry.dayOfWeek}-${entry.startTime}-${entry.startDate}"
             sb.append("BEGIN:VEVENT\r\n")
-            sb.append("UID:schedule-${entry.id}@selfattendancetracker\r\n")
+            sb.append("UID:$uid@selfattendancetracker\r\n")
             sb.append("DTSTAMP:$dtStamp\r\n")
             sb.append("DTSTART;TZID=${zoneId.id}:${dtStart.format(icsLocalFormatter)}\r\n")
             sb.append("DTEND;TZID=${zoneId.id}:${dtEnd.format(icsLocalFormatter)}\r\n")

@@ -29,7 +29,8 @@ class AttendanceViewModel(application: Application) : AndroidViewModel(applicati
     private val repository = AttendanceRepository(
         database.subjectDao(),
         database.attendanceDao(),
-        database.scheduleDao()
+        database.scheduleDao(),
+        database
     )
     private val themeRepository = com.attendance.tracker.data.repository.ThemePreferenceRepository(
         database.themePreferenceDao()
@@ -55,6 +56,9 @@ class AttendanceViewModel(application: Application) : AndroidViewModel(applicati
     private val _selectedMonth = MutableStateFlow(YearMonth.now())
     val selectedMonth: StateFlow<YearMonth> = _selectedMonth.asStateFlow()
 
+    private val _calendarSelectedDate = MutableStateFlow(LocalDate.now())
+    val calendarSelectedDate: StateFlow<LocalDate> = _calendarSelectedDate.asStateFlow()
+
     private val _todayAttendance = MutableStateFlow<Map<Long, AttendanceRecord>>(emptyMap())
     val todayAttendance: StateFlow<Map<Long, AttendanceRecord>> = _todayAttendance.asStateFlow()
 
@@ -64,6 +68,7 @@ class AttendanceViewModel(application: Application) : AndroidViewModel(applicati
     // Job handles for cancelling stale collectors before starting new ones
     private var todayAttendanceJob: Job? = null
     private var monthAttendanceJob: Job? = null
+    private var rangeAttendanceJob: Job? = null
 
     // Guards markAttendance/clearAttendance against being re-entered for the same
     // subject+date before the previous call's read-modify-write on the attendance
@@ -95,6 +100,7 @@ class AttendanceViewModel(application: Application) : AndroidViewModel(applicati
         viewModelScope.launch {
             TimeOffStore.syncActiveTimeOff(getApplication<Application>(), repository)
             loadAttendanceForDate(LocalDate.now())
+            loadAttendanceForMonth(YearMonth.now())
         }
         // Initialize theme preferences
         viewModelScope.launch {
@@ -152,14 +158,22 @@ class AttendanceViewModel(application: Application) : AndroidViewModel(applicati
         }
     }
 
+    fun loadAttendanceForRange(startDate: LocalDate, endDate: LocalDate) {
+        rangeAttendanceJob?.cancel()
+        rangeAttendanceJob = viewModelScope.launch {
+            repository.getAttendanceInRange(startDate, endDate).collect { records ->
+                _attendanceRecords.value = records
+            }
+        }
+    }
+
     suspend fun getAttendanceInRangeOnce(startDate: LocalDate, endDate: LocalDate): List<AttendanceRecord> {
         return repository.getAttendanceInRangeOnce(startDate, endDate)
     }
 
     fun setSelectedDate(date: LocalDate) {
-        // Only the calendar's selection: todayAttendance must stay on today for Home,
-        // which always marks LocalDate.now().
-        _selectedDate.value = date
+        // Only the calendar's selection; keeps HomeScreen selectedDate unaffected
+        _calendarSelectedDate.value = date
     }
 
     fun setSelectedMonth(yearMonth: YearMonth) {
@@ -507,6 +521,7 @@ class AttendanceViewModel(application: Application) : AndroidViewModel(applicati
                     repository.restoreData(data.subjects, data.attendanceRecords, data.scheduleEntries)
                 }
                 SlotAttendanceStore.clear(getApplication<Application>())
+                TimeOffStore.clear(getApplication<Application>())
                 if (data.timeOffRules.isNotEmpty()) {
                     TimeOffStore.setRules(getApplication<Application>(), data.timeOffRules)
                     TimeOffStore.syncActiveTimeOff(getApplication<Application>(), repository)

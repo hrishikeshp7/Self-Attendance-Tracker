@@ -36,23 +36,30 @@ object TimeOffStore {
         subjectIds: Set<Long>? = null
     ) {
         val current = prefs.getStringSet(KEY_RULES, emptySet())?.toMutableSet() ?: mutableSetOf()
-        val iterator = current.iterator()
-        while (iterator.hasNext()) {
-            val item = iterator.next()
-            val rule = parseRule(item)
-            if (rule != null) {
-                val overlaps = !startDate.isAfter(rule.endDate) && !endDate.isBefore(rule.startDate)
-                if (overlaps) {
-                    val subjectOverlap = when {
-                        subjectIds == null || rule.subjectIds == null -> true
-                        else -> subjectIds.any { it in rule.subjectIds }
-                    }
-                    if (subjectOverlap) {
-                        iterator.remove()
+        val toRemove = mutableListOf<String>()
+        val toAdd = mutableListOf<String>()
+
+        for (item in current) {
+            val rule = parseRule(item) ?: continue
+            val overlaps = !startDate.isAfter(rule.endDate) && !endDate.isBefore(rule.startDate)
+            if (overlaps) {
+                if (subjectIds == null) {
+                    // New rule covers ALL subjects, remove overlapping rule
+                    toRemove.add(item)
+                } else if (rule.subjectIds != null) {
+                    val remaining = rule.subjectIds - subjectIds
+                    if (remaining.isEmpty()) {
+                        toRemove.add(item)
+                    } else if (remaining.size != rule.subjectIds.size) {
+                        toRemove.add(item)
+                        val subsStr = remaining.joinToString(",")
+                        toAdd.add("${rule.startDate}:${rule.endDate}:${rule.status.name}:$subsStr")
                     }
                 }
             }
         }
+        current.removeAll(toRemove)
+        current.addAll(toAdd)
 
         if (status != null) {
             val subsStr = subjectIds?.joinToString(",") ?: "ALL"
@@ -77,12 +84,13 @@ object TimeOffStore {
         }
     }
 
-    fun getActiveRuleForDate(context: Context, date: LocalDate): TimeOffRule? =
-        getActiveRuleForDate(prefs(context), date)
+    fun getActiveRuleForDate(context: Context, date: LocalDate, subjectId: Long? = null): TimeOffRule? =
+        getActiveRuleForDate(prefs(context), date, subjectId)
 
-    fun getActiveRuleForDate(prefs: SharedPreferences, date: LocalDate): TimeOffRule? {
+    fun getActiveRuleForDate(prefs: SharedPreferences, date: LocalDate, subjectId: Long? = null): TimeOffRule? {
         return getActiveRules(prefs).firstOrNull { rule ->
-            !date.isBefore(rule.startDate) && !date.isAfter(rule.endDate)
+            !date.isBefore(rule.startDate) && !date.isAfter(rule.endDate) &&
+                (subjectId == null || rule.subjectIds == null || subjectId in rule.subjectIds)
         }
     }
 
@@ -131,19 +139,8 @@ object TimeOffStore {
         today: LocalDate = LocalDate.now()
     ) {
         val rules = getActiveRules(context)
-        val allRecords = repository.getAllAttendanceRecordsOnce()
-        val futureRecords = allRecords.filter { it.date.isAfter(today) }
-        val effectiveRules = if (rules.isEmpty() && futureRecords.isNotEmpty()) {
-            val minDate = futureRecords.minOf { it.date }
-            val maxDate = futureRecords.maxOf { it.date }
-            val sampleStatus = futureRecords.first().status
-            val recovered = TimeOffRule(minDate, maxDate, sampleStatus, null)
-            recordTimeOff(context, minDate, maxDate, sampleStatus, null)
-            listOf(recovered)
-        } else {
-            rules
-        }
-        syncActiveTimeOff(effectiveRules, repository, today)
+        if (rules.isEmpty()) return
+        syncActiveTimeOff(rules, repository, today)
     }
 
     suspend fun syncActiveTimeOff(
@@ -151,11 +148,18 @@ object TimeOffStore {
         repository: AttendanceRepository,
         today: LocalDate = LocalDate.now()
     ) {
-        // 1. Purge any future records (> today)
+        if (rules.isEmpty()) return
+        // 1. Purge future records covered by active rules
         val allRecords = repository.getAllAttendanceRecordsOnce()
         val futureRecords = allRecords.filter { it.date.isAfter(today) }
         for (rec in futureRecords) {
-            repository.clearDay(rec.subjectId, rec.date)
+            val covered = rules.any { rule ->
+                !rec.date.isBefore(rule.startDate) && !rec.date.isAfter(rule.endDate) &&
+                    (rule.subjectIds == null || rec.subjectId in rule.subjectIds)
+            }
+            if (covered) {
+                repository.clearDay(rec.subjectId, rec.date)
+            }
         }
 
         // 2. Apply active rules for eligible dates up to today

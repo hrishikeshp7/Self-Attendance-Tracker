@@ -1,5 +1,6 @@
 package com.attendance.tracker.data.repository
 
+import androidx.room.withTransaction
 import com.attendance.tracker.data.database.AttendanceDao
 import com.attendance.tracker.data.database.ScheduleDao
 import com.attendance.tracker.data.database.SubjectDao
@@ -10,14 +11,30 @@ import com.attendance.tracker.data.model.datesOverlap
 import com.attendance.tracker.data.model.Subject
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.time.DayOfWeek
 import java.time.LocalDate
 
 class AttendanceRepository(
     private val subjectDao: SubjectDao,
     private val attendanceDao: AttendanceDao,
-    private val scheduleDao: ScheduleDao
+    private val scheduleDao: ScheduleDao,
+    private val database: androidx.room.RoomDatabase? = null
 ) {
+    companion object {
+        val writeMutex = Mutex()
+    }
+
+    private suspend fun <T> runInTransaction(block: suspend () -> T): T {
+        return writeMutex.withLock {
+            if (database != null) {
+                database.withTransaction { block() }
+            } else {
+                block()
+            }
+        }
+    }
     // Subject operations
     val allSubjects: Flow<List<Subject>> = subjectDao.getAllSubjects()
     val topLevelSubjects: Flow<List<Subject>> = subjectDao.getTopLevelSubjects()
@@ -31,7 +48,7 @@ class AttendanceRepository(
 
     suspend fun updateSubject(subject: Subject) = subjectDao.updateSubject(subject)
 
-    suspend fun deleteSubject(subject: Subject) {
+    suspend fun deleteSubject(subject: Subject) = runInTransaction {
         if (subject.isFolder) {
             // Promote any sub-subjects to top-level rather than orphaning them under a
             // now-deleted folder id — preserves their attendance history and keeps them
@@ -67,9 +84,9 @@ class AttendanceRepository(
         date: LocalDate,
         status: AttendanceStatus,
         targetCount: Int = 1
-    ) {
+    ) = runInTransaction {
         val existing = attendanceDao.getAttendanceRecord(subjectId, date)
-        if (existing != null && existing.status == status && existing.otherCount == 0 && existing.count >= maxOf(targetCount, 1)) return
+        if (existing != null && existing.status == status && existing.otherCount == 0 && existing.count >= maxOf(targetCount, 1)) return@runInTransaction
         val total = if (existing == null) maxOf(targetCount, 1) else maxOf(existing.count + existing.otherCount, targetCount)
         val newPresent = if (status == AttendanceStatus.PRESENT) total else 0
         val newAbsent = if (status == AttendanceStatus.ABSENT) total else 0
@@ -107,8 +124,8 @@ class AttendanceRepository(
             getSubjectById(subjectId)?.let {
                 subjectDao.updateAttendanceCounts(
                     subjectId,
-                    it.presentLectures + newPresent - existing.presentCount,
-                    it.absentLectures + newAbsent - existing.absentCount
+                    maxOf(0, it.presentLectures + newPresent - existing.presentCount),
+                    maxOf(0, it.absentLectures + newAbsent - existing.absentCount)
                 )
             }
         }
@@ -118,10 +135,14 @@ class AttendanceRepository(
     }
 
     /** Removes the day's record (any status, including No Class); subject totals move by what it held. */
-    suspend fun clearDay(subjectId: Long, date: LocalDate) {
-        val existing = attendanceDao.getAttendanceRecord(subjectId, date) ?: return
+    suspend fun clearDay(subjectId: Long, date: LocalDate) = runInTransaction {
+        val existing = attendanceDao.getAttendanceRecord(subjectId, date) ?: return@runInTransaction
         getSubjectById(subjectId)?.let {
-            subjectDao.updateAttendanceCounts(subjectId, it.presentLectures - existing.presentCount, it.absentLectures - existing.absentCount)
+            subjectDao.updateAttendanceCounts(
+                subjectId,
+                maxOf(0, it.presentLectures - existing.presentCount),
+                maxOf(0, it.absentLectures - existing.absentCount)
+            )
         }
         attendanceDao.deleteAttendanceForSubjectOnDate(subjectId, date)
     }
@@ -130,13 +151,17 @@ class AttendanceRepository(
      * Sets the exact number of present and absent lectures on [date] (the per-lecture editor).
      * Both zero removes the day's record. Subject totals move by the difference.
      */
-    suspend fun setDayCounts(subjectId: Long, date: LocalDate, present: Int, absent: Int) {
+    suspend fun setDayCounts(subjectId: Long, date: LocalDate, present: Int, absent: Int) = runInTransaction {
         val existing = attendanceDao.getAttendanceRecord(subjectId, date)
         val oldPresent = existing?.presentCount ?: 0
         val oldAbsent = existing?.absentCount ?: 0
-        if (present == oldPresent && absent == oldAbsent) return
+        if (present == oldPresent && absent == oldAbsent) return@runInTransaction
         getSubjectById(subjectId)?.let {
-            subjectDao.updateAttendanceCounts(subjectId, it.presentLectures + present - oldPresent, it.absentLectures + absent - oldAbsent)
+            subjectDao.updateAttendanceCounts(
+                subjectId,
+                maxOf(0, it.presentLectures + present - oldPresent),
+                maxOf(0, it.absentLectures + absent - oldAbsent)
+            )
         }
         when {
             present + absent == 0 -> attendanceDao.deleteAttendanceForSubjectOnDate(subjectId, date)
@@ -154,21 +179,37 @@ class AttendanceRepository(
      * day already holds: present and absent lectures can coexist on the same date. A day with
      * no record, or marked No Class, just gets marked [status].
      */
-    suspend fun addExtraLecture(subjectId: Long, date: LocalDate, status: AttendanceStatus) {
-        if (status == AttendanceStatus.NO_CLASS) return
+    suspend fun addExtraLecture(subjectId: Long, date: LocalDate, status: AttendanceStatus) = runInTransaction {
+        if (status == AttendanceStatus.NO_CLASS) return@runInTransaction
         val record = attendanceDao.getAttendanceRecord(subjectId, date)
-        if (record == null || record.status == AttendanceStatus.NO_CLASS) {
-            setDayStatus(subjectId, date, status)
-            return
-        }
         when (status) {
             AttendanceStatus.PRESENT -> subjectDao.markPresent(subjectId)
             else -> subjectDao.markAbsent(subjectId)
         }
-        attendanceDao.insertAttendance(
-            if (record.status == status) record.copy(count = record.count + 1)
-            else record.copy(otherCount = record.otherCount + 1)
-        )
+        if (record == null) {
+            attendanceDao.insertAttendance(
+                AttendanceRecord(
+                    subjectId = subjectId,
+                    date = date,
+                    status = status,
+                    count = 1,
+                    otherCount = 0
+                )
+            )
+        } else if (record.status == AttendanceStatus.NO_CLASS) {
+            attendanceDao.insertAttendance(
+                record.copy(
+                    status = status,
+                    count = 1,
+                    otherCount = 0
+                )
+            )
+        } else {
+            attendanceDao.insertAttendance(
+                if (record.status == status) record.copy(count = record.count + 1)
+                else record.copy(otherCount = record.otherCount + 1)
+            )
+        }
     }
 
     // Attendance operations
@@ -205,55 +246,57 @@ class AttendanceRepository(
         val allSubIds = actualSubs.map { it.id }.toSet()
         val targetSubjectIds = subjectIds ?: allSubIds
 
-        // Never mark future dates in advance; only mark dates up to today.
+        // Never mark future dates in advance; only mark dates up to today in database.
         // When resetting (status == null), allow clearing up to endDate.
         val effectiveEnd = if (status != null && endDate.isAfter(today)) today else endDate
-        if (effectiveEnd.isBefore(startDate)) return 0
 
         var affectedSlots = 0
         var curr = startDate
-        while (!curr.isAfter(effectiveEnd)) {
-            val date = curr
-            if (scheduleList.isNotEmpty()) {
-                val dayEntries = scheduleList.filter { it.occursOn(date) && it.subjectId in targetSubjectIds }
-                val subjectCounts = dayEntries.groupBy { it.subjectId }.mapValues { it.value.size }
-                for ((subId, count) in subjectCounts) {
-                    if (status != null) {
-                        setDayStatus(subId, date, status, targetCount = count)
-                    } else {
-                        clearDay(subId, date)
+        if (!effectiveEnd.isBefore(startDate)) {
+            while (!curr.isAfter(effectiveEnd)) {
+                val date = curr
+                if (scheduleList.isNotEmpty()) {
+                    val dayEntries = scheduleList.filter { it.occursOn(date) && it.subjectId in targetSubjectIds }
+                    val subjectCounts = dayEntries.groupBy { it.subjectId }.mapValues { it.value.size }
+                    for ((subId, count) in subjectCounts) {
+                        if (status != null) {
+                            setDayStatus(subId, date, status, targetCount = count)
+                        } else {
+                            clearDay(subId, date)
+                        }
+                        affectedSlots += count
                     }
-                    affectedSlots += count
-                }
-                if (status == null) {
-                    val existingForDate = attendanceDao.getAttendanceRecordsForSubjectsOnDateOnce(targetSubjectIds.toList(), date)
-                    for (rec in existingForDate) {
-                        if (!subjectCounts.containsKey(rec.subjectId)) {
+                    if (status == null) {
+                        val existingForDate = attendanceDao.getAttendanceRecordsForSubjectsOnDateOnce(targetSubjectIds.toList(), date)
+                        for (rec in existingForDate) {
+                            if (!subjectCounts.containsKey(rec.subjectId)) {
+                                clearDay(rec.subjectId, date)
+                                affectedSlots += (rec.presentCount + rec.absentCount).coerceAtLeast(1)
+                            }
+                        }
+                    }
+                } else {
+                    if (status != null) {
+                        if (date.dayOfWeek != DayOfWeek.SATURDAY && date.dayOfWeek != DayOfWeek.SUNDAY) {
+                            for (sub in actualSubs) {
+                                if (sub.id in targetSubjectIds) {
+                                    setDayStatus(sub.id, date, status, targetCount = 1)
+                                    affectedSlots += 1
+                                }
+                            }
+                        }
+                    } else {
+                        val existingForDate = attendanceDao.getAttendanceRecordsForSubjectsOnDateOnce(targetSubjectIds.toList(), date)
+                        for (rec in existingForDate) {
                             clearDay(rec.subjectId, date)
                             affectedSlots += (rec.presentCount + rec.absentCount).coerceAtLeast(1)
                         }
                     }
                 }
-            } else {
-                if (status != null) {
-                    if (date.dayOfWeek != DayOfWeek.SATURDAY && date.dayOfWeek != DayOfWeek.SUNDAY) {
-                        for (sub in actualSubs) {
-                            if (sub.id in targetSubjectIds) {
-                                setDayStatus(sub.id, date, status, targetCount = 1)
-                                affectedSlots += 1
-                            }
-                        }
-                    }
-                } else {
-                    val existingForDate = attendanceDao.getAttendanceRecordsForSubjectsOnDateOnce(targetSubjectIds.toList(), date)
-                    for (rec in existingForDate) {
-                        clearDay(rec.subjectId, date)
-                        affectedSlots += (rec.presentCount + rec.absentCount).coerceAtLeast(1)
-                    }
-                }
+                curr = curr.plusDays(1)
             }
-            curr = curr.plusDays(1)
         }
+
         return affectedSlots
     }
 
@@ -290,7 +333,7 @@ class AttendanceRepository(
         
         val existing = existingEntries.find { it.dayOfWeek == dayOfWeek }
         if (existing != null) {
-            scheduleDao.deleteScheduleEntry(subjectId, dayOfWeek)
+            scheduleDao.deleteScheduleEntry(existing)
         } else {
             scheduleDao.insertScheduleEntry(
                 ScheduleEntry(subjectId = subjectId, dayOfWeek = dayOfWeek)
@@ -374,9 +417,10 @@ class AttendanceRepository(
             if (slot.subjectName.lowercase() in current) {
                 // Timetable slots of the same subject whose dates overlap this one
                 val clashing = before.filter {
-                    it.subjectId == subjectId && datesOverlap(it.startDate, it.endDate, slot.startDate, slot.endDate)
+                    it.subjectId == subjectId &&
+                        datesOverlap(it.startDate, it.endDate, slot.startDate, slot.endDate)
                 }
-                if (!replaceExisting) { if (clashing.isNotEmpty()) continue }  // that period is already covered
+                if (!replaceExisting) { if (clashing.isNotEmpty()) continue }  // that slot is already covered
                 else clashing.forEach { scheduleDao.deleteScheduleEntry(it) }
             }
             scheduleDao.insertScheduleEntry(

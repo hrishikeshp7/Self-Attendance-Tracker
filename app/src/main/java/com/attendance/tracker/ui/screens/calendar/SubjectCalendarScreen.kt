@@ -221,6 +221,7 @@ fun SubjectCalendarScreen(
                     absentCount    = rangeAbsentCount,
                     total          = rangeTotal,
                     percentage     = rangePercentage,
+                    requiredPercentage = subject.requiredAttendance,
                     onClearRange   = {
                         rangeEnd = null
                         isRangeMode = false
@@ -403,6 +404,7 @@ private fun RangeStatsSection(
     absentCount: Int,
     total: Int,
     percentage: Float,
+    requiredPercentage: Int = 75,
     onClearRange: () -> Unit,
     onApplyAction: (AttendanceStatus?) -> Unit = {}
 ) {
@@ -464,7 +466,7 @@ private fun RangeStatsSection(
                     AttendanceStatItem(
                         label = "Attendance",
                         value = if (total > 0) "%.1f%%".format(percentage) else "—",
-                        color = if (percentage >= 75f) PresentGreen else AbsentRed
+                        color = if (percentage >= requiredPercentage) PresentGreen else AbsentRed
                     )
                 }
             }

@@ -104,7 +104,7 @@ class TodayWidget : GlanceAppWidget() {
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val db = AttendanceDatabase.getDatabase(context)
-        val repository = AttendanceRepository(db.subjectDao(), db.attendanceDao(), db.scheduleDao())
+        val repository = AttendanceRepository(db.subjectDao(), db.attendanceDao(), db.scheduleDao(), db)
         // Collected inside the composition: an already-running Glance session is woken by
         // updateAll but does not re-run provideGlance, so a one-off snapshot here went stale.
         // The date is part of the flow too, so a session that outlives midnight rolls over.
@@ -143,8 +143,8 @@ class TodayWidget : GlanceAppWidget() {
         val byId = all.associateBy { it.id }
         val subjects = all.filter { !it.isFolder }
         val scheduledIds = schedule.filter { it.occursOn(today) }.map { it.subjectId }.toSet()
-        val shown = if (schedule.isEmpty()) subjects else subjects.filter { it.id in scheduledIds }
         val marks = records.associateBy { it.subjectId }
+        val shown = if (schedule.isEmpty()) subjects else subjects.filter { it.id in scheduledIds || it.id in marks }
 
         val rows = shown.flatMap { subject ->
             val dayEntries = schedule.filter { it.occursOn(today) && it.subjectId == subject.id }.sortedBy { it.startTime }
@@ -365,7 +365,7 @@ class MarkAction : ActionCallback {
         val status = parameters[StatusKey]?.let { AttendanceStatus.valueOf(it) } ?: return
         withContext(Dispatchers.IO) {
             val db = AttendanceDatabase.getDatabase(context)
-            val repository = AttendanceRepository(db.subjectDao(), db.attendanceDao(), db.scheduleDao())
+            val repository = AttendanceRepository(db.subjectDao(), db.attendanceDao(), db.scheduleDao(), db)
             val today = LocalDate.now()
             val record = repository.getAttendanceForDate(today).first().find { it.subjectId == subjectId }
             SlotAttendanceStore.ensureSlotsInitialized(
@@ -374,7 +374,7 @@ class MarkAction : ActionCallback {
             val res = SlotAttendanceStore.updateSlotAndCompute(
                 context, subjectId, today, totalSlots, slotIndex, status
             )
-            if (res.isAllNoClass) {
+            if (res.isAllNoClass || (res.noClassCount > 0 && res.presentCount == 0 && res.absentCount == 0)) {
                 repository.markNoClass(subjectId, today)
             } else if (res.presentCount > 0 || res.absentCount > 0) {
                 repository.setDayCounts(subjectId, today, res.presentCount, res.absentCount)
@@ -416,7 +416,7 @@ class TodayWidgetReceiver : GlanceAppWidgetReceiver() {
 class WidgetDayRolloverWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {
         val db = AttendanceDatabase.getDatabase(applicationContext)
-        val repository = AttendanceRepository(db.subjectDao(), db.attendanceDao(), db.scheduleDao())
+        val repository = AttendanceRepository(db.subjectDao(), db.attendanceDao(), db.scheduleDao(), db)
         TimeOffStore.syncActiveTimeOff(applicationContext, repository)
         refreshAllWidgets(applicationContext)
         return Result.success()

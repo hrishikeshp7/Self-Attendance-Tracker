@@ -47,13 +47,13 @@ data class Subject(
      * Returns 0 if already above required attendance
      */
     val isTargetUnreachable: Boolean
-        get() = requiredAttendance >= 100 && presentLectures < totalLectures
+        get() = (requiredAttendance >= 100 && presentLectures < totalLectures) || requiredAttendance > 100
 
     val classesToAttend: Int
         get() {
             if (isAboveRequired || totalLectures == 0) return 0
             
-            // Edge case: if 100% required and already missed classes, impossible to reach
+            // Edge case: if 100%+ required and already missed classes or target > 100, impossible to reach
             if (isTargetUnreachable) {
                 return 999
             }
@@ -61,13 +61,14 @@ data class Subject(
             // Formula: (P + x) / (T + x) = R/100
             // Where P = present, T = total, R = required%, x = classes to attend
             // Solving: x = (R*T - 100*P) / (100 - R)
-            val numerator = (requiredAttendance * totalLectures) - (100 * presentLectures)
+            // Use Long arithmetic to prevent 32-bit integer overflow with large counts
+            val numerator = (requiredAttendance.toLong() * totalLectures) - (100L * presentLectures)
             val denominator = 100 - requiredAttendance
             
             return if (denominator > 0) {
                 ceil(numerator.toDouble() / denominator).toInt().coerceAtLeast(0)
             } else {
-                0
+                999
             }
         }
     
@@ -85,10 +86,10 @@ data class Subject(
             // Formula: (P) / (T + x) = R/100
             // Where P = present, T = total, R = required%, x = classes can bunk
             // Solving: x = (100*P/R) - T
-            val maxTotalWithBunks = (100.0 * presentLectures) / requiredAttendance
-            val canBunk = floor(maxTotalWithBunks - totalLectures).toInt()
+            // Pure integer division prevents floating-point rounding errors (e.g. 2.99999 -> 2)
+            val canBunk = ((100L * presentLectures) / requiredAttendance) - totalLectures
             
-            return canBunk.coerceAtLeast(0)
+            return canBunk.toInt().coerceAtLeast(0)
         }
 }
 

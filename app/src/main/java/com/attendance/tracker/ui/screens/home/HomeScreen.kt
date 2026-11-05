@@ -103,7 +103,31 @@ fun HomeScreen(
             context, subjectId, selectedDate, totalSlots, slotIndex, status
         )
         slotUpdateTrigger = System.currentTimeMillis()
-        if (res.isAllNoClass) {
+        if (res.isAllNoClass || (res.noClassCount > 0 && res.presentCount == 0 && res.absentCount == 0)) {
+            onMarkAttendance(subjectId, AttendanceStatus.NO_CLASS, 1)
+        } else if (res.presentCount > 0 || res.absentCount > 0) {
+            onSetDayCounts(subjectId, res.presentCount, res.absentCount)
+        } else {
+            onClearAttendance(subjectId)
+        }
+        if (isToday) {
+            coroutineScope.launch {
+                try {
+                    refreshAllWidgets(context)
+                } catch (_: Exception) {}
+            }
+        }
+    }
+
+    val onClearSlot = { subjectId: Long, slotIndex: Int, totalSlots: Int ->
+        SlotAttendanceStore.ensureSlotsInitialized(
+            context, subjectId, selectedDate, totalSlots, todayAttendance[subjectId]
+        )
+        val res = SlotAttendanceStore.updateSlotAndCompute(
+            context, subjectId, selectedDate, totalSlots, slotIndex, null
+        )
+        slotUpdateTrigger = System.currentTimeMillis()
+        if (res.isAllNoClass || (res.noClassCount > 0 && res.presentCount == 0 && res.absentCount == 0)) {
             onMarkAttendance(subjectId, AttendanceStatus.NO_CLASS, 1)
         } else if (res.presentCount > 0 || res.absentCount > 0) {
             onSetDayCounts(subjectId, res.presentCount, res.absentCount)
@@ -337,7 +361,7 @@ fun HomeScreen(
                                 onMarkSlot(subject.id, slotItem.slotIndex, slotItem.totalSlots, AttendanceStatus.NO_CLASS)
                             },
                             onSetDayCounts = { p, a -> onSetDayCounts(subject.id, p, a) },
-                            onClearAttendance = { onClearAttendance(subject.id) },
+                            onClearAttendance = { onClearSlot(subject.id, slotItem.slotIndex, slotItem.totalSlots) },
                             onEditClick = { onEditSubject(subject) },
                             onCardClick = { onSubjectClick(subject) }
                         )
@@ -422,7 +446,7 @@ private fun ExtraClassDialog(
         onDismissRequest = onDismiss,
         title = { Text("Add Extra Class") },
         text = {
-            Column {
+            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
                 Text(
                     text = "Select the subject and mark attendance:",
                     style = MaterialTheme.typography.bodyMedium,
@@ -501,7 +525,7 @@ private fun NoClassesTodayState(
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.verticalScroll(rememberScrollState()).padding(40.dp)  // scrolls when short (landscape)
+            modifier = Modifier.padding(40.dp)
         ) {
             Text(
                 text = "🎉",
@@ -556,7 +580,7 @@ private fun EmptySubjectsState(modifier: Modifier = Modifier) {
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.verticalScroll(rememberScrollState()).padding(40.dp)  // scrolls when short (landscape)
+            modifier = Modifier.padding(40.dp)
         ) {
             Text(
                 text = "📚",

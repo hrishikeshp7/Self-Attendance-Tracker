@@ -17,7 +17,7 @@ class Converters {
 
     @TypeConverter
     fun toLocalDate(dateString: String?): LocalDate? {
-        return dateString?.let { LocalDate.parse(it) }
+        return dateString?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
     }
 
     @TypeConverter
@@ -27,7 +27,7 @@ class Converters {
 
     @TypeConverter
     fun toDayOfWeek(value: Int?): DayOfWeek? {
-        return value?.let { DayOfWeek.of(it) }
+        return value?.let { runCatching { DayOfWeek.of(it) }.getOrNull() }
     }
 
     @TypeConverter
@@ -50,6 +50,10 @@ class Converters {
 
     @TypeConverter
     fun toLocalTime(minutesSinceMidnight: Int?): LocalTime? {
-        return minutesSinceMidnight?.let { LocalTime.of(it / 60, it % 60) }
+        return minutesSinceMidnight?.let {
+            if (it in 0 until 1440) {
+                runCatching { LocalTime.of(it / 60, it % 60) }.getOrNull()
+            } else null
+        }
     }
 }

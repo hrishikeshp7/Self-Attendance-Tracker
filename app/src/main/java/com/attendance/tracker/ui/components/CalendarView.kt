@@ -361,17 +361,22 @@ private fun CalendarDay(
         else -> null
     }
 
-    val indicatorShape: Shape = if (isRangeEndpoint || isSelected) CircleShape else RoundedCornerShape(14.dp)
+    val indicatorShape: Shape = if (isRangeEndpoint) CircleShape else RoundedCornerShape(14.dp)
     val indicatorFill: Color? = when {
-        isRangeEndpoint || isSelected -> MaterialTheme.colorScheme.primary
+        isRangeEndpoint -> MaterialTheme.colorScheme.primary
+        isSelected && singleStatusColor != null -> singleStatusColor.copy(alpha = if (isDark) 0.40f else 0.25f)
+        isSelected -> MaterialTheme.colorScheme.primary.copy(alpha = if (isDark) 0.35f else 0.18f)
         singleStatusColor != null -> singleStatusColor.copy(alpha = if (isDark) 0.30f else 0.16f)
         else -> null
     }
-    val indicatorBorder: Color? = if (isToday && !isRangeEndpoint && !isSelected) {
-        MaterialTheme.colorScheme.primary
-    } else null
+    val indicatorBorder: Color? = when {
+        isRangeEndpoint -> null
+        isSelected -> MaterialTheme.colorScheme.primary
+        isToday -> MaterialTheme.colorScheme.primary
+        else -> null
+    }
     val textColor = when {
-        isRangeEndpoint || isSelected -> MaterialTheme.colorScheme.onPrimary
+        isRangeEndpoint -> MaterialTheme.colorScheme.onPrimary
         isInRange -> MaterialTheme.colorScheme.onPrimaryContainer
         isToday -> MaterialTheme.colorScheme.primary
         else -> MaterialTheme.colorScheme.onSurface

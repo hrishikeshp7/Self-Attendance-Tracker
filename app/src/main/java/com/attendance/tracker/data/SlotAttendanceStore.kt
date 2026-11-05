@@ -107,20 +107,15 @@ object SlotAttendanceStore {
         record: AttendanceRecord?
     ): AttendanceStatus? {
         if (record == null) {
-            // Clean up any stale leftover preferences if record was deleted/cleared
-            if (getSlotStatus(context, subjectId, date, slotIndex) != null) {
-                clearSlotsForDate(context, subjectId, date, totalSlots)
-            }
             return null
         }
-        if (record.status == AttendanceStatus.NO_CLASS) return AttendanceStatus.NO_CLASS
 
         val explicit = getSlotStatus(context, subjectId, date, slotIndex)
         if (explicit != null) {
             val isValid = when (explicit) {
                 AttendanceStatus.PRESENT -> record.presentCount > 0
                 AttendanceStatus.ABSENT -> record.absentCount > 0
-                AttendanceStatus.NO_CLASS -> record.status == AttendanceStatus.NO_CLASS
+                AttendanceStatus.NO_CLASS -> true
             }
             if (isValid) return explicit
         }
@@ -133,7 +128,7 @@ object SlotAttendanceStore {
                     val valid = when (st) {
                         AttendanceStatus.PRESENT -> record.presentCount > 0
                         AttendanceStatus.ABSENT -> record.absentCount > 0
-                        AttendanceStatus.NO_CLASS -> record.status == AttendanceStatus.NO_CLASS
+                        AttendanceStatus.NO_CLASS -> true
                     }
                     if (valid) {
                         anyExplicit = true
@@ -143,6 +138,8 @@ object SlotAttendanceStore {
             }
             if (anyExplicit) return null
         }
+
+        if (record.status == AttendanceStatus.NO_CLASS) return AttendanceStatus.NO_CLASS
 
         // If recorded as aggregate counts:
         return when {
@@ -161,7 +158,7 @@ object SlotAttendanceStore {
         date: LocalDate,
         totalSlots: Int,
         slotIndex: Int,
-        newStatus: AttendanceStatus
+        newStatus: AttendanceStatus?
     ): SlotComputeResult {
         setSlotStatus(context, subjectId, date, slotIndex, newStatus)
 

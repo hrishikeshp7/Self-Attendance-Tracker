@@ -81,11 +81,13 @@ fun BackupRestoreScreen(
         ActivityResultContracts.OpenDocument()
     ) { uri ->
         if (uri != null) {
-            val text = readFromUri(context, uri)
-            csvPreview = if (text == null) {
-                CsvImporter.Result(emptyList(), emptyList(), listOf("Couldn't read that file."))
-            } else {
-                viewModel.previewCsvImport(text)
+            scope.launch {
+                val text = withContext(Dispatchers.IO) { readFromUri(context, uri) }
+                csvPreview = if (text == null) {
+                    CsvImporter.Result(emptyList(), emptyList(), listOf("Couldn't read that file."))
+                } else {
+                    viewModel.previewCsvImport(text)
+                }
             }
         }
     }
