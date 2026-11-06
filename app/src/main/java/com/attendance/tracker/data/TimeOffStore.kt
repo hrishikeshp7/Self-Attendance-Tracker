@@ -149,10 +149,12 @@ object TimeOffStore {
         today: LocalDate = LocalDate.now()
     ) {
         if (rules.isEmpty()) return
-        // 1. Purge future records covered by active rules
+        // 1. Purge future records covered by active rules, but only if they were not manually
+        //    set by the user. Manual records (isManual = true) take precedence over time-off.
         val allRecords = repository.getAllAttendanceRecordsOnce()
         val futureRecords = allRecords.filter { it.date.isAfter(today) }
         for (rec in futureRecords) {
+            if (rec.isManual) continue  // never wipe a user-set record
             val covered = rules.any { rule ->
                 !rec.date.isBefore(rule.startDate) && !rec.date.isAfter(rule.endDate) &&
                     (rule.subjectIds == null || rec.subjectId in rule.subjectIds)

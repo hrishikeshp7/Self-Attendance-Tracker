@@ -64,13 +64,13 @@ class AttendanceRepository(
     }
 
     suspend fun markPresent(subjectId: Long, date: LocalDate, count: Int = 1) =
-        setDayStatus(subjectId, date, AttendanceStatus.PRESENT, targetCount = count)
+        setDayStatus(subjectId, date, AttendanceStatus.PRESENT, targetCount = count, isManual = true)
 
     suspend fun markAbsent(subjectId: Long, date: LocalDate, count: Int = 1) =
-        setDayStatus(subjectId, date, AttendanceStatus.ABSENT, targetCount = count)
+        setDayStatus(subjectId, date, AttendanceStatus.ABSENT, targetCount = count, isManual = true)
 
     suspend fun markNoClass(subjectId: Long, date: LocalDate) =
-        setDayStatus(subjectId, date, AttendanceStatus.NO_CLASS)
+        setDayStatus(subjectId, date, AttendanceStatus.NO_CLASS, isManual = true)
 
     /**
      * Sets the whole day to [status]. A day that already holds lectures (including a mixed
@@ -78,12 +78,15 @@ class AttendanceRepository(
      * a day with the status it already has is a no-op so repeated taps never add a lecture.
      * Subject totals are adjusted by the difference.
      * When marking a new day, [targetCount] specifies how many scheduled lectures were held.
+     * [isManual] should be true when the user explicitly sets the status (protects the record
+     * from being overridden by time-off / vacation syncs).
      */
     private suspend fun setDayStatus(
         subjectId: Long,
         date: LocalDate,
         status: AttendanceStatus,
-        targetCount: Int = 1
+        targetCount: Int = 1,
+        isManual: Boolean = false
     ) = runInTransaction {
         val existing = attendanceDao.getAttendanceRecord(subjectId, date)
         if (existing != null && existing.status == status && existing.otherCount == 0 && existing.count >= maxOf(targetCount, 1)) return@runInTransaction
@@ -130,7 +133,10 @@ class AttendanceRepository(
             }
         }
         attendanceDao.insertAttendance(
-            AttendanceRecord(subjectId = subjectId, date = date, status = status, count = total)
+            AttendanceRecord(subjectId = subjectId, date = date, status = status, count = total,
+                // Preserve isManual: once a record is manually set, keep it manual even on
+                // subsequent updates so it's never silently overridden by time-off.
+                isManual = isManual || (existing?.isManual == true))
         )
     }
 
@@ -166,10 +172,10 @@ class AttendanceRepository(
         when {
             present + absent == 0 -> attendanceDao.deleteAttendanceForSubjectOnDate(subjectId, date)
             present >= absent -> attendanceDao.insertAttendance(
-                AttendanceRecord(subjectId = subjectId, date = date, status = AttendanceStatus.PRESENT, count = present, otherCount = absent)
+                AttendanceRecord(subjectId = subjectId, date = date, status = AttendanceStatus.PRESENT, count = present, otherCount = absent, isManual = true)
             )
             else -> attendanceDao.insertAttendance(
-                AttendanceRecord(subjectId = subjectId, date = date, status = AttendanceStatus.ABSENT, count = absent, otherCount = present)
+                AttendanceRecord(subjectId = subjectId, date = date, status = AttendanceStatus.ABSENT, count = absent, otherCount = present, isManual = true)
             )
         }
     }
@@ -193,7 +199,8 @@ class AttendanceRepository(
                     date = date,
                     status = status,
                     count = 1,
-                    otherCount = 0
+                    otherCount = 0,
+                    isManual = true
                 )
             )
         } else if (record.status == AttendanceStatus.NO_CLASS) {
@@ -201,13 +208,14 @@ class AttendanceRepository(
                 record.copy(
                     status = status,
                     count = 1,
-                    otherCount = 0
+                    otherCount = 0,
+                    isManual = true
                 )
             )
         } else {
             attendanceDao.insertAttendance(
-                if (record.status == status) record.copy(count = record.count + 1)
-                else record.copy(otherCount = record.otherCount + 1)
+                if (record.status == status) record.copy(count = record.count + 1, isManual = true)
+                else record.copy(otherCount = record.otherCount + 1, isManual = true)
             )
         }
     }
@@ -260,6 +268,9 @@ class AttendanceRepository(
                     val subjectCounts = dayEntries.groupBy { it.subjectId }.mapValues { it.value.size }
                     for ((subId, count) in subjectCounts) {
                         if (status != null) {
+                            // Don't override a record the user manually set
+                            val existing = attendanceDao.getAttendanceRecord(subId, date)
+                            if (existing?.isManual == true) continue
                             setDayStatus(subId, date, status, targetCount = count)
                         } else {
                             clearDay(subId, date)
@@ -280,6 +291,9 @@ class AttendanceRepository(
                         if (date.dayOfWeek != DayOfWeek.SATURDAY && date.dayOfWeek != DayOfWeek.SUNDAY) {
                             for (sub in actualSubs) {
                                 if (sub.id in targetSubjectIds) {
+                                    // Don't override a record the user manually set
+                                    val existing = attendanceDao.getAttendanceRecord(sub.id, date)
+                                    if (existing?.isManual == true) continue
                                     setDayStatus(sub.id, date, status, targetCount = 1)
                                     affectedSlots += 1
                                 }

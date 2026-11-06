@@ -30,7 +30,10 @@ data class AttendanceRecord(
     val count: Int = 1,
     // Lectures that day with the OTHER of PRESENT/ABSENT (e.g. status PRESENT, count 1,
     // otherCount 1 = one lecture attended, one missed). Always 0 for NO_CLASS.
-    val otherCount: Int = 0
+    val otherCount: Int = 0,
+    // True when this record was set by the user manually (not by an automated time-off rule).
+    // Manual records are never overridden by vacation / time-off syncs.
+    val isManual: Boolean = false
 ) {
     val presentCount: Int
         get() = when (status) {

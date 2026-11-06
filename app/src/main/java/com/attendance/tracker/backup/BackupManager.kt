@@ -67,6 +67,7 @@ object BackupManager {
             obj.put("status", r.status.name)
             obj.put("count", r.count)
             obj.put("otherCount", r.otherCount)
+            if (r.isManual) obj.put("isManual", true)  // omit false to keep old backups compact
             recordsArray.put(obj)
         }
         root.put("attendanceRecords", recordsArray)
@@ -149,7 +150,8 @@ object BackupManager {
                     date = LocalDate.parse(obj.getString("date")),
                     status = AttendanceStatus.valueOf(obj.getString("status")),
                     count = obj.optInt("count", 1),
-                    otherCount = obj.optInt("otherCount", 0)
+                    otherCount = obj.optInt("otherCount", 0),
+                    isManual = obj.optBoolean("isManual", false)
                 )
             }
 
