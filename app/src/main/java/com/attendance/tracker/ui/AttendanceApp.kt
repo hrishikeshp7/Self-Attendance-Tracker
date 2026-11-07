@@ -30,8 +30,11 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import android.widget.Toast
+import androidx.compose.ui.platform.LocalContext
 import com.attendance.tracker.data.model.AttendanceStatus
 import java.time.LocalDate
+import com.attendance.tracker.ui.components.ImportTimetableDialog
 import com.attendance.tracker.ui.components.TimeOffSheet
 import com.attendance.tracker.ui.screens.about.AboutScreen
 import com.attendance.tracker.ui.screens.aiimport.AiImportScreen
@@ -62,6 +65,7 @@ fun AttendanceApp(
     viewModel: AttendanceViewModel = viewModel()
 ) {
     val navController = rememberNavController()
+    val context = LocalContext.current
     
     // Collect state from ViewModel
     val subjects by viewModel.subjects.collectAsState()
@@ -74,6 +78,7 @@ fun AttendanceApp(
     val todayAttendance by viewModel.todayAttendance.collectAsState()
     val attendanceRecords by viewModel.attendanceRecords.collectAsState()
     val themePreference by viewModel.themePreference.collectAsState()
+    val pendingSharedTimetable by viewModel.pendingSharedTimetable.collectAsState()
 
     // Variables for navigation to subjects screen
     var showAddSubjectOnSubjectsScreen by remember { mutableStateOf(false) }
@@ -301,6 +306,15 @@ fun AttendanceApp(
                     },
                     onDeleteLecture = { entry ->
                         viewModel.removeScheduleEntry(entry)
+                    },
+                    onImportSharedTimetable = { timetable, replace ->
+                        viewModel.importSharedTimetable(timetable, replace) { newSubs, newSlots ->
+                            Toast.makeText(
+                                context,
+                                "Imported $newSlots lectures into ${if (newSubs > 0) "$newSubs new subjects" else "existing subjects"}!",
+                                Toast.LENGTH_LONG
+                            ).show()
+                        }
                     }
                 )
             }
@@ -411,6 +425,22 @@ fun AttendanceApp(
             },
             onApply = { startDate, endDate, status, subjectIds ->
                 viewModel.applyTimeOff(startDate, endDate, status, subjectIds)
+            }
+        )
+    }
+
+    pendingSharedTimetable?.let { timetable ->
+        ImportTimetableDialog(
+            initialTimetable = timetable,
+            onDismiss = { viewModel.setPendingSharedTimetable(null) },
+            onConfirmImport = { tt, replace ->
+                viewModel.importSharedTimetable(tt, replace) { newSubs, newSlots ->
+                    Toast.makeText(
+                        context,
+                        "Imported $newSlots lectures into ${if (newSubs > 0) "$newSubs new subjects" else "existing subjects"}!",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
             }
         )
     }

@@ -9,6 +9,7 @@ import com.attendance.tracker.data.model.AttendanceStatus
 import com.attendance.tracker.data.model.ScheduleEntry
 import com.attendance.tracker.data.model.datesOverlap
 import com.attendance.tracker.data.model.Subject
+import com.attendance.tracker.share.SharedTimetable
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
@@ -378,6 +379,55 @@ class AttendanceRepository(
         subjectDao.insertSubjects(subjects)
         attendanceDao.insertAttendanceRecords(attendanceRecords)
         scheduleDao.insertScheduleEntries(scheduleEntries)
+    }
+
+    suspend fun importSharedTimetable(
+        shared: SharedTimetable,
+        replaceSchedule: Boolean
+    ): Pair<Int, Int> {
+        val existingSubjects = getAllSubjectsOnce()
+        val subjectMap = existingSubjects.associateBy { it.name.trim().lowercase() }.toMutableMap()
+        val indexToSubjectId = mutableMapOf<Int, Long>()
+
+        var newSubjectsCount = 0
+        shared.subjects.forEachIndexed { index, sharedSubject ->
+            val key = sharedSubject.name.trim().lowercase()
+            val existing = subjectMap[key]
+            val subjectId = if (existing != null) {
+                existing.id
+            } else {
+                val newId = insertSubject(
+                    Subject(
+                        name = sharedSubject.name.trim(),
+                        requiredAttendance = sharedSubject.requiredAttendance
+                    )
+                )
+                newSubjectsCount++
+                val created = getSubjectById(newId)
+                if (created != null) subjectMap[key] = created
+                newId
+            }
+            indexToSubjectId[index] = subjectId
+        }
+
+        if (replaceSchedule) {
+            scheduleDao.deleteAllScheduleEntries()
+        }
+
+        val entriesToInsert = shared.lectures.mapNotNull { lecture ->
+            val subId = indexToSubjectId[lecture.subjectIndex] ?: return@mapNotNull null
+            ScheduleEntry(
+                subjectId = subId,
+                dayOfWeek = lecture.dayOfWeek,
+                startTime = lecture.startTime,
+                endTime = lecture.endTime,
+                startDate = lecture.startDate,
+                endDate = lecture.endDate
+            )
+        }
+
+        scheduleDao.insertScheduleEntries(entriesToInsert)
+        return Pair(newSubjectsCount, entriesToInsert.size)
     }
 
     data class CsvImportSummary(val subjectsAdded: Int, val subjectsExisting: Int, val slotsAdded: Int)

@@ -95,6 +95,25 @@ class AttendanceViewModel(application: Application) : AndroidViewModel(applicati
     val themePreference = themeRepository.themePreference
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
+    private val _pendingSharedTimetable = MutableStateFlow<com.attendance.tracker.share.SharedTimetable?>(null)
+    val pendingSharedTimetable: StateFlow<com.attendance.tracker.share.SharedTimetable?> = _pendingSharedTimetable.asStateFlow()
+
+    fun setPendingSharedTimetable(timetable: com.attendance.tracker.share.SharedTimetable?) {
+        _pendingSharedTimetable.value = timetable
+    }
+
+    fun importSharedTimetable(
+        timetable: com.attendance.tracker.share.SharedTimetable,
+        replaceSchedule: Boolean,
+        onComplete: (newSubjects: Int, newSlots: Int) -> Unit = { _, _ -> }
+    ) {
+        viewModelScope.launch {
+            val (newSubjects, newSlots) = repository.importSharedTimetable(timetable, replaceSchedule)
+            _pendingSharedTimetable.value = null
+            onComplete(newSubjects, newSlots)
+        }
+    }
+
     init {
         // Sync active time-off rules, purge any future records, and load today's attendance
         viewModelScope.launch {

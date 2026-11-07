@@ -4,9 +4,11 @@ import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.content.Intent
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.viewModels
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -24,6 +26,8 @@ import com.attendance.tracker.ui.theme.AttendanceTrackerTheme
 
 class MainActivity : ComponentActivity() {
 
+    private val viewModel: AttendanceViewModel by viewModels()
+
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { isGranted ->
@@ -38,9 +42,9 @@ class MainActivity : ComponentActivity() {
         NotificationHelper.createNotificationChannels(this)
         com.attendance.tracker.widget.WidgetDayRollover.schedule(this)
         setupNotifications()
+        handleDeepLink(intent)
 
         setContent {
-            val viewModel: AttendanceViewModel = viewModel()
             val themePreference by viewModel.themePreference.collectAsState(initial = null)
             
             val themeMode = themePreference?.themeMode ?: com.attendance.tracker.data.model.ThemeMode.SYSTEM
@@ -53,6 +57,25 @@ class MainActivity : ComponentActivity() {
                     color = MaterialTheme.colorScheme.background
                 ) {
                     AttendanceApp(viewModel = viewModel)
+                }
+            }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent?) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleDeepLink(intent)
+    }
+
+    private fun handleDeepLink(intent: Intent?) {
+        val uri = intent?.data ?: return
+        if (uri.scheme == "attendance" && uri.host == "import") {
+            val tt = uri.getQueryParameter("tt")
+            if (!tt.isNullOrBlank()) {
+                val parsed = com.attendance.tracker.share.TimetableShareManager.decode(tt)
+                if (parsed != null) {
+                    viewModel.setPendingSharedTimetable(parsed)
                 }
             }
         }

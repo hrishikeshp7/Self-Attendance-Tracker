@@ -140,6 +140,9 @@ dependencies {
     // WorkManager for background notifications
     implementation("androidx.work:work-runtime-ktx:2.9.0")
 
+    // QR Code generation for Timetable Sharing (Viral Multiplier)
+    implementation("com.google.zxing:core:3.5.3")
+
     // Testing
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20231013")

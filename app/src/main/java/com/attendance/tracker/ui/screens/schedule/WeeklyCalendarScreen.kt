@@ -15,6 +15,10 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.Share
+import com.attendance.tracker.share.SharedTimetable
+import com.attendance.tracker.ui.components.ImportTimetableDialog
+import com.attendance.tracker.ui.components.ShareTimetableDialog
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -80,10 +84,13 @@ fun WeeklyCalendarScreen(
     onOpenSubjectCalendar: ((Long) -> Unit)? = null,
     onOpenTimeOff: ((LocalDate, LocalDate) -> Unit)? = null,
     onWeekChanged: ((LocalDate) -> Unit)? = null,
+    onImportSharedTimetable: ((SharedTimetable, Boolean) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     var editorState by remember { mutableStateOf<LectureEditorState?>(null) }
     var showAddSubjectsHint by remember { mutableStateOf(false) }
+    var showShareDialog by remember { mutableStateOf(false) }
+    var showImportDialog by remember { mutableStateOf(false) }
 
     // The week being browsed (its Monday), kept across rotation as an epoch day
     val thisMonday = remember { LocalDate.now().with(DayOfWeek.MONDAY) }
@@ -117,6 +124,16 @@ fun WeeklyCalendarScreen(
                     titleContentColor = MaterialTheme.colorScheme.onBackground
                 ),
                 actions = {
+                    IconButton(
+                        onClick = { showShareDialog = true },
+                        modifier = Modifier.padding(end = 4.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Share,
+                            contentDescription = "Share Timetable",
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
                     if (onOpenTimeOff != null) {
                         Surface(
                             onClick = { onOpenTimeOff(weekStart, weekStart.plusDays(6)) },
@@ -288,6 +305,29 @@ fun WeeklyCalendarScreen(
             text = { Text("You need at least one subject before you can schedule a lecture for it.") },
             confirmButton = {
                 TextButton(onClick = { showAddSubjectsHint = false }) { Text("OK") }
+            }
+        )
+    }
+
+    if (showShareDialog) {
+        ShareTimetableDialog(
+            scheduleEntries = scheduleEntries,
+            subjectsMap = allSubjects,
+            onDismiss = { showShareDialog = false },
+            onOpenImportManual = {
+                showShareDialog = false
+                showImportDialog = true
+            }
+        )
+    }
+
+    if (showImportDialog) {
+        ImportTimetableDialog(
+            initialTimetable = null,
+            onDismiss = { showImportDialog = false },
+            onConfirmImport = { timetable, replace ->
+                onImportSharedTimetable?.invoke(timetable, replace)
+                showImportDialog = false
             }
         )
     }
