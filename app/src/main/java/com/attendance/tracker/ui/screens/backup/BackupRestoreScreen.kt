@@ -8,22 +8,28 @@ import android.provider.DocumentsContract
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContract
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.FileUpload
+import androidx.compose.material.icons.filled.HistoryEdu
 import androidx.compose.material.icons.filled.RestorePage
+import androidx.compose.material.icons.filled.TableChart
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.attendance.tracker.backup.CsvImporter
 import com.attendance.tracker.ui.AttendanceViewModel
@@ -44,6 +50,7 @@ fun BackupRestoreScreen(
     val status by viewModel.backupRestoreStatus.collectAsState()
     val message by viewModel.backupRestoreMessage.collectAsState()
 
+    var selectedTab by remember { mutableIntStateOf(0) }
     var showRestoreConfirmDialog by remember { mutableStateOf(false) }
     var pendingRestoreUri by remember { mutableStateOf<Uri?>(null) }
     var csvPreview by remember { mutableStateOf<CsvImporter.Result?>(null) }
@@ -98,11 +105,7 @@ fun BackupRestoreScreen(
         if (uri != null) scope.launch { writeToUri(context, uri) { CsvImporter.TEMPLATE } }
     }
 
-    // Google Drive Backup – opens the SAF file-picker pre-navigated to Google Drive.
-    // Uses a custom contract so we can embed EXTRA_INITIAL_URI pointing to the Drive root,
-    // which causes Android to open the picker directly inside Google Drive instead of local
-    // storage.  The file is still written via the standard ContentResolver, so no OAuth or
-    // Google Drive SDK is required.
+    // Google Drive Backup – opens SAF file-picker pre-navigated to Google Drive root
     val googleDriveExportLauncher = rememberLauncherForActivityResult(
         contract = object : ActivityResultContract<String, Uri?>() {
             override fun createIntent(context: Context, input: String): Intent =
@@ -110,8 +113,6 @@ fun BackupRestoreScreen(
                     addCategory(Intent.CATEGORY_OPENABLE)
                     type = "application/json"
                     putExtra(Intent.EXTRA_TITLE, input)
-                    // Pre-navigate the picker to Google Drive "My Drive" root.
-                    // Authority: com.google.android.apps.docs.storage (Google Drive SAF provider)
                     putExtra(
                         DocumentsContract.EXTRA_INITIAL_URI,
                         DocumentsContract.buildRootUri(
@@ -132,7 +133,7 @@ fun BackupRestoreScreen(
         }
     }
 
-    // Restore – ask user to pick a JSON file (also shows Google Drive)
+    // Restore – ask user to pick a JSON file
     val restoreLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument()
     ) { uri ->
@@ -151,7 +152,7 @@ fun BackupRestoreScreen(
             title = { Text("Restore Backup?") },
             text = {
                 Text(
-                    "This will replace ALL current data with the selected backup. " +
+                    "This will replace ALL current data with the selected backup file. " +
                     "This action cannot be undone. Continue?"
                 )
             },
@@ -169,7 +170,7 @@ fun BackupRestoreScreen(
                             }
                         }
                     }
-                ) { Text("Restore") }
+                ) { Text("Restore", color = MaterialTheme.colorScheme.error) }
             },
             dismissButton = {
                 TextButton(onClick = { showRestoreConfirmDialog = false }) { Text("Cancel") }
@@ -235,9 +236,7 @@ fun BackupRestoreScreen(
         )
     }
 
-    // ---------------------------------------------------------------
     // Status / result snack-bar
-    // ---------------------------------------------------------------
     if (status == AttendanceViewModel.BackupRestoreStatus.SUCCESS ||
         status == AttendanceViewModel.BackupRestoreStatus.ERROR) {
         AlertDialog(
@@ -296,153 +295,309 @@ fun BackupRestoreScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .padding(16.dp)
-                .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-
-            // ---- Info banner ----
-            Card(
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.secondaryContainer
+            // Segmented Tabs: Backup vs Restore & Import
+            TabRow(
+                selectedTabIndex = selectedTab,
+                containerColor = MaterialTheme.colorScheme.background,
+                contentColor = MaterialTheme.colorScheme.primary,
+                divider = { Divider() }
+            ) {
+                Tab(
+                    selected = selectedTab == 0,
+                    onClick = { selectedTab = 0 },
+                    text = { Text("Backup / Export", fontWeight = if (selectedTab == 0) FontWeight.Bold else FontWeight.Normal) }
                 )
-            ) {
-                Text(
-                    text = "Backup your attendance data to a local file or to Google Drive. " +
-                           "Use the same file to restore on a new device with a single tap.",
-                    modifier = Modifier.padding(12.dp),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer
-                )
-            }
-
-            // ---- Export section ----
-            Text("Export", style = MaterialTheme.typography.titleMedium)
-
-            BackupActionCard(
-                title = "Export to JSON",
-                description = "Full backup – subjects, attendance records and schedule. " +
-                              "Use this file to restore on another device.",
-                icon = { Icon(Icons.Default.FileDownload, contentDescription = null) },
-                buttonLabel = "Export JSON"
-            ) {
-                val today = LocalDate.now().toString()
-                exportJsonLauncher.launch("attendance_backup_$today.json")
-            }
-
-            BackupActionCard(
-                title = "Export to CSV",
-                description = "Attendance records in a spreadsheet-friendly format. " +
-                              "Useful for analysis – cannot be used for restore.",
-                icon = { Icon(Icons.Default.FileDownload, contentDescription = null) },
-                buttonLabel = "Export CSV"
-            ) {
-                val today = LocalDate.now().toString()
-                exportCsvLauncher.launch("attendance_export_$today.csv")
-            }
-
-            BackupActionCard(
-                title = "Google Drive Backup",
-                description = "Save your JSON backup directly to Google Drive. " +
-                              "The file picker will open inside Google Drive so you can " +
-                              "choose a folder and save without leaving the app.",
-                icon = { Icon(Icons.Default.CloudUpload, contentDescription = null) },
-                buttonLabel = "Backup to Drive"
-            ) {
-                val today = LocalDate.now().toString()
-                googleDriveExportLauncher.launch("attendance_backup_$today.json")
-            }
-
-            // ---- Restore section ----
-            Divider()
-            Text("Restore", style = MaterialTheme.typography.titleMedium)
-
-            BackupActionCard(
-                title = "Restore from Backup",
-                description = "Select a previously exported JSON file from local storage " +
-                              "or Google Drive. All current data will be replaced.",
-                icon = { Icon(Icons.Default.RestorePage, contentDescription = null) },
-                buttonLabel = "Select Backup File",
-                buttonColors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.error
-                )
-            ) {
-                restoreLauncher.launch(arrayOf("application/json", "application/octet-stream"))
-            }
-
-            // ---- Import section ----
-            Divider()
-            if (onNavigateToAiImport != null) {
-                Text("AI Timetable Import", style = MaterialTheme.typography.titleMedium)
-                BackupActionCard(
-                    title = "Extract from photo or PDF",
-                    description = "Use ChatGPT, Claude, or Gemini to turn your timetable image or document into subjects and timetable slots.",
-                    icon = { Icon(Icons.Default.AutoAwesome, contentDescription = null) },
-                    buttonLabel = "Open AI Import",
-                    onClick = onNavigateToAiImport
+                Tab(
+                    selected = selectedTab == 1,
+                    onClick = { selectedTab = 1 },
+                    text = { Text("Restore & CSV", fontWeight = if (selectedTab == 1) FontWeight.Bold else FontWeight.Normal) }
                 )
             }
 
-            Text("Import from CSV", style = MaterialTheme.typography.titleMedium)
-
-            BackupActionCard(
-                title = "Import subjects & timetable from CSV",
-                description = "Bulk-add subjects (target %, attended, total) and weekly lectures " +
-                    "from a spreadsheet. Columns: subject, target_percentage, attended, total, " +
-                    "day, start, end. The file is checked first and nothing is saved until you confirm.",
-                icon = { Icon(Icons.Default.FileUpload, contentDescription = null) },
-                buttonLabel = "Choose CSV File"
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                replaceExisting = false
-                csvImportLauncher.launch(arrayOf("text/*", "application/vnd.ms-excel"))
-            }
-            TextButton(onClick = { csvTemplateLauncher.launch("attendance_import_template.csv") }) {
-                Text("Download a template CSV")
+                if (selectedTab == 0) {
+                    // ───────────────────────────────────────────────
+                    // TAB 1: BACKUP (EXPORT)
+                    // ───────────────────────────────────────────────
+
+                    // Google Drive Featured Hero Card
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(20.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.primaryContainer
+                        )
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(18.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                Surface(
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.16f),
+                                    modifier = Modifier.size(44.dp)
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Icon(
+                                            Icons.Default.CloudUpload,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(24.dp)
+                                        )
+                                    }
+                                }
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = "Google Drive Cloud Backup",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                                    )
+                                    Text(
+                                        text = "Safely store your backup in Google Drive",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                                    )
+                                }
+                            }
+
+                            Button(
+                                onClick = {
+                                    val today = LocalDate.now().toString()
+                                    googleDriveExportLauncher.launch("attendance_backup_$today.json")
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = MaterialTheme.colorScheme.primary,
+                                    contentColor = MaterialTheme.colorScheme.onPrimary
+                                )
+                            ) {
+                                Icon(Icons.Default.CloudUpload, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Backup to Google Drive")
+                            }
+                        }
+                    }
+
+                    // Local File Exports Group
+                    Text(
+                        text = "Local Storage Export",
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.SemiBold
+                    )
+
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surface
+                        ),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                    ) {
+                        Column {
+                            ActionListItem(
+                                title = "Full App Backup (.json)",
+                                subtitle = "Complete backup including subjects, attendance & timetable",
+                                icon = Icons.Default.FileDownload,
+                                onClick = {
+                                    val today = LocalDate.now().toString()
+                                    exportJsonLauncher.launch("attendance_backup_$today.json")
+                                }
+                            )
+                            Divider(modifier = Modifier.padding(horizontal = 16.dp))
+                            ActionListItem(
+                                title = "Spreadsheet Export (.csv)",
+                                subtitle = "Export attendance records for Excel or Google Sheets",
+                                icon = Icons.Default.TableChart,
+                                onClick = {
+                                    val today = LocalDate.now().toString()
+                                    exportCsvLauncher.launch("attendance_export_$today.csv")
+                                }
+                            )
+                        }
+                    }
+
+                } else {
+                    // ───────────────────────────────────────────────
+                    // TAB 2: RESTORE & CSV IMPORT
+                    // ───────────────────────────────────────────────
+
+                    // Restore Warning Card
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(20.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f)
+                        )
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(18.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                Surface(
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = MaterialTheme.colorScheme.error.copy(alpha = 0.16f),
+                                    modifier = Modifier.size(44.dp)
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Icon(
+                                            Icons.Default.RestorePage,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.error,
+                                            modifier = Modifier.size(24.dp)
+                                        )
+                                    }
+                                }
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = "Restore App Backup",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onErrorContainer
+                                    )
+                                    Text(
+                                        text = "Replaces all current subjects, logs, and timetable",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.8f)
+                                    )
+                                }
+                            }
+
+                            FilledTonalButton(
+                                onClick = {
+                                    restoreLauncher.launch(arrayOf("application/json", "application/octet-stream"))
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = ButtonDefaults.filledTonalButtonColors(
+                                    containerColor = MaterialTheme.colorScheme.error,
+                                    contentColor = MaterialTheme.colorScheme.onError
+                                )
+                            ) {
+                                Icon(Icons.Default.RestorePage, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Select Backup File (.json)")
+                            }
+                        }
+                    }
+
+                    // CSV Timetable Import Group
+                    Text(
+                        text = "Spreadsheet Import",
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.SemiBold
+                    )
+
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surface
+                        ),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                    ) {
+                        Column {
+                            ActionListItem(
+                                title = "Import Subjects & Timetable",
+                                subtitle = "Bulk-add subjects and timetable slots from a CSV file",
+                                icon = Icons.Default.FileUpload,
+                                onClick = {
+                                    replaceExisting = false
+                                    csvImportLauncher.launch(arrayOf("text/*", "application/vnd.ms-excel"))
+                                }
+                            )
+                            Divider(modifier = Modifier.padding(horizontal = 16.dp))
+                            ActionListItem(
+                                title = "Download CSV Template",
+                                subtitle = "Sample format with required columns for import",
+                                icon = Icons.Default.HistoryEdu,
+                                onClick = {
+                                    csvTemplateLauncher.launch("attendance_import_template.csv")
+                                }
+                            )
+                        }
+                    }
+                }
             }
         }
     }
 }
 
 // ---------------------------------------------------------------------------
-// Reusable action card
+// Reusable modern list row
 // ---------------------------------------------------------------------------
 
 @Composable
-private fun BackupActionCard(
+private fun ActionListItem(
     title: String,
-    description: String,
-    icon: @Composable () -> Unit,
-    buttonLabel: String,
-    buttonColors: ButtonColors = ButtonDefaults.buttonColors(),
+    subtitle: String,
+    icon: ImageVector,
     onClick: () -> Unit
 ) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+        Surface(
+            shape = RoundedCornerShape(10.dp),
+            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
+            modifier = Modifier.size(38.dp)
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                icon()
-                Text(text = title, style = MaterialTheme.typography.titleSmall)
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(20.dp)
+                )
             }
+        }
+
+        Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = description,
+                text = title,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.SemiBold
+            )
+            Text(
+                text = subtitle,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            Button(
-                onClick = onClick,
-                colors = buttonColors,
-                modifier = Modifier.align(Alignment.End)
-            ) {
-                Text(buttonLabel)
-            }
         }
+
+        Icon(
+            imageVector = Icons.Default.ChevronRight,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+            modifier = Modifier.size(20.dp)
+        )
     }
 }
 
@@ -450,11 +605,6 @@ private fun BackupActionCard(
 // I/O helpers
 // ---------------------------------------------------------------------------
 
-/**
- * Builds [content] and writes it off the main thread (the target may be a network-backed
- * provider like Google Drive), reporting the outcome. Failures used to escape the launched
- * coroutine uncaught and crash the app — or, when no stream opened, fail silently.
- */
 private suspend fun writeToUri(context: Context, uri: Uri, content: suspend () -> String) {
     val saved = try {
         val text = content()
