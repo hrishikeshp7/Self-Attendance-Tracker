@@ -3,7 +3,12 @@ package com.attendance.tracker.share
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
+import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.Paint
+import android.graphics.Rect
+import android.graphics.RectF
+import androidx.core.content.FileProvider
 import com.attendance.tracker.data.model.ScheduleEntry
 import com.attendance.tracker.data.model.Subject
 import com.google.zxing.BarcodeFormat
@@ -12,6 +17,8 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
+import java.io.File
+import java.io.FileOutputStream
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.LocalTime
@@ -219,6 +226,120 @@ object TimetableShareManager {
             putExtra(Intent.EXTRA_TEXT, message)
         }
         val chooser = Intent.createChooser(sendIntent, "Share Timetable with Classmates").apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        context.startActivity(chooser)
+    }
+
+    /**
+     * Creates a branded, readable share card with the QR code and batch metadata.
+     */
+    fun createQrCardBitmap(timetable: SharedTimetable, qrBitmap: Bitmap): Bitmap {
+        val width = 720
+        val height = 960
+        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+
+        canvas.drawColor(Color.WHITE)
+
+        val titlePaint = Paint().apply {
+            color = Color.parseColor("#1C1B1F")
+            textSize = 38f
+            isFakeBoldText = true
+            isAntiAlias = true
+            textAlign = Paint.Align.CENTER
+        }
+
+        val subPaint = Paint().apply {
+            color = Color.parseColor("#49454F")
+            textSize = 26f
+            isAntiAlias = true
+            textAlign = Paint.Align.CENTER
+        }
+
+        val badgePaint = Paint().apply {
+            color = Color.parseColor("#E8DEF8")
+            style = Paint.Style.FILL
+            isAntiAlias = true
+        }
+
+        val badgeTextPaint = Paint().apply {
+            color = Color.parseColor("#21005D")
+            textSize = 22f
+            isFakeBoldText = true
+            isAntiAlias = true
+            textAlign = Paint.Align.CENTER
+        }
+
+        val footerPaint = Paint().apply {
+            color = Color.parseColor("#79747E")
+            textSize = 24f
+            isAntiAlias = true
+            textAlign = Paint.Align.CENTER
+        }
+
+        // Top App Badge
+        val badgeRect = RectF(width / 2f - 190f, 60f, width / 2f + 190f, 110f)
+        canvas.drawRoundRect(badgeRect, 25f, 25f, badgePaint)
+        canvas.drawText("ATTENDANCE TRACKER", width / 2f, 95f, badgeTextPaint)
+
+        // Title
+        val maxTitleLen = 28
+        val displayTitle = if (timetable.title.length > maxTitleLen) {
+            timetable.title.take(maxTitleLen - 3) + "..."
+        } else {
+            timetable.title
+        }
+        canvas.drawText(displayTitle, width / 2f, 175f, titlePaint)
+
+        // Subtitle
+        val subtitle = "${timetable.subjects.size} Subjects · ${timetable.lectures.size} Weekly Lectures"
+        canvas.drawText(subtitle, width / 2f, 220f, subPaint)
+
+        // QR Code
+        val qrSize = 520
+        val qrLeft = (width - qrSize) / 2f
+        val qrTop = 270f
+        val srcRect = Rect(0, 0, qrBitmap.width, qrBitmap.height)
+        val dstRect = RectF(qrLeft, qrTop, qrLeft + qrSize, qrTop + qrSize)
+        canvas.drawBitmap(qrBitmap, srcRect, dstRect, null)
+
+        // Footer instructions
+        canvas.drawText("Scan with Camera / Google Lens to import", width / 2f, 855f, footerPaint)
+        canvas.drawText("or tap the shared link", width / 2f, 895f, footerPaint)
+
+        return bitmap
+    }
+
+    /**
+     * Shares the QR code image card directly via Android Chooser (WhatsApp, Telegram, etc.)
+     * with the deep link included as caption text.
+     */
+    fun shareQrImage(context: Context, timetable: SharedTimetable, qrBitmap: Bitmap) {
+        val card = createQrCardBitmap(timetable, qrBitmap)
+        val dir = File(context.cacheDir, "qr_exports").apply { mkdirs() }
+        val file = File(dir, "timetable_qr.png")
+        FileOutputStream(file).use { out ->
+            card.compress(Bitmap.CompressFormat.PNG, 100, out)
+        }
+        val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+        val deepLink = buildDeepLink(timetable)
+        val caption = """
+            📅 Timetable: ${timetable.title}
+            ${timetable.subjects.size} subjects · ${timetable.lectures.size} weekly lectures
+            
+            ⚡ Scan the attached QR code or tap this link to import:
+            $deepLink
+        """.trimIndent()
+
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = "image/png"
+            putExtra(Intent.EXTRA_STREAM, uri)
+            putExtra(Intent.EXTRA_SUBJECT, "Timetable QR: ${timetable.title}")
+            putExtra(Intent.EXTRA_TEXT, caption)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        val chooser = Intent.createChooser(intent, "Share Timetable QR").apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
         context.startActivity(chooser)

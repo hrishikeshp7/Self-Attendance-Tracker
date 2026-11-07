@@ -2,4 +2,5 @@
 <paths>
     <cache-path name="updates" path="updates/" />
     <cache-path name="calendar_exports" path="calendar_exports/" />
+    <cache-path name="qr_exports" path="qr_exports/" />
 </paths>

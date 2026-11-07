@@ -4,8 +4,9 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -14,12 +15,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
@@ -29,6 +30,8 @@ import androidx.compose.ui.unit.dp
 import com.attendance.tracker.data.model.ScheduleEntry
 import com.attendance.tracker.data.model.Subject
 import com.attendance.tracker.share.TimetableShareManager
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -39,6 +42,7 @@ fun ShareTimetableDialog(
     onOpenImportManual: () -> Unit
 ) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     var batchTitle by remember { mutableStateOf("Class Timetable") }
 
     val sharedTimetable = remember(batchTitle, scheduleEntries, subjectsMap) {
@@ -51,9 +55,31 @@ fun ShareTimetableDialog(
 
     val qrBitmap = remember(deepLink) {
         try {
-            TimetableShareManager.generateQrBitmap(deepLink, sizePx = 480)
+            TimetableShareManager.generateQrBitmap(deepLink, sizePx = 540)
         } catch (_: Exception) {
             null
+        }
+    }
+
+    val saveQrLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("image/png")
+    ) { uri ->
+        if (uri != null && qrBitmap != null) {
+            scope.launch(Dispatchers.IO) {
+                try {
+                    val card = TimetableShareManager.createQrCardBitmap(sharedTimetable, qrBitmap)
+                    context.contentResolver.openOutputStream(uri)?.use { stream ->
+                        card.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, stream)
+                    }
+                    launch(Dispatchers.Main) {
+                        Toast.makeText(context, "QR Card saved to storage!", Toast.LENGTH_SHORT).show()
+                    }
+                } catch (e: Exception) {
+                    launch(Dispatchers.Main) {
+                        Toast.makeText(context, "Failed to save: ${e.message}", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
         }
     }
 
@@ -65,7 +91,7 @@ fun ShareTimetableDialog(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("Share Timetable", fontWeight = FontWeight.Bold)
+                Text("Share Timetable QR", fontWeight = FontWeight.Bold)
                 IconButton(onClick = onDismiss) {
                     Icon(Icons.Default.Close, contentDescription = "Close")
                 }
@@ -115,26 +141,42 @@ fun ShareTimetableDialog(
                         }
                     }
                     Text(
-                        text = "Classmates can scan this QR code with their phone camera to import in 1 tap.",
+                        text = "Share this QR image to WhatsApp or class groups. Anyone can scan or tap to import in 1 tap.",
                         style = MaterialTheme.typography.bodySmall,
                         textAlign = TextAlign.Center,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
 
+                // 1. Primary Action: Share QR Image Card (with deep link in caption)
+                Button(
+                    onClick = {
+                        qrBitmap?.let { bitmap ->
+                            TimetableShareManager.shareQrImage(context, sharedTimetable, bitmap)
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Share QR Code (Image + Link)")
+                }
+
+                // 2. Secondary Actions: Save QR Image or Copy Link
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Button(
+                    OutlinedButton(
                         onClick = {
-                            TimetableShareManager.shareViaChooser(context, sharedTimetable)
+                            val safeName = batchTitle.trim().replace(Regex("[^a-zA-Z0-9_]"), "_")
+                            saveQrLauncher.launch("${safeName}_timetable_qr.png")
                         },
                         modifier = Modifier.weight(1f)
                     ) {
-                        Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Icon(Icons.Default.Save, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text("Share Link")
+                        Text("Save QR")
                     }
 
                     OutlinedButton(
