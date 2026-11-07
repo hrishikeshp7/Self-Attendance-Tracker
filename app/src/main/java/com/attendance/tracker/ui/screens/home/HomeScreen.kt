@@ -426,6 +426,7 @@ fun HomeScreen(
                         selectedMonth = pickerMonth,
                         selectedDate = selectedDate,
                         attendanceRecords = attendanceRecords,
+                        binaryMarkedOnly = true,
                         onDateSelected = { picked ->
                             onSelectDate(picked)
                             showDatePicker = false

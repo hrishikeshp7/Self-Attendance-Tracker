@@ -64,7 +64,8 @@ fun CalendarView(
     rangeEnd: LocalDate? = null,
     onDateSelected: (LocalDate) -> Unit,
     onMonthChanged: (YearMonth) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    binaryMarkedOnly: Boolean = false
 ) {
     // Constants for pager configuration
     val CALENDAR_INITIAL_PAGE = 10000
@@ -187,17 +188,18 @@ fun CalendarView(
                     attendanceRecords = attendanceRecords,
                     rangeStart = rangeStart,
                     rangeEnd = rangeEnd,
-                    onDateSelected = onDateSelected
+                    onDateSelected = onDateSelected,
+                    binaryMarkedOnly = binaryMarkedOnly
                 )
             }
 
-            CalendarLegend()
+            CalendarLegend(binaryMarkedOnly = binaryMarkedOnly)
         }
     }
 }
 
 @Composable
-private fun CalendarLegend() {
+private fun CalendarLegend(binaryMarkedOnly: Boolean = false) {
     Divider(
         modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
         color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
@@ -208,9 +210,13 @@ private fun CalendarLegend() {
             .padding(horizontal = 16.dp),
         horizontalArrangement = Arrangement.SpaceEvenly
     ) {
-        LegendItem(color = PresentGreen, label = "Present")
-        LegendItem(color = AbsentRed, label = "Absent")
-        LegendItem(color = NoClassGray, label = "No Class")
+        if (binaryMarkedOnly) {
+            LegendItem(color = MaterialTheme.colorScheme.primary, label = "Attendance Marked")
+        } else {
+            LegendItem(color = PresentGreen, label = "Present")
+            LegendItem(color = AbsentRed, label = "Absent")
+            LegendItem(color = NoClassGray, label = "No Class")
+        }
     }
 }
 
@@ -238,7 +244,8 @@ private fun MonthCalendarGrid(
     attendanceRecords: List<AttendanceRecord>,
     rangeStart: LocalDate? = null,
     rangeEnd: LocalDate? = null,
-    onDateSelected: (LocalDate) -> Unit
+    onDateSelected: (LocalDate) -> Unit,
+    binaryMarkedOnly: Boolean = false
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
         // Day of Week Headers
@@ -322,7 +329,8 @@ private fun MonthCalendarGrid(
                     attendanceRecords = date?.let { d ->
                         attendanceRecords.filter { it.date == d }
                     } ?: emptyList(),
-                    onClick = { date?.let { onDateSelected(it) } }
+                    onClick = { date?.let { onDateSelected(it) } },
+                    binaryMarkedOnly = binaryMarkedOnly
                 )
             }
         }
@@ -338,7 +346,8 @@ private fun CalendarDay(
     isRangeEnd: Boolean = false,
     isInRange: Boolean = false,
     attendanceRecords: List<AttendanceRecord>,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    binaryMarkedOnly: Boolean = false
 ) {
     if (date == null) {
         Box(modifier = Modifier.size(DAY_CELL_SIZE + DAY_CELL_SPACING))
@@ -352,12 +361,15 @@ private fun CalendarDay(
     val hasPresent = attendanceRecords.any { it.presentCount > 0 }
     val hasAbsent = attendanceRecords.any { it.absentCount > 0 }
     val hasNoClass = attendanceRecords.any { it.status == AttendanceStatus.NO_CLASS }
+    val isAnyMarked = hasPresent || hasAbsent || hasNoClass
+
     val statusCount = listOf(hasPresent, hasAbsent, hasNoClass).count { it }
-    val isMixedStatus = statusCount > 1
+    val isMixedStatus = !binaryMarkedOnly && statusCount > 1
     val singleStatusColor = when {
-        statusCount == 1 && hasPresent -> PresentGreen
-        statusCount == 1 && hasAbsent -> AbsentRed
-        statusCount == 1 && hasNoClass -> NoClassGray
+        binaryMarkedOnly && isAnyMarked -> MaterialTheme.colorScheme.primary
+        !binaryMarkedOnly && statusCount == 1 && hasPresent -> PresentGreen
+        !binaryMarkedOnly && statusCount == 1 && hasAbsent -> AbsentRed
+        !binaryMarkedOnly && statusCount == 1 && hasNoClass -> NoClassGray
         else -> null
     }
 
@@ -435,10 +447,10 @@ private fun CalendarDay(
                     color = textColor
                 )
 
-                // Mixed-status days (e.g. present for one lecture, absent for another
-                // on the same date) get a small dot row since a single tint can't
-                // represent more than one status.
-                if (isMixedStatus) {
+                if (binaryMarkedOnly && isAnyMarked) {
+                    Spacer(modifier = Modifier.height(2.dp))
+                    StatusDot(MaterialTheme.colorScheme.primary)
+                } else if (isMixedStatus) {
                     Spacer(modifier = Modifier.height(2.dp))
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(2.dp),
