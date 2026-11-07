@@ -212,6 +212,12 @@ object SlotAttendanceStore {
             isAllNoClass = totalSlots > 0 && noClassCount == totalSlots
         )
     }
+    data class SlotEntry(
+        val subjectId: Long,
+        val date: LocalDate,
+        val slotIndex: Int,
+        val status: AttendanceStatus
+    )
 }
 
 data class SlotComputeResult(
@@ -222,9 +228,4 @@ data class SlotComputeResult(
     val isAllNoClass: Boolean
 )
 
-data class SlotEntry(
-    val subjectId: Long,
-    val date: LocalDate,
-    val slotIndex: Int,
-    val status: AttendanceStatus
-)
+typealias SlotEntry = SlotAttendanceStore.SlotEntry
