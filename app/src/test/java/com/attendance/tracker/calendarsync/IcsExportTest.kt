@@ -29,4 +29,27 @@ class IcsExportTest {
         assertTrue(until <= today.plusWeeks(2).toString().replace("-", "") + "9")  // UTC conversion can land a day later
         assertTrue(until >= today.plusWeeks(2).toString().replace("-", ""))
     }
+
+    @Test
+    fun `overnight slot sets DTEND on the following calendar day`() {
+        val entry = ScheduleEntry(
+            subjectId = 1,
+            dayOfWeek = today.dayOfWeek,
+            startTime = java.time.LocalTime.of(23, 30),
+            endTime = java.time.LocalTime.of(0, 30),
+            startDate = today,
+            endDate = today.plusWeeks(1)
+        )
+        val ics = CalendarSyncManager.buildIcsContent(listOf(entry), subjects, today.plusWeeks(1))
+        val dtStartMatch = Regex("DTSTART[^:]*:(\\d{8})T(\\d{6})").find(ics)!!
+        val dtEndMatch = Regex("DTEND[^:]*:(\\d{8})T(\\d{6})").find(ics)!!
+
+        val startDateStr = dtStartMatch.groupValues[1]
+        val endDateStr = dtEndMatch.groupValues[1]
+        val startLocalDate = LocalDate.parse(startDateStr, java.time.format.DateTimeFormatter.BASIC_ISO_DATE)
+        val endLocalDate = LocalDate.parse(endDateStr, java.time.format.DateTimeFormatter.BASIC_ISO_DATE)
+
+        assertEquals(startLocalDate.plusDays(1), endLocalDate)
+        assertEquals("003000", dtEndMatch.groupValues[2])
+    }
 }

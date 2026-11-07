@@ -377,7 +377,7 @@ fun AiImportScreen(
                                                 onClick = { replaceExisting = false }
                                             )
                                             Text(
-                                                text = "Keep existing attendance & add new lecture slots",
+                                                text = "Keep existing timetable & attendance (keep as is)",
                                                 style = MaterialTheme.typography.bodySmall
                                             )
                                         }

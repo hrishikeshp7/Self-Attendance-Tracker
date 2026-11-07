@@ -66,33 +66,38 @@ suspend fun checkForUpdate(context: Context): UpdateInfo? = withContext(Dispatch
     }
 }
 
-/** Downloads the APK, reporting 0..1 progress, then opens the system installer. */
+/** Downloads the APK, reporting 0..1 progress, then opens the system installer. Reuses existing download if already cached. */
 suspend fun downloadAndInstall(context: Context, info: UpdateInfo, onProgress: (Float) -> Unit) {
-    val file = withContext(Dispatchers.IO) {
-        val dir = File(context.cacheDir, "updates").apply { deleteRecursively(); mkdirs() }
-        val out = File(dir, "update-${info.version}.apk")
-        val conn = URL(info.apkUrl).openConnection() as HttpURLConnection
-        try {
-            conn.connectTimeout = 15_000
-            conn.readTimeout = 30_000
-            val total = conn.contentLengthLong
-            conn.inputStream.use { input ->
-                out.outputStream().use { output ->
-                    val buf = ByteArray(32 * 1024)
-                    var done = 0L
-                    while (true) {
-                        val n = input.read(buf)
-                        if (n < 0) break
-                        output.write(buf, 0, n)
-                        done += n
-                        if (total > 0) onProgress(done.toFloat() / total)
+    val dir = File(context.cacheDir, "updates")
+    val file = File(dir, "update-${info.version}.apk")
+
+    if (!file.exists() || file.length() == 0L) {
+        withContext(Dispatchers.IO) {
+            dir.apply { deleteRecursively(); mkdirs() }
+            val conn = URL(info.apkUrl).openConnection() as HttpURLConnection
+            try {
+                conn.connectTimeout = 15_000
+                conn.readTimeout = 30_000
+                val total = conn.contentLengthLong
+                conn.inputStream.use { input ->
+                    file.outputStream().use { output ->
+                        val buf = ByteArray(32 * 1024)
+                        var done = 0L
+                        while (true) {
+                            val n = input.read(buf)
+                            if (n < 0) break
+                            output.write(buf, 0, n)
+                            done += n
+                            if (total > 0) onProgress(done.toFloat() / total)
+                        }
                     }
                 }
+            } finally {
+                conn.disconnect()
             }
-        } finally {
-            conn.disconnect()
         }
-        out
+    } else {
+        onProgress(1f)
     }
 
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {

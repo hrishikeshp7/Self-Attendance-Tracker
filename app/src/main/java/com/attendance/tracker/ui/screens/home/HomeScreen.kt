@@ -149,16 +149,24 @@ fun HomeScreen(
         }
     }
 
-    val todaySlots: List<TodaySlotItem> = remember(todaysSubjects, scheduleEntries, selectedDate, allSubjects) {
+    val todaySlots: List<TodaySlotItem> = remember(todaysSubjects, scheduleEntries, selectedDate, allSubjects, todayAttendance) {
         todaysSubjects.flatMap { subject ->
             val dayEntries = scheduleEntries.filter { it.occursOn(selectedDate) && it.subjectId == subject.id }.sortedBy { it.startTime }
-            if (dayEntries.size > 1) {
-                dayEntries.indices.map { idx ->
+            val record = todayAttendance[subject.id]
+            val recordedCount = (record?.presentCount ?: 0) + (record?.absentCount ?: 0)
+            val totalSlots = maxOf(dayEntries.size, recordedCount, 1)
+            if (totalSlots > 1) {
+                (0 until totalSlots).map { idx ->
+                    val title = when {
+                        idx < dayEntries.size -> "${subject.getDisplayName(allSubjects)} - Lecture ${idx + 1}"
+                        dayEntries.isNotEmpty() -> "${subject.getDisplayName(allSubjects)} - Extra ${idx - dayEntries.size + 1}"
+                        else -> "${subject.getDisplayName(allSubjects)} - Lecture ${idx + 1}"
+                    }
                     TodaySlotItem(
                         subject = subject,
                         slotIndex = idx,
-                        totalSlots = dayEntries.size,
-                        title = "${subject.getDisplayName(allSubjects)} - Lecture ${idx + 1}"
+                        totalSlots = totalSlots,
+                        title = title
                     )
                 }
             } else {

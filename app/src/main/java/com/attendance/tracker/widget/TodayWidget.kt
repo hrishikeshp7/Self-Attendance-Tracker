@@ -148,20 +148,27 @@ class TodayWidget : GlanceAppWidget() {
 
         val rows = shown.flatMap { subject ->
             val dayEntries = schedule.filter { it.occursOn(today) && it.subjectId == subject.id }.sortedBy { it.startTime }
-            if (dayEntries.size > 1) {
-                dayEntries.indices.map { idx ->
-                    val label = "${subject.getDisplayName(byId)} - Lecture ${idx + 1}"
+            val record = marks[subject.id]
+            val recordedCount = (record?.presentCount ?: 0) + (record?.absentCount ?: 0)
+            val totalSlots = maxOf(dayEntries.size, recordedCount, 1)
+            if (totalSlots > 1) {
+                (0 until totalSlots).map { idx ->
+                    val label = when {
+                        idx < dayEntries.size -> "${subject.getDisplayName(byId)} - Lecture ${idx + 1}"
+                        dayEntries.isNotEmpty() -> "${subject.getDisplayName(byId)} - Extra ${idx - dayEntries.size + 1}"
+                        else -> "${subject.getDisplayName(byId)} - Lecture ${idx + 1}"
+                    }
                     val effStatus = SlotAttendanceStore.getEffectiveSlotStatus(
-                        context, subject.id, today, idx, dayEntries.size, marks[subject.id]
+                        context, subject.id, today, idx, totalSlots, record
                     )
-                    TodayRow(subject, marks[subject.id], label, idx, dayEntries.size, effStatus)
+                    TodayRow(subject, record, label, idx, totalSlots, effStatus)
                 }
             } else {
                 val label = subject.getDisplayName(byId)
                 val effStatus = SlotAttendanceStore.getEffectiveSlotStatus(
-                    context, subject.id, today, 0, 1, marks[subject.id]
+                    context, subject.id, today, 0, 1, record
                 )
-                listOf(TodayRow(subject, marks[subject.id], label, 0, 1, effStatus))
+                listOf(TodayRow(subject, record, label, 0, 1, effStatus))
             }
         }
 

@@ -58,6 +58,31 @@ object SlotAttendanceStore {
         prefs(context).edit().clear().apply()
     }
 
+    fun exportAll(context: Context): List<SlotEntry> {
+        val all = prefs(context).all
+        val entries = mutableListOf<SlotEntry>()
+        for ((key, value) in all) {
+            val statusStr = value as? String ?: continue
+            val status = runCatching { AttendanceStatus.valueOf(statusStr) }.getOrNull() ?: continue
+            val parts = key.split("_")
+            if (parts.size == 3) {
+                val subjectId = parts[0].toLongOrNull() ?: continue
+                val date = runCatching { LocalDate.parse(parts[1]) }.getOrNull() ?: continue
+                val slotIndex = parts[2].toIntOrNull() ?: continue
+                entries.add(SlotEntry(subjectId, date, slotIndex, status))
+            }
+        }
+        return entries
+    }
+
+    fun restoreAll(context: Context, entries: List<SlotEntry>) {
+        val editor = prefs(context).edit()
+        for (entry in entries) {
+            editor.putString("${entry.subjectId}_${entry.date}_${entry.slotIndex}", entry.status.name)
+        }
+        editor.apply()
+    }
+
     /**
      * If user interacts with slots and no explicit slot entries exist yet,
      * seed them from the existing [record] so other slots don't lose their status.
@@ -195,4 +220,11 @@ data class SlotComputeResult(
     val noClassCount: Int,
     val markedCount: Int,
     val isAllNoClass: Boolean
+)
+
+data class SlotEntry(
+    val subjectId: Long,
+    val date: LocalDate,
+    val slotIndex: Int,
+    val status: AttendanceStatus
 )

@@ -150,8 +150,9 @@ class AttendanceViewModel(application: Application) : AndroidViewModel(applicati
     fun loadAttendanceForMonth(yearMonth: YearMonth) {
         monthAttendanceJob?.cancel()
         monthAttendanceJob = viewModelScope.launch {
-            val startDate = yearMonth.atDay(1)
-            val endDate = yearMonth.atEndOfMonth()
+            // Include adjacent months so swipe transitions render marks immediately without flicker
+            val startDate = yearMonth.minusMonths(1).atDay(1)
+            val endDate = yearMonth.plusMonths(1).atEndOfMonth()
             repository.getAttendanceInRange(startDate, endDate).collect { records ->
                 _attendanceRecords.value = records
             }
@@ -281,9 +282,17 @@ class AttendanceViewModel(application: Application) : AndroidViewModel(applicati
         viewModelScope.launch {
             try {
                 attendanceMutex.withLock {
-                    // addExtraLecture marks the day normally when it has no lectures yet
                     if (repository.getSubjectById(subjectId) != null) {
+                        val recordBefore = repository.getAttendanceRecord(subjectId, date)
+                        val oldCount = (recordBefore?.presentCount ?: 0) + (recordBefore?.absentCount ?: 0)
                         repository.addExtraLecture(subjectId, date, status)
+                        SlotAttendanceStore.setSlotStatus(
+                            getApplication<Application>(),
+                            subjectId,
+                            date,
+                            oldCount,
+                            status
+                        )
                     }
                 }
             } finally {
@@ -337,10 +346,11 @@ class AttendanceViewModel(application: Application) : AndroidViewModel(applicati
             attendanceMutex.withLock {
                 val today = LocalDate.now()
                 val context = getApplication<Application>()
-                TimeOffStore.recordTimeOff(context, startDate, endDate, status, subjectIds)
-                val affected = repository.applyTimeOff(startDate, endDate, status, subjectIds, today = today)
                 val allSubs = repository.getAllSubjectsOnce().filter { !it.isFolder }
-                val targetIds = subjectIds ?: allSubs.map { it.id }.toSet()
+                val allSubIds = allSubs.map { it.id }.toSet()
+                TimeOffStore.recordTimeOff(context, startDate, endDate, status, subjectIds, allSubjectIds = allSubIds)
+                val affected = repository.applyTimeOff(startDate, endDate, status, subjectIds, today = today)
+                val targetIds = subjectIds ?: allSubIds
                 val effectiveEnd = if (status != null && endDate.isAfter(today)) today else endDate
                 if (!effectiveEnd.isBefore(startDate)) {
                     var curr = startDate
@@ -494,7 +504,8 @@ class AttendanceViewModel(application: Application) : AndroidViewModel(applicati
         val records = repository.getAllAttendanceRecordsOnce()
         val schedule = repository.getAllScheduleEntriesOnce()
         val timeOffRules = TimeOffStore.getActiveRules(getApplication<Application>())
-        return BackupManager.exportToJson(subjects, records, schedule, timeOffRules)
+        val slotAttendance = SlotAttendanceStore.exportAll(getApplication<Application>())
+        return BackupManager.exportToJson(subjects, records, schedule, timeOffRules, slotAttendance)
     }
 
     /** Collect attendance data and return a CSV string ready to be written to a file. */
@@ -521,6 +532,9 @@ class AttendanceViewModel(application: Application) : AndroidViewModel(applicati
                     repository.restoreData(data.subjects, data.attendanceRecords, data.scheduleEntries)
                 }
                 SlotAttendanceStore.clear(getApplication<Application>())
+                if (data.slotAttendance.isNotEmpty()) {
+                    SlotAttendanceStore.restoreAll(getApplication<Application>(), data.slotAttendance)
+                }
                 TimeOffStore.clear(getApplication<Application>())
                 if (data.timeOffRules.isNotEmpty()) {
                     TimeOffStore.setRules(getApplication<Application>(), data.timeOffRules)

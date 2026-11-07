@@ -43,7 +43,19 @@ class AttendanceReminderWorker(
             }
 
         if (todayScheduledEntries.isEmpty()) {
-            // No classes scheduled today – notify at-risk subjects if any, but do not send "Mark Today's Attendance"
+            val allScheduleEntries = scheduleDao.getAllScheduleEntriesOnce()
+            if (allScheduleEntries.isEmpty()) {
+                val actualSubjects = subjectDao.getAllSubjectsOnce().filter { !it.isFolder }
+                if (actualSubjects.isNotEmpty() && today.dayOfWeek != java.time.DayOfWeek.SATURDAY && today.dayOfWeek != java.time.DayOfWeek.SUNDAY) {
+                    val markedIds = attendanceDao.getAttendanceRecordsForSubjectsOnDateOnce(actualSubjects.map { it.id }, today).map { it.subjectId }.toSet()
+                    val unmarked = actualSubjects.filter { it.id !in markedIds }
+                    if (unmarked.isNotEmpty()) {
+                        NotificationHelper.showDailyReminderNotification(applicationContext)
+                        return Result.success()
+                    }
+                }
+            }
+            // No classes scheduled today – notify at-risk subjects if any
             notifyAtRiskOnly(subjectDao)
             return Result.success()
         }

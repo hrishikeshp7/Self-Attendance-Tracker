@@ -79,9 +79,9 @@ fun CalendarView(
         pageCount = { CALENDAR_MAX_PAGES } // Large number to simulate infinite scrolling
     )
 
-    // Track month changes from swipe gestures
-    LaunchedEffect(pagerState.currentPage) {
-        val currentMonth = anchorMonth.plusMonths((pagerState.currentPage - CALENDAR_INITIAL_PAGE).toLong())
+    // Track month changes from swipe gestures once page settles
+    LaunchedEffect(pagerState.settledPage) {
+        val currentMonth = anchorMonth.plusMonths((pagerState.settledPage - CALENDAR_INITIAL_PAGE).toLong())
         if (currentMonth != selectedMonth) {
             onMonthChanged(currentMonth)
         }
@@ -90,7 +90,7 @@ fun CalendarView(
     // Scroll pager when month changes externally (e.g., arrow buttons, Today button)
     LaunchedEffect(selectedMonth) {
         val targetPage = CALENDAR_INITIAL_PAGE + ChronoUnit.MONTHS.between(anchorMonth, selectedMonth).toInt()
-        if (pagerState.currentPage != targetPage) {
+        if (pagerState.currentPage != targetPage && pagerState.settledPage != targetPage) {
             pagerState.animateScrollToPage(targetPage)
         }
     }

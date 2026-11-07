@@ -1,5 +1,6 @@
 package com.attendance.tracker.backup
 
+import com.attendance.tracker.data.SlotAttendanceStore
 import com.attendance.tracker.data.TimeOffRule
 import com.attendance.tracker.data.model.AttendanceRecord
 import com.attendance.tracker.data.model.AttendanceStatus
@@ -36,7 +37,8 @@ object BackupManager {
         subjects: List<Subject>,
         attendanceRecords: List<AttendanceRecord>,
         scheduleEntries: List<ScheduleEntry>,
-        timeOffRules: List<TimeOffRule> = emptyList()
+        timeOffRules: List<TimeOffRule> = emptyList(),
+        slotAttendance: List<SlotAttendanceStore.SlotEntry> = emptyList()
     ): String {
         val root = JSONObject()
         root.put("version", BACKUP_VERSION)
@@ -101,6 +103,20 @@ object BackupManager {
             root.put("timeOffRules", timeOffArray)
         }
 
+        // Slot attendance
+        if (slotAttendance.isNotEmpty()) {
+            val slotArray = JSONArray()
+            slotAttendance.forEach { s ->
+                val obj = JSONObject()
+                obj.put("subjectId", s.subjectId)
+                obj.put("date", s.date.toString())
+                obj.put("slotIndex", s.slotIndex)
+                obj.put("status", s.status.name)
+                slotArray.put(obj)
+            }
+            root.put("slotAttendance", slotArray)
+        }
+
         return root.toString(2) // pretty-print with 2-space indent
     }
 
@@ -112,7 +128,8 @@ object BackupManager {
         val subjects: List<Subject>,
         val attendanceRecords: List<AttendanceRecord>,
         val scheduleEntries: List<ScheduleEntry>,
-        val timeOffRules: List<TimeOffRule> = emptyList()
+        val timeOffRules: List<TimeOffRule> = emptyList(),
+        val slotAttendance: List<SlotAttendanceStore.SlotEntry> = emptyList()
     )
 
     /**
@@ -189,7 +206,20 @@ object BackupManager {
                 }
             } else emptyList()
 
-            BackupData(subjects, attendanceRecords, scheduleEntries, timeOffRules)
+            // --- slot attendance ---
+            val slotArray = root.optJSONArray("slotAttendance")
+            val slotAttendance = if (slotArray != null) {
+                (0 until slotArray.length()).mapNotNull { i ->
+                    val obj = slotArray.getJSONObject(i)
+                    val subId = obj.optLong("subjectId", -1L).takeIf { it >= 0 } ?: return@mapNotNull null
+                    val d = runCatching { LocalDate.parse(obj.getString("date")) }.getOrNull() ?: return@mapNotNull null
+                    val idx = obj.optInt("slotIndex", -1).takeIf { it >= 0 } ?: return@mapNotNull null
+                    val st = runCatching { AttendanceStatus.valueOf(obj.getString("status")) }.getOrNull() ?: return@mapNotNull null
+                    SlotAttendanceStore.SlotEntry(subId, d, idx, st)
+                }
+            } else emptyList()
+
+            BackupData(subjects, attendanceRecords, scheduleEntries, timeOffRules, slotAttendance)
         } catch (e: Exception) {
             null
         }

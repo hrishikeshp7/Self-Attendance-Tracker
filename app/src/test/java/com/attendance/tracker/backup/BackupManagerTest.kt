@@ -28,12 +28,27 @@ class BackupManagerTest {
                 subjectIds = setOf(1L)
             )
         )
-        val data = BackupManager.parseJson(BackupManager.exportToJson(subjects, records, schedule, rules))
+        val slots = listOf(
+            com.attendance.tracker.data.SlotEntry(
+                subjectId = 1L,
+                date = LocalDate.of(2026, 11, 2),
+                slotIndex = 0,
+                status = AttendanceStatus.PRESENT
+            ),
+            com.attendance.tracker.data.SlotEntry(
+                subjectId = 1L,
+                date = LocalDate.of(2026, 11, 2),
+                slotIndex = 1,
+                status = AttendanceStatus.ABSENT
+            )
+        )
+        val data = BackupManager.parseJson(BackupManager.exportToJson(subjects, records, schedule, rules, slots))
         assertNotNull(data)
         assertEquals(subjects, data!!.subjects)
         assertEquals(records, data.attendanceRecords)
         assertEquals(schedule, data.scheduleEntries)
         assertEquals(rules, data.timeOffRules)
+        assertEquals(slots, data.slotAttendance)
     }
 
     @Test

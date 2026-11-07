@@ -25,15 +25,17 @@ object TimeOffStore {
         startDate: LocalDate,
         endDate: LocalDate,
         status: AttendanceStatus?,
-        subjectIds: Set<Long>? = null
-    ) = recordTimeOff(prefs(context), startDate, endDate, status, subjectIds)
+        subjectIds: Set<Long>? = null,
+        allSubjectIds: Set<Long>? = null
+    ) = recordTimeOff(prefs(context), startDate, endDate, status, subjectIds, allSubjectIds)
 
     fun recordTimeOff(
         prefs: SharedPreferences,
         startDate: LocalDate,
         endDate: LocalDate,
         status: AttendanceStatus?,
-        subjectIds: Set<Long>? = null
+        subjectIds: Set<Long>? = null,
+        allSubjectIds: Set<Long>? = null
     ) {
         val current = prefs.getStringSet(KEY_RULES, emptySet())?.toMutableSet() ?: mutableSetOf()
         val toRemove = mutableListOf<String>()
@@ -43,17 +45,23 @@ object TimeOffStore {
             val rule = parseRule(item) ?: continue
             val overlaps = !startDate.isAfter(rule.endDate) && !endDate.isBefore(rule.startDate)
             if (overlaps) {
-                if (subjectIds == null) {
-                    // New rule covers ALL subjects, remove overlapping rule
-                    toRemove.add(item)
-                } else if (rule.subjectIds != null) {
-                    val remaining = rule.subjectIds - subjectIds
-                    if (remaining.isEmpty()) {
-                        toRemove.add(item)
-                    } else if (remaining.size != rule.subjectIds.size) {
-                        toRemove.add(item)
-                        val subsStr = remaining.joinToString(",")
-                        toAdd.add("${rule.startDate}:${rule.endDate}:${rule.status.name}:$subsStr")
+                toRemove.add(item)
+                // Preserve non-overlapping portion before
+                if (rule.startDate.isBefore(startDate)) {
+                    toAdd.add(serializeRule(rule.copy(endDate = startDate.minusDays(1))))
+                }
+                // Preserve non-overlapping portion after
+                if (rule.endDate.isAfter(endDate)) {
+                    toAdd.add(serializeRule(rule.copy(startDate = endDate.plusDays(1))))
+                }
+                // Overlapping portion
+                val overlapStart = maxOf(rule.startDate, startDate)
+                val overlapEnd = minOf(rule.endDate, endDate)
+                if (subjectIds != null) {
+                    val ruleSubs = rule.subjectIds ?: allSubjectIds
+                    val remaining = if (ruleSubs != null) ruleSubs - subjectIds else null
+                    if (remaining != null && remaining.isNotEmpty()) {
+                        toAdd.add(serializeRule(TimeOffRule(overlapStart, overlapEnd, rule.status, remaining)))
                     }
                 }
             }
@@ -62,11 +70,15 @@ object TimeOffStore {
         current.addAll(toAdd)
 
         if (status != null) {
-            val subsStr = subjectIds?.joinToString(",") ?: "ALL"
-            current.add("$startDate:$endDate:${status.name}:$subsStr")
+            current.add(serializeRule(TimeOffRule(startDate, endDate, status, subjectIds)))
         }
 
         prefs.edit().putStringSet(KEY_RULES, current).apply()
+    }
+
+    private fun serializeRule(rule: TimeOffRule): String {
+        val subsStr = rule.subjectIds?.joinToString(",") ?: "ALL"
+        return "${rule.startDate}:${rule.endDate}:${rule.status.name}:$subsStr"
     }
 
     fun isVacationAbsent(context: Context, date: LocalDate, subjectIds: Set<Long>? = null): Boolean =

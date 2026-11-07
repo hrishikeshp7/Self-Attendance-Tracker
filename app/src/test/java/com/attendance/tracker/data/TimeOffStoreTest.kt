@@ -169,4 +169,45 @@ class TimeOffStoreTest {
         org.junit.Assert.assertEquals(AttendanceStatus.ABSENT, loaded[0].status)
         org.junit.Assert.assertEquals(setOf(5L, 6L), loaded[0].subjectIds)
     }
+
+    @Test
+    fun `resetting a specific subject from an all-subject rule preserves other subjects and outer dates`() {
+        val prefs = FakeSharedPreferences()
+        val monday = LocalDate.of(2026, 11, 2)
+        val friday = LocalDate.of(2026, 11, 6)
+        val wednesday = monday.plusDays(2)
+
+        // Set ALL subjects holiday for Monday..Friday
+        TimeOffStore.recordTimeOff(prefs, monday, friday, AttendanceStatus.NO_CLASS)
+
+        // Reset Wednesday for subject 1L only (allSubjectIds = {1L, 2L})
+        TimeOffStore.recordTimeOff(
+            prefs = prefs,
+            startDate = wednesday,
+            endDate = wednesday,
+            status = null,
+            subjectIds = setOf(1L),
+            allSubjectIds = setOf(1L, 2L)
+        )
+
+        val rules = TimeOffStore.getActiveRules(prefs)
+        // Rule for Mon..Tue preserved
+        val monRule = TimeOffStore.getActiveRuleForDate(prefs, monday, 1L)
+        org.junit.Assert.assertNotNull(monRule)
+        org.junit.Assert.assertEquals(AttendanceStatus.NO_CLASS, monRule?.status)
+
+        // Rule for Thu..Fri preserved
+        val thuRule = TimeOffStore.getActiveRuleForDate(prefs, friday, 1L)
+        org.junit.Assert.assertNotNull(thuRule)
+        org.junit.Assert.assertEquals(AttendanceStatus.NO_CLASS, thuRule?.status)
+
+        // Wednesday for subject 1L is CLEARED (null)
+        val wedRuleSub1 = TimeOffStore.getActiveRuleForDate(prefs, wednesday, 1L)
+        org.junit.Assert.assertNull(wedRuleSub1)
+
+        // Wednesday for subject 2L is KEPT (NO_CLASS)
+        val wedRuleSub2 = TimeOffStore.getActiveRuleForDate(prefs, wednesday, 2L)
+        org.junit.Assert.assertNotNull(wedRuleSub2)
+        org.junit.Assert.assertEquals(AttendanceStatus.NO_CLASS, wedRuleSub2?.status)
+    }
 }
