@@ -167,7 +167,10 @@ fun CalendarView(
                     }
                 }
 
-                FilledTonalIconButton(onClick = { onMonthChanged(selectedMonth.plusMonths(1)) }) {
+                FilledTonalIconButton(
+                    onClick = { onMonthChanged(selectedMonth.plusMonths(1)) },
+                    enabled = selectedMonth < YearMonth.now()
+                ) {
                     Icon(Icons.Filled.KeyboardArrowRight, contentDescription = "Next Month")
                 }
             }
@@ -189,7 +192,8 @@ fun CalendarView(
                     rangeStart = rangeStart,
                     rangeEnd = rangeEnd,
                     onDateSelected = onDateSelected,
-                    binaryMarkedOnly = binaryMarkedOnly
+                    binaryMarkedOnly = binaryMarkedOnly,
+                    maxSelectableDate = LocalDate.now()
                 )
             }
 
@@ -245,7 +249,8 @@ private fun MonthCalendarGrid(
     rangeStart: LocalDate? = null,
     rangeEnd: LocalDate? = null,
     onDateSelected: (LocalDate) -> Unit,
-    binaryMarkedOnly: Boolean = false
+    binaryMarkedOnly: Boolean = false,
+    maxSelectableDate: LocalDate = LocalDate.now()
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
         // Day of Week Headers
@@ -319,17 +324,19 @@ private fun MonthCalendarGrid(
                         normalizedEnd != null && normalizedStart != normalizedEnd
                 val isRangeEnd   = date != null && date == normalizedEnd   &&
                         normalizedStart != normalizedEnd
+                val isFuture = date != null && date.isAfter(maxSelectableDate)
                 CalendarDay(
                     date = date,
                     isSelected = date == selectedDate,
                     isToday = date == LocalDate.now(),
+                    isFuture = isFuture,
                     isRangeStart = isRangeStart,
                     isRangeEnd = isRangeEnd,
                     isInRange = isInRange,
                     attendanceRecords = date?.let { d ->
                         attendanceRecords.filter { it.date == d }
                     } ?: emptyList(),
-                    onClick = { date?.let { onDateSelected(it) } },
+                    onClick = { if (!isFuture) date?.let { onDateSelected(it) } },
                     binaryMarkedOnly = binaryMarkedOnly
                 )
             }
@@ -342,6 +349,7 @@ private fun CalendarDay(
     date: LocalDate?,
     isSelected: Boolean,
     isToday: Boolean,
+    isFuture: Boolean = false,
     isRangeStart: Boolean = false,
     isRangeEnd: Boolean = false,
     isInRange: Boolean = false,
@@ -388,6 +396,7 @@ private fun CalendarDay(
         else -> null
     }
     val textColor = when {
+        isFuture -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.30f)
         isRangeEndpoint -> MaterialTheme.colorScheme.onPrimary
         isInRange -> MaterialTheme.colorScheme.onPrimaryContainer
         isToday -> MaterialTheme.colorScheme.primary
@@ -398,7 +407,7 @@ private fun CalendarDay(
     Box(
         modifier = Modifier
             .size(DAY_CELL_SIZE + DAY_CELL_SPACING)
-            .clickable(onClick = onClick),
+            .clickable(enabled = !isFuture, onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
         // Range connector band, drawn beneath the day indicator so consecutive

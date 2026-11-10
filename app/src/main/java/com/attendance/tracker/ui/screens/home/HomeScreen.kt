@@ -213,7 +213,8 @@ fun HomeScreen(
                         Icon(Icons.Default.CalendarMonth, contentDescription = "Pick Date from Calendar")
                     }
                     IconButton(
-                        onClick = { onSelectDate(selectedDate.plusDays(1)) }
+                        onClick = { onSelectDate(selectedDate.plusDays(1)) },
+                        enabled = selectedDate < LocalDate.now()
                     ) {
                         Icon(Icons.Default.ChevronRight, contentDescription = "Next Day")
                     }
