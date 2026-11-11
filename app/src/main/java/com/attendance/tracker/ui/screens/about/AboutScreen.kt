@@ -83,15 +83,15 @@ fun AboutScreen(
             
             Spacer(modifier = Modifier.height(8.dp))
             
-            // Open Source Section
+            // License Section
             Text(
-                text = "Open Source Project",
+                text = "Project License",
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold
             )
             
             Text(
-                text = "This is an open source project licensed under the GNU Affero General Public License v3.0 (AGPL-3.0).",
+                text = "Licensed under the PolyForm Noncommercial License 1.0.0.",
                 style = MaterialTheme.typography.bodyMedium,
                 textAlign = TextAlign.Center,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -111,12 +111,12 @@ fun AboutScreen(
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Text(
-                        text = "AGPL-3.0 License",
+                        text = "PolyForm Noncommercial 1.0.0",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold
                     )
                     Text(
-                        text = "This program is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.",
+                        text = "Permits free personal, educational, and non-commercial use, modification, and distribution. Commercial use and monetization are reserved exclusively for the author.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )

@@ -8,7 +8,7 @@
 [![Kotlin](https://img.shields.io/badge/kotlin-%237F52FF.svg?style=flat&logo=kotlin&logoColor=white)](https://kotlinlang.org/)
 [![Jetpack Compose](https://img.shields.io/badge/Jetpack%20Compose-4285F4?style=flat&logo=android&logoColor=white)](https://developer.android.com/jetpack/compose)
 [![Material Design 3](https://img.shields.io/badge/Material%203-EADDFF?style=flat&logo=materialdesign&logoColor=black)](https://m3.material.io/)
-[![License: AGPL v3](https://img.shields.io/badge/License-AGPLv3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0.html)
+[![License: PolyForm Noncommercial 1.0.0](https://img.shields.io/badge/License-PolyForm_Noncommercial_1.0.0-blue.svg)](https://polyformproject.org/licenses/noncommercial/1.0.0)
 
 *Built with Kotlin, Jetpack Compose, Room, and Material 3. Entirely vibe-coded with AI as a test project.*
 
@@ -204,4 +204,4 @@ Grab the latest signed APK from the [Releases page](https://github.com/hrishikes
 
 Made with ❤️ by [hrishikeshp7](https://github.com/hrishikeshp7)
 
-This project is licensed under the **GNU Affero General Public License v3.0 (AGPL-3.0)**. See [LICENSE](LICENSE) for the full text.
+This project is licensed under the **PolyForm Noncommercial License 1.0.0**. It permits free personal, educational, and non-commercial use, modification, and distribution, while reserving commercial and monetization rights for the author. See [LICENSE](LICENSE) for the full text.
