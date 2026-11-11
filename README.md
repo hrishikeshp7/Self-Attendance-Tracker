@@ -12,6 +12,16 @@
 
 *Built with Kotlin, Jetpack Compose, Room, and Material 3. Entirely vibe-coded with AI as a test project.*
 
+<br />
+
+<p align="center">
+  <img src="docs/screenshots/01_home_dashboard.png" width="28%" alt="Home Dashboard (Dark)" />
+  &nbsp;
+  <img src="docs/screenshots/03_subject_calendar.png" width="28%" alt="Subject Calendar History" />
+  &nbsp;
+  <img src="docs/screenshots/04_weekly_timetable.png" width="28%" alt="Weekly Timetable" />
+</p>
+
 </div>
 
 <br />
@@ -19,6 +29,29 @@
 ## 🌟 Overview
 
 Attendance Tracker keeps a per-lecture record of your attendance and turns it into a clear answer: how many classes you can still skip, or how many you must attend to get back above your target. It supports weekly timetables with real date ranges, multiple lectures per day, folders, holidays and leave, home-screen marking, calendar export, and local or Google Drive backups.
+
+---
+
+## 📱 Screenshots
+
+<div align="center">
+
+### Daily Dashboard & Tracking
+| Today's Dashboard (Dark) | Today's Dashboard (Light) | Subject Calendar & History |
+| :---: | :---: | :---: |
+| <img src="docs/screenshots/01_home_dashboard.png" width="260" alt="Home Dashboard (Dark Mode)" /> | <img src="docs/screenshots/02_home_dashboard_light.png" width="260" alt="Home Dashboard (Light Mode)" /> | <img src="docs/screenshots/03_subject_calendar.png" width="260" alt="Subject Calendar & Stats" /> |
+
+### Timetable & Organization
+| Weekly Timetable | Subject & Folder Hierarchy | Inside Subject Folder |
+| :---: | :---: | :---: |
+| <img src="docs/screenshots/04_weekly_timetable.png" width="260" alt="Weekly Timetable" /> | <img src="docs/screenshots/05_manage_subjects.png" width="260" alt="Subject and Folder Management" /> | <img src="docs/screenshots/06_subjects_folder.png" width="260" alt="Inside Folder Breakdown" /> |
+
+### Smart Tools & Setup
+| Time Off & Vacation Modes | Add / Edit Lecture Slot | AI Timetable Import |
+| :---: | :---: | :---: |
+| <img src="docs/screenshots/07_time_off_sheet.png" width="260" alt="Time Off Sheet" /> | <img src="docs/screenshots/09_add_lecture_sheet.png" width="260" alt="Add Lecture Sheet" /> | <img src="docs/screenshots/08_ai_timetable_import.png" width="260" alt="AI Timetable Import" /> |
+
+</div>
 
 ---
 
