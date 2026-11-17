@@ -501,6 +501,7 @@ private fun WeekGrid(
     }
 
     val context = LocalContext.current
+    val weekRules = remember(weekStart) { TimeOffStore.getActiveRules(context) }
 
     Column(modifier = modifier) {
         // Day header row — scrolls horizontally in lockstep with the grid body below.
@@ -510,7 +511,7 @@ private fun WeekGrid(
                 DayOfWeek.entries.forEach { day ->
                     val dayDate = weekStart.plusDays(day.ordinal.toLong())
                     val dayRecords = attendanceRecords.filter { it.date == dayDate }
-                    val activeRule = TimeOffStore.getActiveRuleForDate(context, dayDate)
+                    val activeRule = TimeOffStore.getActiveRuleForDate(weekRules, dayDate)
                     val isDayHoliday = (dayRecords.isNotEmpty() && dayRecords.all { it.status == AttendanceStatus.NO_CLASS }) ||
                         (activeRule != null && activeRule.status == AttendanceStatus.NO_CLASS)
                     DayHeaderCell(
@@ -576,7 +577,7 @@ private fun WeekGrid(
                     val dayRecords = attendanceRecords.filter { it.date == dayDate }
                     val dayEntries = entriesByDay[day].orEmpty()
                     layoutDayEntries(dayEntries).forEach { (entry, lane) ->
-                        val activeRule = TimeOffStore.getActiveRuleForDate(context, dayDate, entry.subjectId)
+                        val activeRule = TimeOffStore.getActiveRuleForDate(weekRules, dayDate, entry.subjectId)
                         val isCancelled = dayRecords.any { it.subjectId == entry.subjectId && it.status == AttendanceStatus.NO_CLASS } ||
                             (activeRule != null && activeRule.status == AttendanceStatus.NO_CLASS)
                         LectureBlock(
@@ -1165,13 +1166,13 @@ private fun LectureEditorSheet(
                     onClick = {
                         submitted = true
                         val (from, until) = when (recurrence) {
-                            LectureRecurrence.ONGOING -> Pair(null, null)
+                            LectureRecurrence.ONGOING -> Pair(existing?.startDate ?: state.weekStart, null)
                             LectureRecurrence.ONE_OFF -> {
                                 val slotDate = existing?.startDate ?: state.weekStart.plusDays(selectedDays.first().ordinal.toLong())
                                 Pair(slotDate, slotDate)
                             }
                             LectureRecurrence.THIS_WEEK -> Pair(state.weekStart, state.weekStart.plusDays(6))
-                            LectureRecurrence.UNTIL_DATE -> Pair(existing?.startDate, customEndDate)
+                            LectureRecurrence.UNTIL_DATE -> Pair(existing?.startDate ?: state.weekStart, customEndDate)
                         }
                         if (selectedDays.size == 1) {
                             onSave(subjectId, selectedDays.first(), startTime, endTime, from, until)

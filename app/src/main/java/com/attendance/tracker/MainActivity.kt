@@ -43,6 +43,7 @@ class MainActivity : ComponentActivity() {
         com.attendance.tracker.widget.WidgetDayRollover.schedule(this)
         setupNotifications()
         handleDeepLink(intent)
+        viewModel.autoBackupToDownloads()
 
         setContent {
             val themePreference by viewModel.themePreference.collectAsState(initial = null)

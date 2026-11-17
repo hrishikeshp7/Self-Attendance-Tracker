@@ -2,6 +2,7 @@ package com.attendance.tracker.widget
 
 import android.content.Context
 import android.content.Intent
+import android.util.Log
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
@@ -101,6 +102,11 @@ private data class TodayData(
  */
 class TodayWidget : GlanceAppWidget() {
 
+    companion object {
+        fun schedule(context: Context) = WidgetDayRollover.schedule(context)
+        fun schedulePeriodicUpdate(context: Context) = WidgetDayRollover.schedule(context)
+    }
+
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val db = AttendanceDatabase.getDatabase(context)
@@ -109,7 +115,6 @@ class TodayWidget : GlanceAppWidget() {
         // updateAll but does not re-run provideGlance, so a one-off snapshot here went stale.
         // The date is part of the flow too, so a session that outlives midnight rolls over.
         val flow = currentDateFlow().flatMapLatest { today ->
-            TimeOffStore.syncActiveTimeOff(context, repository, today)
             combine(
                 repository.allSubjects,
                 repository.allScheduleEntries,
@@ -366,30 +371,36 @@ private fun standing(s: Subject): String {
 
 class MarkAction : ActionCallback {
     override suspend fun onAction(context: Context, glanceId: GlanceId, parameters: ActionParameters) {
-        val subjectId = parameters[SubjectIdKey] ?: return
-        val slotIndex = parameters[SlotIndexKey] ?: 0
-        val totalSlots = parameters[TotalSlotsKey] ?: 1
-        val status = parameters[StatusKey]?.let { AttendanceStatus.valueOf(it) } ?: return
-        withContext(Dispatchers.IO) {
-            val db = AttendanceDatabase.getDatabase(context)
-            val repository = AttendanceRepository(db.subjectDao(), db.attendanceDao(), db.scheduleDao(), db)
-            val today = LocalDate.now()
-            val record = repository.getAttendanceForDate(today).first().find { it.subjectId == subjectId }
-            SlotAttendanceStore.ensureSlotsInitialized(
-                context, subjectId, today, totalSlots, record
-            )
-            val res = SlotAttendanceStore.updateSlotAndCompute(
-                context, subjectId, today, totalSlots, slotIndex, status
-            )
-            if (res.isAllNoClass || (res.noClassCount > 0 && res.presentCount == 0 && res.absentCount == 0)) {
-                repository.markNoClass(subjectId, today)
-            } else if (res.presentCount > 0 || res.absentCount > 0) {
-                repository.setDayCounts(subjectId, today, res.presentCount, res.absentCount)
-            } else {
-                repository.clearDay(subjectId, today)
+        try {
+            val subjectId = parameters[SubjectIdKey] ?: return
+            val slotIndex = parameters[SlotIndexKey] ?: 0
+            val totalSlots = parameters[TotalSlotsKey] ?: 1
+            val status = parameters[StatusKey]?.let { AttendanceStatus.valueOf(it) } ?: return
+            withContext(Dispatchers.IO) {
+                val db = AttendanceDatabase.getDatabase(context)
+                val repository = AttendanceRepository(db.subjectDao(), db.attendanceDao(), db.scheduleDao(), db)
+                val today = LocalDate.now()
+                val record = repository.getAttendanceForDate(today).first().find { it.subjectId == subjectId }
+                SlotAttendanceStore.ensureSlotsInitialized(
+                    context, subjectId, today, totalSlots, record
+                )
+                val res = SlotAttendanceStore.updateSlotAndCompute(
+                    context, subjectId, today, totalSlots, slotIndex, status
+                )
+                if (res.isAllNoClass || (res.noClassCount > 0 && res.presentCount == 0 && res.absentCount == 0)) {
+                    repository.markNoClass(subjectId, today)
+                } else if (res.presentCount > 0 || res.absentCount > 0) {
+                    repository.setDayCounts(subjectId, today, res.presentCount, res.absentCount)
+                } else {
+                    repository.clearDay(subjectId, today)
+                }
             }
+            refreshAllWidgets(context)
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Log.w("TodayWidget", "Failed to handle widget mark action", e)
         }
-        refreshAllWidgets(context)
     }
 }
 
@@ -408,7 +419,7 @@ class TodayWidgetReceiver : GlanceAppWidgetReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         super.onReceive(context, intent)
         when (intent.action) {
-            Intent.ACTION_TIME_CHANGED, Intent.ACTION_TIMEZONE_CHANGED, Intent.ACTION_DATE_CHANGED -> {
+            Intent.ACTION_TIME_CHANGED, Intent.ACTION_TIMEZONE_CHANGED -> {
                 WidgetDayRollover.schedule(context, replace = true)
                 WidgetDayRolloverWorker.runNow(context)
             }
@@ -439,14 +450,29 @@ class WidgetDayRolloverWorker(context: Context, params: WorkerParameters) : Coro
 object WidgetDayRollover {
     private const val WORK_NAME = "widget_day_rollover"
 
-    /** Daily job anchored to 00:00:30; KEEP so calling it on every app start is harmless. */
+    @androidx.annotation.VisibleForTesting
+    internal fun calculateInitialDelaySeconds(now: LocalDateTime): Long {
+        val next = now.toLocalDate().plusDays(1).atStartOfDay().plusSeconds(30)
+        return Duration.between(now, next).seconds
+    }
+
+    /** Daily job anchored to 00:00:30; CANCEL_AND_REENQUEUE ensures initial delays are properly anchored. */
     fun schedule(context: Context, replace: Boolean = false) {
         val now = LocalDateTime.now()
-        val next = now.toLocalDate().plusDays(1).atStartOfDay().plusSeconds(30)
+        val delaySeconds = calculateInitialDelaySeconds(now)
         val request = PeriodicWorkRequestBuilder<WidgetDayRolloverWorker>(1, TimeUnit.DAYS)
-            .setInitialDelay(Duration.between(now, next).seconds, TimeUnit.SECONDS)
+            .setInitialDelay(delaySeconds, TimeUnit.SECONDS)
             .build()
         WorkManager.getInstance(context)
-            .enqueueUniquePeriodicWork(WORK_NAME, if (replace) ExistingPeriodicWorkPolicy.UPDATE else ExistingPeriodicWorkPolicy.KEEP, request)
+            .enqueueUniquePeriodicWork(
+                WORK_NAME,
+                ExistingPeriodicWorkPolicy.CANCEL_AND_REENQUEUE,
+                request
+            )
     }
+
+    fun schedulePeriodicUpdate(context: Context) = schedule(context)
 }
+
+fun schedule(context: Context) = WidgetDayRollover.schedule(context)
+fun schedulePeriodicUpdate(context: Context) = WidgetDayRollover.schedule(context)

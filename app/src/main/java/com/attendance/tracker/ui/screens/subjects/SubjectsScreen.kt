@@ -53,12 +53,18 @@ fun SubjectsScreen(
     }
     
     // Filter subjects based on current view
-    val displaySubjects = if (currentFolder == null) {
-        // Show top-level items (both folders and subjects)
-        subjects.filter { it.parentSubjectId == null }
-    } else {
-        // Show subjects within the selected folder
-        subjects.filter { it.parentSubjectId == currentFolder?.id }
+    val displaySubjects = remember(subjects, currentFolder) {
+        if (currentFolder == null) {
+            // Show top-level items (both folders and subjects)
+            subjects.filter { it.parentSubjectId == null }
+        } else {
+            // Show subjects within the selected folder
+            subjects.filter { it.parentSubjectId == currentFolder?.id }
+        }
+    }
+
+    val subSubjects = remember(subjects) {
+        subjects.filter { it.parentSubjectId != null }.groupBy { it.parentSubjectId }
     }
 
     Scaffold(
@@ -129,7 +135,7 @@ fun SubjectsScreen(
                         if (subject.isFolder) {
                             FolderListItem(
                                 folder = subject,
-                                children = subjects.filter { it.parentSubjectId == subject.id && !it.isFolder },
+                                children = subSubjects[subject.id] ?: emptyList(),
                                 onFolderClick = { currentFolder = it },
                                 onEditClick = {
                                     selectedSubject = subject

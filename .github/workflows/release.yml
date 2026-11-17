@@ -55,15 +55,6 @@ jobs:
           KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
         run: ./gradlew assembleRelease
 
-      - name: Generate random release name
-        id: release_name
-        run: |
-          ADJECTIVES=(Swift Bright Cosmic Noble Stellar Amber Vivid Crimson Azure Bold Radiant Serene)
-          NOUNS=(Falcon Horizon Phoenix Comet Orbit Aurora Nebula Summit Beacon Spark Zenith Tide)
-          ADJ=${ADJECTIVES[$RANDOM % ${#ADJECTIVES[@]}]}
-          NOUN=${NOUNS[$RANDOM % ${#NOUNS[@]}]}
-          echo "name=${ADJ} ${NOUN}" >> $GITHUB_OUTPUT
-
       - name: Get version info
         id: version
         run: |
@@ -104,7 +95,7 @@ jobs:
         uses: softprops/action-gh-release@v3
         with:
           tag_name: v${{ steps.version.outputs.version_name }}-${{ steps.version.outputs.date }}
-          name: ${{ steps.release_name.outputs.name }} (v${{ steps.version.outputs.version_name }})
+          name: Attendance Tracker v${{ steps.version.outputs.version_name }}
           body_path: release-notes.md
           files: app/build/outputs/apk/release/*.apk
           draft: false

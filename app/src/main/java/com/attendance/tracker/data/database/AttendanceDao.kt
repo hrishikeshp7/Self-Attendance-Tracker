@@ -38,6 +38,9 @@ interface AttendanceDao {
     @Query("DELETE FROM attendance_records WHERE subjectId = :subjectId AND date = :date")
     suspend fun deleteAttendanceForSubjectOnDate(subjectId: Long, date: LocalDate)
 
+    @Query("DELETE FROM attendance_records WHERE subjectId = :subjectId")
+    suspend fun deleteAttendanceForSubject(subjectId: Long)
+
     @Query("SELECT * FROM attendance_records ORDER BY date ASC")
     suspend fun getAllAttendanceRecordsOnce(): List<AttendanceRecord>
 

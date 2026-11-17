@@ -61,6 +61,8 @@ class AttendanceRepository(
             }
             subjectDao.clearParentForSubjects(subject.id)
         }
+        attendanceDao.deleteAttendanceForSubject(subject.id)
+        scheduleDao.deleteScheduleForSubject(subject.id)
         subjectDao.deleteSubject(subject)
     }
 
@@ -319,6 +321,10 @@ class AttendanceRepository(
         attendanceDao.deleteAttendanceForSubjectOnDate(subjectId, date)
     }
 
+    suspend fun deleteAttendanceForSubject(subjectId: Long) {
+        attendanceDao.deleteAttendanceForSubject(subjectId)
+    }
+
     // Schedule operations
     val allScheduleEntries: Flow<List<ScheduleEntry>> = scheduleDao.getAllScheduleEntries()
 
@@ -370,7 +376,7 @@ class AttendanceRepository(
         subjects: List<Subject>,
         attendanceRecords: List<AttendanceRecord>,
         scheduleEntries: List<ScheduleEntry>
-    ) {
+    ) = runInTransaction {
         // Clear in dependency order (child tables first)
         scheduleDao.deleteAllScheduleEntries()
         attendanceDao.deleteAllAttendance()
@@ -379,6 +385,17 @@ class AttendanceRepository(
         subjectDao.insertSubjects(subjects)
         attendanceDao.insertAttendanceRecords(attendanceRecords)
         scheduleDao.insertScheduleEntries(scheduleEntries)
+    }
+
+    suspend fun exportAttendanceCsv(): String {
+        return exportAttendanceCsv(getAllSubjectsOnce(), getAllAttendanceRecordsOnce())
+    }
+
+    fun exportAttendanceCsv(
+        subjects: List<Subject>,
+        records: List<AttendanceRecord>
+    ): String {
+        return com.attendance.tracker.backup.BackupManager.exportToCsv(subjects, records)
     }
 
     suspend fun importSharedTimetable(

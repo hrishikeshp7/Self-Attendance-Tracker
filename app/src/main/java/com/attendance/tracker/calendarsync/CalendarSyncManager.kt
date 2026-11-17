@@ -13,6 +13,9 @@ import java.time.LocalDate
 import java.time.ZoneId
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
+import java.util.Locale
+import java.util.TimeZone
+import kotlin.math.abs
 
 /**
  * Exports the weekly timetable as an .ics (iCalendar) calendar feed.
@@ -66,20 +69,77 @@ object CalendarSyncManager {
     private val icsLocalFormatter = DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss")
     private val icsUtcFormatter = DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss'Z'")
 
-    fun buildIcsContent(
+    private fun formatUtcOffset(offset: ZoneOffset): String {
+        val totalSeconds = offset.totalSeconds
+        val sign = if (totalSeconds >= 0) '+' else '-'
+        val absSec = abs(totalSeconds)
+        val hours = absSec / 3600
+        val minutes = (absSec % 3600) / 60
+        val seconds = absSec % 60
+        return if (seconds == 0) {
+            String.format(Locale.US, "%c%02d%02d", sign, hours, minutes)
+        } else {
+            String.format(Locale.US, "%c%02d%02d%02d", sign, hours, minutes, seconds)
+        }
+    }
+
+    fun buildVTimezone(zoneId: ZoneId = ZoneId.systemDefault()): String {
+        val offset = zoneId.rules.getStandardOffset(Instant.now())
+        val offsetStr = formatUtcOffset(offset)
+        val tzName = try {
+            val tzId = if (zoneId.id.startsWith("+") || zoneId.id.startsWith("-")) "GMT${zoneId.id}" else zoneId.id
+            TimeZone.getTimeZone(tzId).getDisplayName(false, TimeZone.SHORT, Locale.US).ifEmpty { zoneId.id }
+        } catch (_: Exception) {
+            zoneId.id
+        }
+        val sb = StringBuilder()
+        sb.append("BEGIN:VTIMEZONE\r\n")
+        sb.append("TZID:${zoneId.id}\r\n")
+        sb.append("BEGIN:STANDARD\r\n")
+        sb.append("DTSTART:19700101T000000\r\n")
+        sb.append("TZOFFSETFROM:$offsetStr\r\n")
+        sb.append("TZOFFSETTO:$offsetStr\r\n")
+        sb.append("TZNAME:$tzName\r\n")
+        sb.append("END:STANDARD\r\n")
+        sb.append("END:VTIMEZONE\r\n")
+        return sb.toString()
+    }
+
+    fun buildRrule(
+        dayOfWeek: DayOfWeek,
+        last: LocalDate,
+        zoneId: ZoneId = ZoneId.systemDefault()
+    ): String {
+        val untilUtc = last.plusDays(1).atStartOfDay(zoneId).withZoneSameInstant(ZoneOffset.UTC)
+        val until = untilUtc.format(icsUtcFormatter)
+        return "RRULE:FREQ=WEEKLY;BYDAY=${rruleDay(dayOfWeek)};UNTIL=$until"
+    }
+
+    fun buildRrule(
+        entry: ScheduleEntry,
+        last: LocalDate,
+        zoneId: ZoneId = ZoneId.systemDefault()
+    ): String {
+        val effectiveLast = minOf(last, entry.endDate ?: last)
+        return buildRrule(entry.dayOfWeek, effectiveLast, zoneId)
+    }
+
+    fun exportToIcs(
         scheduleEntries: List<ScheduleEntry>,
         subjectsById: Map<Long, Subject>,
-        endDate: LocalDate
+        endDate: LocalDate,
+        zoneId: ZoneId = ZoneId.systemDefault()
     ): String {
-        val zoneId = ZoneId.systemDefault()
         val dtStamp = Instant.now().atZone(ZoneOffset.UTC).format(icsUtcFormatter)
-        val today = LocalDate.now()
+        val today = LocalDate.now(zoneId)
 
         val sb = StringBuilder()
         sb.append("BEGIN:VCALENDAR\r\n")
         sb.append("VERSION:2.0\r\n")
         sb.append("PRODID:-//Self Attendance Tracker//Timetable//EN\r\n")
         sb.append("CALSCALE:GREGORIAN\r\n")
+
+        sb.append(buildVTimezone(zoneId))
 
         for (entry in scheduleEntries) {
             val subject = subjectsById[entry.subjectId] ?: continue
@@ -88,7 +148,6 @@ object CalendarSyncManager {
             val last = minOf(endDate, entry.endDate ?: endDate)
             val anchorDate = nextOrSameDate(maxOf(today, entry.startDate ?: today), entry.dayOfWeek)
             if (anchorDate.isAfter(last)) continue
-            val until = last.atTime(23, 59, 59).atZone(zoneId).withZoneSameInstant(ZoneOffset.UTC).format(icsUtcFormatter)
             val dtStart = anchorDate.atTime(entry.startTime)
             val isOvernight = !entry.endTime.isAfter(entry.startTime) && entry.endTime != entry.startTime
             val dtEnd = when {
@@ -103,7 +162,7 @@ object CalendarSyncManager {
             sb.append("DTSTAMP:$dtStamp\r\n")
             sb.append("DTSTART;TZID=${zoneId.id}:${dtStart.format(icsLocalFormatter)}\r\n")
             sb.append("DTEND;TZID=${zoneId.id}:${dtEnd.format(icsLocalFormatter)}\r\n")
-            sb.append("RRULE:FREQ=WEEKLY;BYDAY=${rruleDay(entry.dayOfWeek)};UNTIL=$until\r\n")
+            sb.append(buildRrule(entry.dayOfWeek, last, zoneId)).append("\r\n")
             sb.append("SUMMARY:${icsEscape(subject.getDisplayName(subjectsById))}\r\n")
             sb.append("END:VEVENT\r\n")
         }
@@ -111,6 +170,13 @@ object CalendarSyncManager {
         sb.append("END:VCALENDAR\r\n")
         return sb.toString()
     }
+
+    fun buildIcsContent(
+        scheduleEntries: List<ScheduleEntry>,
+        subjectsById: Map<Long, Subject>,
+        endDate: LocalDate,
+        zoneId: ZoneId = ZoneId.systemDefault()
+    ): String = exportToIcs(scheduleEntries, subjectsById, endDate, zoneId)
 
     private fun icsEscape(text: String): String =
         text.replace("\\", "\\\\").replace(";", "\\;").replace(",", "\\,").replace("\r\n", "\\n").replace("\r", "\\n").replace("\n", "\\n")

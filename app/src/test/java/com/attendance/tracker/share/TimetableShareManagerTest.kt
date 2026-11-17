@@ -79,4 +79,13 @@ class TimetableShareManagerTest {
         assertNull(TimetableShareManager.decode("invalid-corrupt-data"))
         assertNull(TimetableShareManager.decode(""))
     }
+
+    @Test
+    fun `decompressed timetable exceeding 512 KB returns null`() {
+        val oversizedData = ByteArray(600 * 1024) { 'a'.code.toByte() }
+        val byteStream = java.io.ByteArrayOutputStream()
+        java.util.zip.GZIPOutputStream(byteStream).use { it.write(oversizedData) }
+        val token = java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(byteStream.toByteArray())
+        assertNull(TimetableShareManager.decode(token))
+    }
 }

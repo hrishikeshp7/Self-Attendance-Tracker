@@ -13,6 +13,8 @@ import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import com.attendance.tracker.backup.AiImport
+import com.attendance.tracker.data.TimeOffStore
+import org.junit.Assert.assertNotNull
 import org.junit.Before
 import org.junit.Test
 import java.time.DayOfWeek
@@ -22,7 +24,7 @@ import java.time.LocalDate
  * In-memory fakes for the Room DAOs so [AttendanceRepository]'s business logic can be
  * exercised without a real database.
  */
-private class FakeSubjectDao : SubjectDao {
+internal class FakeSubjectDao : SubjectDao {
     val subjects = mutableMapOf<Long, Subject>()
 
     override fun getAllSubjects(): Flow<List<Subject>> = MutableStateFlow(subjects.values.toList())
@@ -77,7 +79,7 @@ private class FakeSubjectDao : SubjectDao {
     }
 }
 
-private class FakeAttendanceDao : AttendanceDao {
+internal class FakeAttendanceDao : AttendanceDao {
     val records = mutableMapOf<Pair<Long, LocalDate>, AttendanceRecord>()
 
     override fun getAttendanceForSubject(subjectId: Long): Flow<List<AttendanceRecord>> =
@@ -117,6 +119,10 @@ private class FakeAttendanceDao : AttendanceDao {
         records.remove(subjectId to date)
     }
 
+    override suspend fun deleteAttendanceForSubject(subjectId: Long) {
+        records.keys.filter { it.first == subjectId }.forEach { records.remove(it) }
+    }
+
     override suspend fun getAllAttendanceRecordsOnce(): List<AttendanceRecord> = records.values.sortedBy { it.date }
     override suspend fun insertAttendanceRecords(records: List<AttendanceRecord>) {
         records.forEach { this.records[it.subjectId to it.date] = it }
@@ -126,7 +132,7 @@ private class FakeAttendanceDao : AttendanceDao {
     }
 }
 
-private class FakeScheduleDao : ScheduleDao {
+internal class FakeScheduleDao : ScheduleDao {
     val entries = mutableListOf<ScheduleEntry>()
 
     override fun getAllScheduleEntries(): Flow<List<ScheduleEntry>> = MutableStateFlow(entries.toList())
@@ -452,5 +458,105 @@ class AttendanceRepositoryTest {
 
         assertNull(attendanceDao.getAttendanceRecord(1L, monday))
         assertNull(attendanceDao.getAttendanceRecord(1L, tuesday))
+    }
+
+    @Test
+    fun `time off applied to previous subject does not affect newly scheduled subject added today`() = runBlocking {
+        val pastMonday = LocalDate.of(2026, 11, 2)
+        val pastFriday = LocalDate.of(2026, 11, 6)
+        val today = LocalDate.of(2026, 11, 16)
+
+        // Add Subject A and Subject B
+        val subA = Subject(id = 1L, name = "Physics")
+        val subB = Subject(id = 2L, name = "Chemistry")
+        subjectDao.insertSubject(subA)
+        subjectDao.insertSubject(subB)
+
+        // Subject A is scheduled on Mondays
+        val entryA = ScheduleEntry(id = 1L, subjectId = 1L, dayOfWeek = DayOfWeek.MONDAY)
+        scheduleDao.insertScheduleEntry(entryA)
+
+        // Mark Time Off for past week for all subjects
+        val affected = repository.applyTimeOff(pastMonday, pastFriday, AttendanceStatus.ABSENT, today = pastFriday)
+        assertEquals(1, affected)
+
+        // Subject A marked absent
+        val recordA = repository.getAttendanceRecord(1L, pastMonday)
+        assertNotNull(recordA)
+        assertEquals(AttendanceStatus.ABSENT, recordA?.status)
+        assertEquals(1, repository.getSubjectById(1L)?.absentLectures)
+
+        // Remove Subject A from schedule
+        repository.deleteScheduleEntry(entryA)
+
+        // Subject B is scheduled today (starts today or ongoing)
+        val entryB = ScheduleEntry(id = 2L, subjectId = 2L, dayOfWeek = DayOfWeek.MONDAY, startDate = today)
+        repository.insertScheduleEntries(listOf(entryB))
+
+        // Time off rule in store
+        val rule = com.attendance.tracker.data.TimeOffRule(pastMonday, pastFriday, AttendanceStatus.ABSENT, null)
+        TimeOffStore.syncActiveTimeOff(listOf(rule), repository, today = today)
+
+        // Subject B has no record on past Monday and 0 absent lectures
+        assertNull(repository.getAttendanceRecord(2L, pastMonday))
+        assertEquals(0, repository.getSubjectById(2L)?.absentLectures)
+        assertEquals(0, repository.getSubjectById(2L)?.totalLectures)
+    }
+
+    @Test
+    fun `deleting a subject cleans up child attendance records and schedule entries`() = runBlocking {
+        val subject = Subject(id = 1L, name = "Physics")
+        subjectDao.insertSubject(subject)
+
+        val date = LocalDate.of(2026, 11, 16)
+        attendanceDao.insertAttendance(AttendanceRecord(subjectId = 1L, date = date, status = AttendanceStatus.PRESENT))
+        repository.insertScheduleEntry(ScheduleEntry(subjectId = 1L, dayOfWeek = DayOfWeek.MONDAY))
+
+        assertNotNull(repository.getSubjectById(1L))
+        assertNotNull(repository.getAttendanceRecord(1L, date))
+        assertEquals(1, scheduleDao.entries.count { it.subjectId == 1L })
+
+        repository.deleteSubject(subject)
+
+        assertNull(repository.getSubjectById(1L))
+        assertNull(repository.getAttendanceRecord(1L, date))
+        assertEquals(0, scheduleDao.entries.count { it.subjectId == 1L })
+    }
+
+    @Test
+    fun `restoreData clears old data and inserts restored data`() = runBlocking {
+        val oldSubject = Subject(id = 1L, name = "Old")
+        subjectDao.insertSubject(oldSubject)
+        attendanceDao.insertAttendance(AttendanceRecord(subjectId = 1L, date = LocalDate.of(2026, 1, 1), status = AttendanceStatus.PRESENT))
+        repository.insertScheduleEntry(ScheduleEntry(subjectId = 1L, dayOfWeek = DayOfWeek.MONDAY))
+
+        val newSubject = Subject(id = 2L, name = "New")
+        val newRecord = AttendanceRecord(subjectId = 2L, date = LocalDate.of(2026, 2, 2), status = AttendanceStatus.ABSENT)
+        val newSchedule = ScheduleEntry(subjectId = 2L, dayOfWeek = DayOfWeek.TUESDAY)
+
+        repository.restoreData(listOf(newSubject), listOf(newRecord), listOf(newSchedule))
+
+        assertNull(repository.getSubjectById(1L))
+        assertNotNull(repository.getSubjectById(2L))
+        assertEquals(1, repository.getAllAttendanceRecordsOnce().size)
+        assertEquals(2L, repository.getAllAttendanceRecordsOnce().first().subjectId)
+        assertEquals(1, repository.getAllScheduleEntriesOnce().size)
+        assertEquals(2L, repository.getAllScheduleEntriesOnce().first().subjectId)
+    }
+
+    @Test
+    fun `exportAttendanceCsv exports attendance and sanitizes formula injection`() = runBlocking {
+        val maliciousSubject = Subject(id = 1L, name = "=cmd|' /C calc'!A0")
+        val normalSubject = Subject(id = 2L, name = "Chemistry")
+        subjectDao.insertSubject(maliciousSubject)
+        subjectDao.insertSubject(normalSubject)
+
+        val date = LocalDate.of(2026, 11, 16)
+        attendanceDao.insertAttendance(AttendanceRecord(subjectId = 1L, date = date, status = AttendanceStatus.PRESENT, count = 1))
+        attendanceDao.insertAttendance(AttendanceRecord(subjectId = 2L, date = date, status = AttendanceStatus.ABSENT, count = 1))
+
+        val csv = repository.exportAttendanceCsv()
+        org.junit.Assert.assertTrue(csv.contains("\"'=cmd|' /C calc'!A0\""))
+        org.junit.Assert.assertTrue(csv.contains("\"Chemistry\""))
     }
 }

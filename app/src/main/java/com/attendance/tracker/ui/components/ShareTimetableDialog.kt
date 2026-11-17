@@ -3,6 +3,7 @@ package com.attendance.tracker.ui.components
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.graphics.Bitmap
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -32,6 +33,7 @@ import com.attendance.tracker.data.model.Subject
 import com.attendance.tracker.share.TimetableShareManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -49,25 +51,30 @@ fun ShareTimetableDialog(
         TimetableShareManager.createSharedTimetable(batchTitle, scheduleEntries, subjectsMap)
     }
 
-    val deepLink = remember(sharedTimetable) {
+    val shareUrl = remember(sharedTimetable) {
         TimetableShareManager.buildDeepLink(sharedTimetable)
     }
+    val deepLink = shareUrl
 
-    val qrBitmap = remember(deepLink) {
-        try {
-            TimetableShareManager.generateQrBitmap(deepLink, sizePx = 540)
-        } catch (_: Exception) {
-            null
+    val qrBitmap by produceState<Bitmap?>(initialValue = null, shareUrl) {
+        value = null
+        value = withContext(Dispatchers.Default) {
+            try {
+                TimetableShareManager.generateQrBitmap(shareUrl, sizePx = 540)
+            } catch (_: Exception) {
+                null
+            }
         }
     }
 
     val saveQrLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("image/png")
     ) { uri ->
-        if (uri != null && qrBitmap != null) {
+        val bitmap = qrBitmap
+        if (uri != null && bitmap != null) {
             scope.launch(Dispatchers.IO) {
                 try {
-                    val card = TimetableShareManager.createQrCardBitmap(sharedTimetable, qrBitmap)
+                    val card = TimetableShareManager.createQrCardBitmap(sharedTimetable, bitmap)
                     context.contentResolver.openOutputStream(uri)?.use { stream ->
                         card.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, stream)
                     }
@@ -119,7 +126,8 @@ fun ShareTimetableDialog(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
-                if (qrBitmap != null) {
+                val currentBitmap = qrBitmap
+                if (currentBitmap != null) {
                     Card(
                         shape = RoundedCornerShape(16.dp),
                         colors = CardDefaults.cardColors(containerColor = Color.White),
@@ -132,7 +140,7 @@ fun ShareTimetableDialog(
                             contentAlignment = Alignment.Center
                         ) {
                             Image(
-                                bitmap = qrBitmap.asImageBitmap(),
+                                bitmap = currentBitmap.asImageBitmap(),
                                 contentDescription = "Timetable QR Code",
                                 modifier = Modifier
                                     .fillMaxSize()
@@ -146,6 +154,15 @@ fun ShareTimetableDialog(
                         textAlign = TextAlign.Center,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .size(220.dp)
+                            .padding(4.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator()
+                    }
                 }
 
                 // 1. Primary Action: Share QR Image Card (with deep link in caption)

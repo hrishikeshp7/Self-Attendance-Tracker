@@ -53,6 +53,10 @@ import java.time.YearMonth
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
+private val dayFormatter = DateTimeFormatter.ofPattern("EEEE")
+private val dateFormatter = DateTimeFormatter.ofPattern("MMMM d, yyyy")
+private val viewingDateFormatter = DateTimeFormatter.ofPattern("EEE, d MMM")
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
@@ -76,8 +80,6 @@ fun HomeScreen(
 ) {
     val context = LocalContext.current
     val isToday = selectedDate == LocalDate.now()
-    val dayFormatter = DateTimeFormatter.ofPattern("EEEE")
-    val dateFormatter = DateTimeFormatter.ofPattern("MMMM d, yyyy")
 
     // Only subjects actually below their target: "close to the limit" nudges just repeated
     // what each card already says and ate half the screen.
@@ -266,7 +268,7 @@ fun HomeScreen(
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
                                 Text(
-                                    text = "Viewing: ${selectedDate.format(DateTimeFormatter.ofPattern("EEE, d MMM"))}",
+                                    text = "Viewing: ${selectedDate.format(viewingDateFormatter)}",
                                     style = MaterialTheme.typography.labelMedium,
                                     fontWeight = FontWeight.SemiBold,
                                     color = MaterialTheme.colorScheme.onSecondaryContainer

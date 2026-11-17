@@ -103,16 +103,26 @@ abstract class AttendanceDatabase : RoomDatabase() {
 
         fun getDatabase(context: Context): AttendanceDatabase {
             return INSTANCE ?: synchronized(this) {
-                val instance = Room.databaseBuilder(
-                    context.applicationContext,
-                    AttendanceDatabase::class.java,
-                    "attendance_database"
-                )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
-                    .build()
+                val instance = buildDatabase(context)
                 INSTANCE = instance
                 instance
             }
+        }
+
+        fun buildDatabase(context: Context): AttendanceDatabase {
+            return Room.databaseBuilder(
+                context.applicationContext,
+                AttendanceDatabase::class.java,
+                "attendance_database"
+            )
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
+                .addCallback(object : RoomDatabase.Callback() {
+                    override fun onOpen(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                        super.onOpen(db)
+                        db.execSQL("PRAGMA foreign_keys = ON;")
+                    }
+                })
+                .build()
         }
     }
 }

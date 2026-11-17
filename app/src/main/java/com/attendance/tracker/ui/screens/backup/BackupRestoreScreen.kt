@@ -327,7 +327,7 @@ fun BackupRestoreScreen(
                     // TAB 1: BACKUP (EXPORT)
                     // ───────────────────────────────────────────────
 
-                    // Google Drive Featured Hero Card
+                    // Cloud / Drive Export Card
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(20.dp),
@@ -361,13 +361,13 @@ fun BackupRestoreScreen(
                                 }
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
-                                        text = "Google Drive Cloud Backup",
+                                        text = "Save to Google Drive",
                                         style = MaterialTheme.typography.titleMedium,
                                         fontWeight = FontWeight.Bold,
                                         color = MaterialTheme.colorScheme.onPrimaryContainer
                                     )
                                     Text(
-                                        text = "Safely store your backup in Google Drive",
+                                        text = "Pick Google Drive in the system file picker to save there",
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
                                     )
@@ -388,8 +388,16 @@ fun BackupRestoreScreen(
                             ) {
                                 Icon(Icons.Default.CloudUpload, contentDescription = null, modifier = Modifier.size(18.dp))
                                 Spacer(modifier = Modifier.width(8.dp))
-                                Text("Backup to Google Drive")
+                                Text("Save Backup to Drive")
                             }
+
+                            Divider(color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.12f))
+
+                            Text(
+                                text = "✅  Auto-backup: a dated .json is also saved to Downloads/AttendanceTracker/ each day the app opens — no setup needed.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.85f)
+                            )
                         }
                     }
 

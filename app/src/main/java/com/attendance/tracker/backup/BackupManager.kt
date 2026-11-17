@@ -229,6 +229,20 @@ object BackupManager {
     // CSV export (attendance records, human-readable)
     // -----------------------------------------------------------------------
 
+    private val CSV_FORMULA_PREFIXES = charArrayOf('=', '+', '-', '@', '\t', '\r')
+
+    /**
+     * Sanitizes a cell against CSV formula injection.
+     * If a cell starts with '=', '+', '-', '@', '\t', or '\r', prepend a single quote (') before writing.
+     */
+    fun sanitizeCsvCell(value: String): String {
+        return if (value.isNotEmpty() && value[0] in CSV_FORMULA_PREFIXES) {
+            "'$value"
+        } else {
+            value
+        }
+    }
+
     fun exportToCsv(
         subjects: List<Subject>,
         attendanceRecords: List<AttendanceRecord>
@@ -239,10 +253,11 @@ object BackupManager {
         attendanceRecords.sortedWith(compareBy({ it.date }, { it.subjectId }))
             .forEach { r ->
                 val name = subjectMap[r.subjectId]?.name ?: r.subjectId.toString()
-                sb.appendLine("${csvEscape(name)},${r.date},${r.status.name},${r.count}")
+                val safeName = sanitizeCsvCell(name)
+                sb.appendLine("${csvEscape(safeName)},${r.date},${r.status.name},${r.count}")
                 if (r.otherCount > 0) {
                     val other = if (r.status == AttendanceStatus.PRESENT) AttendanceStatus.ABSENT else AttendanceStatus.PRESENT
-                    sb.appendLine("${csvEscape(name)},${r.date},${other.name},${r.otherCount}")
+                    sb.appendLine("${csvEscape(safeName)},${r.date},${other.name},${r.otherCount}")
                 }
             }
         return sb.toString()

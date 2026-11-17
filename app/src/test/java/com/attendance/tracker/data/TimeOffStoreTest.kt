@@ -2,9 +2,20 @@ package com.attendance.tracker.data
 
 import android.content.SharedPreferences
 import com.attendance.tracker.data.model.AttendanceStatus
+import com.attendance.tracker.data.model.ScheduleEntry
+import com.attendance.tracker.data.model.Subject
+import com.attendance.tracker.data.repository.AttendanceRepository
+import com.attendance.tracker.data.repository.FakeAttendanceDao
+import com.attendance.tracker.data.repository.FakeScheduleDao
+import com.attendance.tracker.data.repository.FakeSubjectDao
+import kotlinx.coroutines.runBlocking
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.time.DayOfWeek
 import java.time.LocalDate
 
 class TimeOffStoreTest {
@@ -209,5 +220,157 @@ class TimeOffStoreTest {
         val wedRuleSub2 = TimeOffStore.getActiveRuleForDate(prefs, wednesday, 2L)
         org.junit.Assert.assertNotNull(wedRuleSub2)
         org.junit.Assert.assertEquals(AttendanceStatus.NO_CLASS, wedRuleSub2?.status)
+    }
+
+    @Test
+    fun `newly scheduled subject does not inherit past time off absences after previous subject removed`() = runBlocking {
+        val prefs = FakeSharedPreferences()
+        val subjectDao = FakeSubjectDao()
+        val attendanceDao = FakeAttendanceDao()
+        val scheduleDao = FakeScheduleDao()
+        val repository = AttendanceRepository(subjectDao, attendanceDao, scheduleDao)
+
+        val pastMonday = LocalDate.of(2026, 11, 2)
+        val pastFriday = LocalDate.of(2026, 11, 6)
+        val today = LocalDate.of(2026, 11, 16) // 2 weeks later
+
+        val subjectA = Subject(id = 1L, name = "Subject A")
+        val subjectB = Subject(id = 2L, name = "Subject B")
+        subjectDao.insertSubject(subjectA)
+        subjectDao.insertSubject(subjectB)
+
+        // 1. Subject A is scheduled on Mondays
+        val scheduleEntryA = ScheduleEntry(id = 1L, subjectId = 1L, dayOfWeek = DayOfWeek.MONDAY)
+        scheduleDao.insertScheduleEntry(scheduleEntryA)
+
+        // Mark absent via time off for past week (Nov 2 - Nov 6) for All Subjects (subjectIds = null)
+        TimeOffStore.recordTimeOff(prefs, pastMonday, pastFriday, AttendanceStatus.ABSENT)
+        repository.applyTimeOff(pastMonday, pastFriday, AttendanceStatus.ABSENT, today = today)
+
+        // Verify Subject A was marked absent for past Monday
+        val recordA = repository.getAttendanceRecord(1L, pastMonday)
+        assertNotNull(recordA)
+        assertEquals(AttendanceStatus.ABSENT, recordA?.status)
+        assertEquals(1, subjectDao.getSubjectById(1L)?.absentLectures)
+        assertEquals(1, subjectDao.getSubjectById(1L)?.totalLectures)
+
+        // 2. Subject A is removed from schedule
+        scheduleDao.deleteScheduleEntry(scheduleEntryA)
+
+        // Subject B is scheduled today with an ongoing recurrence (startDate == null)
+        val scheduleEntryB = ScheduleEntry(id = 2L, subjectId = 2L, dayOfWeek = DayOfWeek.MONDAY)
+        scheduleDao.insertScheduleEntry(scheduleEntryB)
+
+        // 3. syncActiveTimeOff runs today
+        TimeOffStore.syncActiveTimeOff(prefs, repository, today = today)
+
+        // 4. Subject B must NOT get marked absent for that past week
+        val recordB = repository.getAttendanceRecord(2L, pastMonday)
+        assertNull(recordB)
+        assertEquals(0, subjectDao.getSubjectById(2L)?.absentLectures)
+        assertEquals(0, subjectDao.getSubjectById(2L)?.totalLectures)
+    }
+
+    @Test
+    fun `active time off rolls over to today but does not backfill past days for newly scheduled subjects`() = runBlocking {
+        val prefs = FakeSharedPreferences()
+        val subjectDao = FakeSubjectDao()
+        val attendanceDao = FakeAttendanceDao()
+        val scheduleDao = FakeScheduleDao()
+        val repository = AttendanceRepository(subjectDao, attendanceDao, scheduleDao)
+
+        val mon = LocalDate.of(2026, 11, 16)
+        val wed = LocalDate.of(2026, 11, 18)
+        val fri = LocalDate.of(2026, 11, 20)
+
+        val subjectA = Subject(id = 1L, name = "Subject A")
+        val subjectB = Subject(id = 2L, name = "Subject B")
+        subjectDao.insertSubject(subjectA)
+        subjectDao.insertSubject(subjectB)
+
+        // Subject A is scheduled on Mondays and Wednesdays
+        val entryA = ScheduleEntry(id = 1L, subjectId = 1L, dayOfWeek = DayOfWeek.MONDAY)
+        scheduleDao.insertScheduleEntry(entryA)
+
+        // Record time off for Mon..Fri as ABSENT
+        TimeOffStore.recordTimeOff(prefs, mon, fri, AttendanceStatus.ABSENT)
+        repository.applyTimeOff(mon, fri, AttendanceStatus.ABSENT, today = mon)
+
+        // Subject A marked absent on Monday
+        assertNotNull(repository.getAttendanceRecord(1L, mon))
+
+        // On Wednesday (today), Subject A is removed from schedule and Subject B is scheduled for Mondays & Wednesdays
+        scheduleDao.deleteScheduleEntry(entryA)
+        val entryBMon = ScheduleEntry(id = 2L, subjectId = 2L, dayOfWeek = DayOfWeek.MONDAY, startDate = wed)
+        val entryBWed = ScheduleEntry(id = 3L, subjectId = 2L, dayOfWeek = DayOfWeek.WEDNESDAY, startDate = wed)
+        scheduleDao.insertScheduleEntry(entryBMon)
+        scheduleDao.insertScheduleEntry(entryBWed)
+
+        // syncActiveTimeOff runs on Wednesday
+        TimeOffStore.syncActiveTimeOff(prefs, repository, today = wed)
+
+        // Subject B must NOT be marked absent for Monday
+        assertNull(repository.getAttendanceRecord(2L, mon))
+        // Subject B SHOULD be marked absent for Wednesday (today, which is during active time off)
+        val recBWed = repository.getAttendanceRecord(2L, wed)
+        assertNotNull(recBWed)
+        assertEquals(AttendanceStatus.ABSENT, recBWed?.status)
+        assertEquals(1, subjectDao.getSubjectById(2L)?.absentLectures)
+    }
+
+    @Test
+    fun `syncActiveTimeOff ignores expired rules completely even when schedule entries have null startDate`() = runBlocking {
+        val prefs = FakeSharedPreferences()
+        val subjectDao = FakeSubjectDao()
+        val attendanceDao = FakeAttendanceDao()
+        val scheduleDao = FakeScheduleDao()
+        val repository = AttendanceRepository(subjectDao, attendanceDao, scheduleDao)
+
+        val pastMon = LocalDate.of(2026, 10, 12)
+        val pastFri = LocalDate.of(2026, 10, 16)
+        val today = LocalDate.of(2026, 11, 16)
+
+        val subject = Subject(id = 10L, name = "Chemistry")
+        subjectDao.insertSubject(subject)
+
+        // Record past time off
+        TimeOffStore.recordTimeOff(prefs, pastMon, pastFri, AttendanceStatus.ABSENT)
+
+        // Chemistry is scheduled on Mondays with null startDate
+        scheduleDao.insertScheduleEntry(ScheduleEntry(id = 100L, subjectId = 10L, dayOfWeek = DayOfWeek.MONDAY, startDate = null))
+
+        // Run syncActiveTimeOff
+        TimeOffStore.syncActiveTimeOff(prefs, repository, today = today)
+
+        // No past records should be created
+        val pastRecords = repository.getAttendanceInRangeOnce(pastMon, pastFri)
+        assertTrue(pastRecords.isEmpty())
+        assertEquals(0, subjectDao.getSubjectById(10L)?.absentLectures)
+    }
+
+    @Test
+    fun `getActiveRuleForDate with rules list evaluates active rule in-memory correctly`() {
+        val start = LocalDate.of(2026, 11, 2)
+        val end = LocalDate.of(2026, 11, 6)
+        val rules = listOf(
+            TimeOffRule(start, end, AttendanceStatus.NO_CLASS, setOf(1L, 2L))
+        )
+
+        // Matching date and subject
+        val rule1 = TimeOffStore.getActiveRuleForDate(rules, LocalDate.of(2026, 11, 3), 1L)
+        assertNotNull(rule1)
+        assertEquals(AttendanceStatus.NO_CLASS, rule1?.status)
+
+        // Matching date without subject filter
+        val ruleAll = TimeOffStore.getActiveRuleForDate(rules, LocalDate.of(2026, 11, 3))
+        assertNotNull(ruleAll)
+
+        // Matching date but different subject
+        val ruleDiffSubject = TimeOffStore.getActiveRuleForDate(rules, LocalDate.of(2026, 11, 3), 3L)
+        assertNull(ruleDiffSubject)
+
+        // Outside date range
+        val ruleOutside = TimeOffStore.getActiveRuleForDate(rules, LocalDate.of(2026, 11, 7), 1L)
+        assertNull(ruleOutside)
     }
 }

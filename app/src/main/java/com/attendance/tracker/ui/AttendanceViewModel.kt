@@ -438,10 +438,12 @@ class AttendanceViewModel(application: Application) : AndroidViewModel(applicati
         }
     }
 
+    fun deleteScheduleEntry(entry: ScheduleEntry) = removeScheduleEntry(entry)
+
     /** Creates a new timed lecture slot (used by the weekly calendar view). */
     fun addLectureSlot(
         subjectId: Long, dayOfWeek: DayOfWeek, startTime: LocalTime, endTime: LocalTime,
-        startDate: LocalDate? = null, endDate: LocalDate? = null
+        startDate: LocalDate? = LocalDate.now(), endDate: LocalDate? = null
     ) {
         addLectureSlots(subjectId, listOf(dayOfWeek), startTime, endTime, startDate, endDate)
     }
@@ -449,7 +451,7 @@ class AttendanceViewModel(application: Application) : AndroidViewModel(applicati
     /** Creates multiple timed lecture slots in one operation (e.g. for recurring days of week). */
     fun addLectureSlots(
         subjectId: Long, days: Collection<DayOfWeek>, startTime: LocalTime, endTime: LocalTime,
-        startDate: LocalDate? = null, endDate: LocalDate? = null
+        startDate: LocalDate? = LocalDate.now(), endDate: LocalDate? = null
     ) {
         viewModelScope.launch {
             val entries = days.map { day ->
@@ -600,5 +602,39 @@ class AttendanceViewModel(application: Application) : AndroidViewModel(applicati
     fun resetBackupRestoreStatus() {
         _backupRestoreStatus.value = BackupRestoreStatus.IDLE
         _backupRestoreMessage.value = ""
+    }
+
+    // -----------------------------------------------------------------------
+    // Silent auto-backup to Downloads/AttendanceTracker/ (at most once per day)
+    // -----------------------------------------------------------------------
+
+    /** Writes a dated JSON backup to Downloads/AttendanceTracker/. No-ops if already ran today.
+     *  Uses MediaStore — no WRITE_EXTERNAL_STORAGE permission needed on Android 10+. */
+    fun autoBackupToDownloads() {
+        val context = getApplication<Application>()
+        val prefs = context.getSharedPreferences("auto_backup", android.content.Context.MODE_PRIVATE)
+        val today = java.time.LocalDate.now().toString()
+        if (prefs.getString("last_date", null) == today) return   // already ran today
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            try {
+                val json = createJsonBackup()
+                val filename = "attendance_backup_$today.json"
+                val resolver = context.contentResolver
+                val collection = android.provider.MediaStore.Downloads.getContentUri(
+                    android.provider.MediaStore.VOLUME_EXTERNAL_PRIMARY
+                )
+                val values = android.content.ContentValues().apply {
+                    put(android.provider.MediaStore.Downloads.DISPLAY_NAME, filename)
+                    put(android.provider.MediaStore.Downloads.MIME_TYPE, "application/json")
+                    put(android.provider.MediaStore.Downloads.RELATIVE_PATH,
+                        "${android.os.Environment.DIRECTORY_DOWNLOADS}/AttendanceTracker")
+                }
+                val uri = resolver.insert(collection, values) ?: return@launch
+                resolver.openOutputStream(uri)?.use { it.write(json.toByteArray(Charsets.UTF_8)) }
+                prefs.edit().putString("last_date", today).apply()
+            } catch (_: Exception) {
+                // Silent — auto-backup should never crash the app
+            }
+        }
     }
 }

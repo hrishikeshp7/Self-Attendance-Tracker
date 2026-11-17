@@ -99,8 +99,11 @@ object TimeOffStore {
     fun getActiveRuleForDate(context: Context, date: LocalDate, subjectId: Long? = null): TimeOffRule? =
         getActiveRuleForDate(prefs(context), date, subjectId)
 
-    fun getActiveRuleForDate(prefs: SharedPreferences, date: LocalDate, subjectId: Long? = null): TimeOffRule? {
-        return getActiveRules(prefs).firstOrNull { rule ->
+    fun getActiveRuleForDate(prefs: SharedPreferences, date: LocalDate, subjectId: Long? = null): TimeOffRule? =
+        getActiveRuleForDate(getActiveRules(prefs), date, subjectId)
+
+    fun getActiveRuleForDate(rules: List<TimeOffRule>, date: LocalDate, subjectId: Long? = null): TimeOffRule? {
+        return rules.firstOrNull { rule ->
             !date.isBefore(rule.startDate) && !date.isAfter(rule.endDate) &&
                 (subjectId == null || rule.subjectIds == null || subjectId in rule.subjectIds)
         }
@@ -156,6 +159,16 @@ object TimeOffStore {
     }
 
     suspend fun syncActiveTimeOff(
+        prefs: SharedPreferences,
+        repository: AttendanceRepository,
+        today: LocalDate = LocalDate.now()
+    ) {
+        val rules = getActiveRules(prefs)
+        if (rules.isEmpty()) return
+        syncActiveTimeOff(rules, repository, today)
+    }
+
+    suspend fun syncActiveTimeOff(
         rules: List<TimeOffRule>,
         repository: AttendanceRepository,
         today: LocalDate = LocalDate.now()
@@ -176,19 +189,28 @@ object TimeOffStore {
             }
         }
 
-        // 2. Apply active rules for eligible dates up to today
+        // 2. Apply active rules for eligible dates up to today.
+        // Rules that have already ended (rule.endDate < today) should never retroactively apply
+        // to newly scheduled subjects in syncActiveTimeOff. syncActiveTimeOff is meant to roll over
+        // current/active time-off day-by-day up to today, not retroactively backfill attendance
+        // on past weeks for subjects that were added after the time-off ended or weren't scheduled then.
+        val allSchedule = repository.getAllScheduleEntriesOnce()
         for (rule in rules) {
-            if (rule.startDate.isAfter(today)) continue
-            val maxDate = if (rule.endDate.isAfter(today)) today else rule.endDate
+            if (rule.endDate.isBefore(today) || rule.startDate.isAfter(today)) continue
+            val maxDate = today
             var d = rule.startDate
             while (!d.isAfter(maxDate)) {
                 val existing = repository.getAttendanceInRangeOnce(d, d)
                 val targetIds = rule.subjectIds
-                val scheduledForDay = repository.getAllScheduleEntriesOnce()
-                    .filter { it.occursOn(d) }
+                val scheduledForDay = allSchedule
+                    .filter { it.occursOn(d) && (d == today || it.startDate != null) }
                     .map { it.subjectId }
                     .toSet()
-                val targetSubjectSet = targetIds ?: if (scheduledForDay.isNotEmpty()) scheduledForDay else repository.getAllSubjectsOnce().filter { !it.isFolder }.map { it.id }.toSet()
+                val targetSubjectSet = if (allSchedule.isNotEmpty()) {
+                    if (targetIds != null) targetIds.filter { it in scheduledForDay }.toSet() else scheduledForDay
+                } else {
+                    targetIds ?: repository.getAllSubjectsOnce().filter { !it.isFolder }.map { it.id }.toSet()
+                }
                 val markedSubjectIds = existing.map { it.subjectId }.toSet()
                 val unrecordedIds = targetSubjectSet.filter { it !in markedSubjectIds }.toSet()
                 if (unrecordedIds.isNotEmpty()) {

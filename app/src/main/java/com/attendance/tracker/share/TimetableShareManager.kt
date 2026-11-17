@@ -136,12 +136,24 @@ object TimetableShareManager {
      * - "https://.../?tt=..."
      * - raw Base64 token
      */
-    fun decode(input: String): SharedTimetable? {
+    fun decode(token: String): SharedTimetable? {
         return try {
-            val token = extractToken(input.trim())
-            val compressedBytes = Base64.getUrlDecoder().decode(token)
-            val decompressedBytes = GZIPInputStream(ByteArrayInputStream(compressedBytes)).use {
-                it.readBytes()
+            val rawToken = extractToken(token.trim())
+            val compressedBytes = Base64.getUrlDecoder().decode(rawToken)
+            val maxBytes = 512 * 1024
+            val decompressedBytes = GZIPInputStream(ByteArrayInputStream(compressedBytes)).use { stream ->
+                val buffer = ByteArray(8192)
+                val out = ByteArrayOutputStream()
+                var totalBytes = 0
+                var bytesRead: Int
+                while (stream.read(buffer).also { bytesRead = it } != -1) {
+                    totalBytes += bytesRead
+                    if (totalBytes > maxBytes) {
+                        throw IllegalArgumentException("Compressed timetable exceeds maximum size of 512 KB")
+                    }
+                    out.write(buffer, 0, bytesRead)
+                }
+                out.toByteArray()
             }
             val jsonStr = String(decompressedBytes, Charsets.UTF_8)
             val root = JSONObject(jsonStr)
