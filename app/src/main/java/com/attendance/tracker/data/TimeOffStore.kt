@@ -209,7 +209,14 @@ object TimeOffStore {
                 val targetSubjectSet = if (allSchedule.isNotEmpty()) {
                     if (targetIds != null) targetIds.filter { it in scheduledForDay }.toSet() else scheduledForDay
                 } else {
-                    targetIds ?: repository.getAllSubjectsOnce().filter { !it.isFolder }.map { it.id }.toSet()
+                    val allSubs = repository.getAllSubjectsOnce().filter { !it.isFolder }
+                    val eligibleSubs = if (d.isBefore(today)) {
+                        allSubs.filter { it.totalLectures > 0 || repository.getAttendanceRecord(it.id, d) != null }
+                    } else {
+                        allSubs
+                    }
+                    val candidateIds = eligibleSubs.map { it.id }.toSet()
+                    if (targetIds != null) targetIds.filter { it in candidateIds }.toSet() else candidateIds
                 }
                 val markedSubjectIds = existing.map { it.subjectId }.toSet()
                 val unrecordedIds = targetSubjectSet.filter { it !in markedSubjectIds }.toSet()

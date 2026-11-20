@@ -1,6 +1,7 @@
 package com.attendance.tracker.ui.components
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -66,7 +67,7 @@ fun TimeOffSheet(
     var endDate by remember { mutableStateOf(initialRange?.second ?: thisSunday) }
 
     var applyToAllSubjects by remember { mutableStateOf(true) }
-    var selectedSubjectIds by remember { mutableStateOf(subjects.map { it.id }.toSet()) }
+    var selectedSubjectIds by remember { mutableStateOf<Set<Long>>(emptySet()) }
 
     var showStartDatePicker by remember { mutableStateOf(false) }
     var showEndDatePicker by remember { mutableStateOf(false) }
@@ -357,7 +358,6 @@ fun TimeOffSheet(
                         onClick = {
                             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                             applyToAllSubjects = true
-                            selectedSubjectIds = subjects.map { it.id }.toSet()
                         },
                         label = { Text("All Subjects") }
                     )
@@ -368,33 +368,76 @@ fun TimeOffSheet(
                             applyToAllSubjects = false
                         },
                         label = {
-                            Text(if (!applyToAllSubjects && selectedSubjectIds.size < subjects.size) "${selectedSubjectIds.size} Selected" else "Choose...")
+                            Text(if (!applyToAllSubjects && selectedSubjectIds.isNotEmpty()) "${selectedSubjectIds.size} Selected" else "Choose...")
                         }
                     )
                 }
             }
 
             AnimatedVisibility(visible = !applyToAllSubjects) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    subjects.forEach { sub ->
-                        val isChosen = sub.id in selectedSubjectIds
-                        FilterChip(
-                            selected = isChosen,
-                            onClick = {
-                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                selectedSubjectIds = if (isChosen) {
-                                    if (selectedSubjectIds.size > 1) selectedSubjectIds - sub.id else selectedSubjectIds
-                                } else {
-                                    selectedSubjectIds + sub.id
-                                }
-                            },
-                            label = { Text(sub.getDisplayName(allSubjects)) }
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = if (selectedSubjectIds.isEmpty()) "Tap subjects to include:" else "${selectedSubjectIds.size} of ${subjects.size} selected",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            if (selectedSubjectIds.size < subjects.size) {
+                                Text(
+                                    text = "Select all",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier
+                                        .clickable {
+                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                            selectedSubjectIds = subjects.map { it.id }.toSet()
+                                        }
+                                        .padding(vertical = 2.dp, horizontal = 4.dp)
+                                )
+                            }
+                            if (selectedSubjectIds.isNotEmpty()) {
+                                Text(
+                                    text = "Clear",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.error,
+                                    modifier = Modifier
+                                        .clickable {
+                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                            selectedSubjectIds = emptySet()
+                                        }
+                                        .padding(vertical = 2.dp, horizontal = 4.dp)
+                                )
+                            }
+                        }
+                    }
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        subjects.forEach { sub ->
+                            val isChosen = sub.id in selectedSubjectIds
+                            FilterChip(
+                                selected = isChosen,
+                                onClick = {
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    selectedSubjectIds = if (isChosen) {
+                                        selectedSubjectIds - sub.id
+                                    } else {
+                                        selectedSubjectIds + sub.id
+                                    }
+                                },
+                                label = { Text(sub.getDisplayName(allSubjects)) }
+                            )
+                        }
                     }
                 }
             }
@@ -420,19 +463,21 @@ fun TimeOffSheet(
             )
 
             // Apply Button
+            val isSelectionValid = applyToAllSubjects || selectedSubjectIds.isNotEmpty()
             Button(
                 onClick = {
                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                     onApply(startDate, endDate, selectedType.status, effectiveSubjectIds)
                     onDismiss()
                 },
+                enabled = isSelectionValid,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(50.dp),
                 shape = RoundedCornerShape(14.dp)
             ) {
                 Text(
-                    text = when (selectedType) {
+                    text = if (!isSelectionValid) "Select at least 1 subject" else when (selectedType) {
                         TimeOffType.HOLIDAY -> "Apply Holiday"
                         TimeOffType.LEAVE -> "Mark Absent"
                         TimeOffType.CLEAR -> "Reset Attendance"

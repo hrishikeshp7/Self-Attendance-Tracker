@@ -67,9 +67,12 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.withContext
+import androidx.compose.ui.graphics.Color
+import com.attendance.tracker.ui.theme.subjectAvatarColor
 import java.time.Duration
 import java.time.LocalDate
 import java.time.LocalDateTime
+import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 
 private val SubjectIdKey = ActionParameters.Key<Long>("subjectId")
@@ -83,9 +86,14 @@ private data class TodayRow(
     val label: String,
     val slotIndex: Int,
     val totalSlots: Int,
-    val slotStatus: AttendanceStatus?
+    val slotStatus: AttendanceStatus?,
+    val subjectName: String = label,
+    val badge: String? = null,
+    val color: Color = Color(0xFF4361EE),
+    val startTime: LocalTime? = null,
+    val timeLabel: String? = null
 ) {
-    fun stableId(): Long = (subject.id to listOf(slotIndex, slotStatus, label, subject.presentLectures, subject.totalLectures, subject.requiredAttendance)).hashCode().toLong()
+    fun stableId(): Long = (subject.id to listOf(slotIndex, slotStatus, label, subject.presentLectures, subject.totalLectures, subject.requiredAttendance, timeLabel, color.value.toLong())).hashCode().toLong()
 }
 
 private data class TodayData(
@@ -151,30 +159,82 @@ class TodayWidget : GlanceAppWidget() {
         val marks = records.associateBy { it.subjectId }
         val shown = if (schedule.isEmpty()) subjects else subjects.filter { it.id in scheduledIds || it.id in marks }
 
-        val rows = shown.flatMap { subject ->
+        val allActiveSubjectIds = shown.map { it.id }
+        val timeFormatter = DateTimeFormatter.ofPattern("h:mm a")
+
+        val rawRows = shown.flatMap { subject ->
             val dayEntries = schedule.filter { it.occursOn(today) && it.subjectId == subject.id }.sortedBy { it.startTime }
             val record = marks[subject.id]
             val recordedCount = (record?.presentCount ?: 0) + (record?.absentCount ?: 0)
             val totalSlots = maxOf(dayEntries.size, recordedCount, 1)
+            val subjectColor = subjectAvatarColor(subject.id, allActiveSubjectIds)
+            val subjectName = subject.getDisplayName(byId)
+
             if (totalSlots > 1) {
                 (0 until totalSlots).map { idx ->
-                    val label = when {
-                        idx < dayEntries.size -> "${subject.getDisplayName(byId)} - Lecture ${idx + 1}"
-                        dayEntries.isNotEmpty() -> "${subject.getDisplayName(byId)} - Extra ${idx - dayEntries.size + 1}"
-                        else -> "${subject.getDisplayName(byId)} - Lecture ${idx + 1}"
+                    val badge = when {
+                        idx < dayEntries.size -> "Lec ${idx + 1}"
+                        dayEntries.isNotEmpty() -> "Extra ${idx - dayEntries.size + 1}"
+                        else -> "Lec ${idx + 1}"
                     }
+                    val label = "$subjectName · $badge"
                     val effStatus = SlotAttendanceStore.getEffectiveSlotStatus(
                         context, subject.id, today, idx, totalSlots, record
                     )
-                    TodayRow(subject, record, label, idx, totalSlots, effStatus)
+                    val entry = dayEntries.getOrNull(idx)
+                    val timeLabel = if (entry != null) {
+                        "${entry.startTime.format(timeFormatter)} - ${entry.endTime.format(timeFormatter)}"
+                    } else if (dayEntries.isNotEmpty()) {
+                        "Extra lecture"
+                    } else null
+
+                    TodayRow(
+                        subject = subject,
+                        record = record,
+                        label = label,
+                        slotIndex = idx,
+                        totalSlots = totalSlots,
+                        slotStatus = effStatus,
+                        subjectName = subjectName,
+                        badge = badge,
+                        color = subjectColor,
+                        startTime = entry?.startTime,
+                        timeLabel = timeLabel
+                    )
                 }
             } else {
-                val label = subject.getDisplayName(byId)
+                val label = subjectName
                 val effStatus = SlotAttendanceStore.getEffectiveSlotStatus(
                     context, subject.id, today, 0, 1, record
                 )
-                listOf(TodayRow(subject, record, label, 0, 1, effStatus))
+                val entry = dayEntries.firstOrNull()
+                val timeLabel = if (entry != null) {
+                    "${entry.startTime.format(timeFormatter)} - ${entry.endTime.format(timeFormatter)}"
+                } else null
+
+                listOf(
+                    TodayRow(
+                        subject = subject,
+                        record = record,
+                        label = label,
+                        slotIndex = 0,
+                        totalSlots = 1,
+                        slotStatus = effStatus,
+                        subjectName = subjectName,
+                        badge = null,
+                        color = subjectColor,
+                        startTime = entry?.startTime,
+                        timeLabel = timeLabel
+                    )
+                )
             }
+        }
+
+        // Sort chronologically like Google Calendar schedule view
+        val rows = if (schedule.isNotEmpty()) {
+            rawRows.sortedWith(compareBy({ it.startTime ?: LocalTime.MAX }, { it.subjectName }))
+        } else {
+            rawRows
         }
 
         val activeRule = TimeOffStore.getActiveRuleForDate(context, today)
@@ -194,16 +254,30 @@ private fun TodayContent(data: TodayData) {
             .cornerRadius(24.dp)
             .padding(12.dp)
     ) {
-        Text(
-            text = "Today · " + data.date.format(DateTimeFormatter.ofPattern("EEE d MMM")),
-            style = TextStyle(color = GlanceTheme.colors.onSurface, fontSize = 14.sp, fontWeight = FontWeight.Bold),
-            modifier = GlanceModifier.fillMaxWidth().padding(bottom = 8.dp).clickable(openApp)
-        )
+        Row(
+            modifier = GlanceModifier
+                .fillMaxWidth()
+                .padding(bottom = 8.dp)
+                .clickable(openApp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Schedule · " + data.date.format(DateTimeFormatter.ofPattern("EEE, d MMM")),
+                style = TextStyle(color = GlanceTheme.colors.onSurface, fontSize = 14.sp, fontWeight = FontWeight.Bold),
+                modifier = GlanceModifier.defaultWeight()
+            )
+            if (data.rows.isNotEmpty() && !data.isTimeOffActive) {
+                Text(
+                    text = "${data.rows.size} class${if (data.rows.size != 1) "es" else ""}",
+                    style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                )
+            }
+        }
         if (data.isTimeOffActive) {
             VacationTimeOffView(openApp, data.timeOffRule)
         } else if (data.rows.isEmpty()) {
             Text(
-                text = if (data.hasSchedule) "No classes today" else "Add subjects in the app",
+                text = if (data.hasSchedule) "No classes scheduled today 🎉" else "Add timetable slots or subjects in the app",
                 style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = 13.sp),
                 modifier = GlanceModifier.clickable(openApp)
             )
@@ -275,27 +349,78 @@ private fun VacationTimeOffView(openApp: Action, rule: TimeOffRule?) {
 
 @Composable
 private fun SubjectRow(row: TodayRow) {
+    val openApp = actionStartActivity(Intent(LocalContext.current, MainActivity::class.java))
     Row(
-        modifier = GlanceModifier.fillMaxWidth().padding(vertical = 4.dp),
+        modifier = GlanceModifier.fillMaxWidth().padding(vertical = 5.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Column(modifier = GlanceModifier.defaultWeight()) {
-            Text(
-                text = row.label,
-                maxLines = 1,
-                style = TextStyle(color = GlanceTheme.colors.onSurface, fontSize = 14.sp, fontWeight = FontWeight.Medium)
-            )
-            Text(
-                text = standing(row.subject),
-                maxLines = 1,
-                style = TextStyle(
-                    color = if (row.subject.isAboveRequired) GlanceTheme.colors.onSurfaceVariant else GlanceTheme.colors.error,
-                    fontSize = 11.sp
+        // Vibrant Google Calendar-style vertical color accent bar
+        Box(
+            modifier = GlanceModifier
+                .width(4.dp)
+                .height(36.dp)
+                .cornerRadius(2.dp)
+                .background(ColorProvider(row.color)),
+            content = {}
+        )
+        Spacer(GlanceModifier.width(8.dp))
+
+        Column(
+            modifier = GlanceModifier
+                .defaultWeight()
+                .clickable(openApp)
+        ) {
+            if (row.badge != null) {
+                Row(
+                    modifier = GlanceModifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = row.subjectName,
+                        maxLines = 1,
+                        modifier = GlanceModifier.defaultWeight(),
+                        style = TextStyle(color = GlanceTheme.colors.onSurface, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                    )
+                    Text(
+                        text = " ${row.badge}",
+                        maxLines = 1,
+                        style = TextStyle(color = ColorProvider(row.color), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    )
+                }
+            } else {
+                Text(
+                    text = row.label,
+                    maxLines = 1,
+                    style = TextStyle(color = GlanceTheme.colors.onSurface, fontSize = 14.sp, fontWeight = FontWeight.Bold)
                 )
-            )
+            }
+            Spacer(GlanceModifier.height(2.dp))
+            Row(
+                modifier = GlanceModifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                val subtitle = buildString {
+                    if (row.timeLabel != null) {
+                        append(row.timeLabel)
+                        append(" · ")
+                    }
+                    append(standing(row.subject))
+                }
+                Text(
+                    text = subtitle,
+                    maxLines = 1,
+                    style = TextStyle(
+                        color = if (row.subject.isAboveRequired) GlanceTheme.colors.onSurfaceVariant else GlanceTheme.colors.error,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Normal
+                    )
+                )
+            }
         }
+
+        Spacer(GlanceModifier.width(8.dp))
+
         if (row.slotStatus == AttendanceStatus.NO_CLASS) {
-            val openApp = actionStartActivity(Intent(LocalContext.current, MainActivity::class.java))
             Box(
                 contentAlignment = Alignment.Center,
                 modifier = GlanceModifier

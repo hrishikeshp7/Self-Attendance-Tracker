@@ -373,4 +373,35 @@ class TimeOffStoreTest {
         val ruleOutside = TimeOffStore.getActiveRuleForDate(rules, LocalDate.of(2026, 11, 7), 1L)
         assertNull(ruleOutside)
     }
+
+    @Test
+    fun `unscheduled new subject during active time off does not get marked absent for past days`() = runBlocking {
+        val prefs = FakeSharedPreferences()
+        val subjectDao = FakeSubjectDao()
+        val attendanceDao = FakeAttendanceDao()
+        val scheduleDao = FakeScheduleDao()
+        val repository = AttendanceRepository(subjectDao, attendanceDao, scheduleDao)
+
+        val mon = LocalDate.of(2026, 11, 16)
+        val wed = LocalDate.of(2026, 11, 18)
+        val fri = LocalDate.of(2026, 11, 20)
+
+        // Time off is recorded for Mon..Fri with no timetable schedule
+        TimeOffStore.recordTimeOff(prefs, mon, fri, AttendanceStatus.ABSENT)
+
+        // Subject created on Wednesday (totalLectures = 0, no past records)
+        val subject = Subject(id = 5L, name = "New Subject", totalLectures = 0, presentLectures = 0, absentLectures = 0)
+        subjectDao.insertSubject(subject)
+
+        // Run syncActiveTimeOff on Wednesday
+        TimeOffStore.syncActiveTimeOff(prefs, repository, today = wed)
+
+        // New subject must NOT have records for past Monday
+        val pastRec = repository.getAttendanceRecord(5L, mon)
+        assertNull(pastRec)
+        // New subject DOES get marked for Wednesday (today)
+        val todayRec = repository.getAttendanceRecord(5L, wed)
+        assertNotNull(todayRec)
+        assertEquals(AttendanceStatus.ABSENT, todayRec?.status)
+    }
 }

@@ -45,6 +45,7 @@ fun SubjectCard(
     onCardClick: () -> Unit,
     modifier: Modifier = Modifier,
     titleOverride: String? = null,
+    lectureBadge: String? = null,
     effectiveStatus: AttendanceStatus? = null,
     scheduledLectures: Int = 1,
     onSetDayCounts: ((present: Int, absent: Int) -> Unit)? = null,
@@ -85,6 +86,18 @@ fun SubjectCard(
         else -> AbsentRed
     }
 
+    val (resolvedTitle, resolvedBadge) = remember(titleOverride, lectureBadge, subject, allSubjects) {
+        if (lectureBadge != null) {
+            Pair(titleOverride ?: subject.getDisplayName(allSubjects), lectureBadge)
+        } else if (titleOverride != null && titleOverride.contains(" - Lecture ")) {
+            Pair(titleOverride.substringBefore(" - Lecture "), "Lec " + titleOverride.substringAfter(" - Lecture "))
+        } else if (titleOverride != null && titleOverride.contains(" - Extra ")) {
+            Pair(titleOverride.substringBefore(" - Extra "), "Extra " + titleOverride.substringAfter(" - Extra "))
+        } else {
+            Pair(titleOverride ?: subject.getDisplayName(allSubjects), null)
+        }
+    }
+
     Card(
         modifier = modifier
             .fillMaxWidth()
@@ -108,14 +121,37 @@ fun SubjectCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = titleOverride ?: subject.getDisplayName(allSubjects),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = resolvedTitle,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false)
+                        )
+                        if (resolvedBadge != null) {
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = MaterialTheme.colorScheme.secondaryContainer,
+                                tonalElevation = 1.dp
+                            ) {
+                                Text(
+                                    text = resolvedBadge,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                    maxLines = 1
+                                )
+                            }
+                        }
+                    }
                     Spacer(modifier = Modifier.height(4.dp))
                     // Compact attendance insight
                     Text(

@@ -159,16 +159,17 @@ fun HomeScreen(
             val totalSlots = maxOf(dayEntries.size, recordedCount, 1)
             if (totalSlots > 1) {
                 (0 until totalSlots).map { idx ->
-                    val title = when {
-                        idx < dayEntries.size -> "${subject.getDisplayName(allSubjects)} - Lecture ${idx + 1}"
-                        dayEntries.isNotEmpty() -> "${subject.getDisplayName(allSubjects)} - Extra ${idx - dayEntries.size + 1}"
-                        else -> "${subject.getDisplayName(allSubjects)} - Lecture ${idx + 1}"
+                    val badge = when {
+                        idx < dayEntries.size -> "Lec ${idx + 1}"
+                        dayEntries.isNotEmpty() -> "Extra ${idx - dayEntries.size + 1}"
+                        else -> "Lec ${idx + 1}"
                     }
                     TodaySlotItem(
                         subject = subject,
                         slotIndex = idx,
                         totalSlots = totalSlots,
-                        title = title
+                        title = subject.getDisplayName(allSubjects),
+                        lectureBadge = badge
                     )
                 }
             } else {
@@ -177,7 +178,8 @@ fun HomeScreen(
                         subject = subject,
                         slotIndex = 0,
                         totalSlots = 1,
-                        title = null
+                        title = null,
+                        lectureBadge = null
                     )
                 )
             }
@@ -352,6 +354,7 @@ fun HomeScreen(
                             allSubjects = allSubjects,
                             currentRecord = currentRecord,
                             titleOverride = slotItem.title,
+                            lectureBadge = slotItem.lectureBadge,
                             effectiveStatus = effStatus,
                             scheduledLectures = slotItem.totalSlots,
                             onMarkPresent = {
@@ -439,14 +442,13 @@ fun HomeScreen(
                             onMonthChanged(newMonth)
                         }
                     )
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 20.dp, vertical = 4.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        if (selectedDate != LocalDate.now()) {
+                    if (selectedDate != LocalDate.now()) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 20.dp, vertical = 6.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
                             FilledTonalButton(
                                 onClick = {
                                     onSelectDate(LocalDate.now())
@@ -456,14 +458,6 @@ fun HomeScreen(
                             ) {
                                 Text("Jump to Today")
                             }
-                        } else {
-                            Spacer(modifier = Modifier.width(1.dp))
-                        }
-                        FilledTonalButton(
-                            onClick = { showDatePicker = false },
-                            shape = RoundedCornerShape(12.dp)
-                        ) {
-                            Text("Close")
                         }
                     }
                 }
@@ -746,7 +740,7 @@ private fun BelowTargetBanner(
                                             modifier = Modifier
                                                 .size(10.dp)
                                                 .clip(CircleShape)
-                                                .background(subjectAvatarColor(subject.id))
+                                                .background(subjectAvatarColor(subject.id, allSubjects.keys))
                                         )
                                         Text(
                                             text = subject.getDisplayName(allSubjects),
@@ -814,6 +808,7 @@ private data class TodaySlotItem(
     val subject: Subject,
     val slotIndex: Int,
     val totalSlots: Int,
-    val title: String?
+    val title: String?,
+    val lectureBadge: String? = null
 )
 

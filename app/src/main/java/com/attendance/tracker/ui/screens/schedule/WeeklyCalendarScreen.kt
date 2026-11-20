@@ -772,7 +772,9 @@ private fun LectureBlock(
     val blockHeight = (HOUR_HEIGHT * ((endMinutes - startMinutes) / 60f)).coerceAtLeast(28.dp)
     val laneWidth: Dp = DAY_COLUMN_WIDTH / totalLanes
     val xOffset = DAY_COLUMN_WIDTH * dayIndex + laneWidth * lane
-    val color = subjectAvatarColor(entry.subjectId)
+    val color = remember(entry.subjectId, allSubjects) {
+        subjectAvatarColor(entry.subjectId, allSubjects.keys)
+    }
     val bgAlpha = if (isCancelled) 0.35f else 0.85f
 
     Box(
@@ -1166,7 +1168,7 @@ private fun LectureEditorSheet(
                     onClick = {
                         submitted = true
                         val (from, until) = when (recurrence) {
-                            LectureRecurrence.ONGOING -> Pair(existing?.startDate ?: state.weekStart, null)
+                            LectureRecurrence.ONGOING -> Pair(existing?.startDate ?: maxOf(state.weekStart, LocalDate.now()), null)
                             LectureRecurrence.ONE_OFF -> {
                                 val slotDate = existing?.startDate ?: state.weekStart.plusDays(selectedDays.first().ordinal.toLong())
                                 Pair(slotDate, slotDate)
